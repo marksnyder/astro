@@ -139,7 +139,7 @@ def _resolve_category_id(name: str | None) -> int | None:
     return None
 
 
-def _execute_tool_call(tool_call, user_timezone: str | None = None) -> str:
+def _execute_tool_call(tool_call, user_timezone: str | None = None, universe_id: int = 1) -> str:
     """Execute a tool call and return a result string."""
     name = tool_call["name"]
     args = tool_call["args"]
@@ -151,13 +151,14 @@ def _execute_tool_call(tool_call, user_timezone: str | None = None) -> str:
         category_name = args.get("category_name")
         category_id = _resolve_category_id(category_name)
 
-        item = create_action_item(title, hot=hot, due_date=due_date, category_id=category_id)
+        item = create_action_item(title, hot=hot, due_date=due_date, category_id=category_id, universe_id=universe_id)
 
         cat_label = category_name if category_id else None
         upsert_action_item(
             item.id, item.title,
             completed=item.completed, hot=item.hot,
             due_date=item.due_date, category_name=cat_label,
+            universe_id=universe_id,
         )
 
         result = {"ok": True, "id": item.id, "title": item.title}
@@ -192,6 +193,7 @@ def _execute_tool_call(tool_call, user_timezone: str | None = None) -> str:
 def _invoke_with_tools(
     llm, messages, model: str,
     user_timezone: str | None = None,
+    universe_id: int = 1,
 ) -> QueryResult:
     """Invoke LLM with tool support, handling tool calls if any."""
     llm_with_tools = llm.bind_tools(BASE_TOOLS)
@@ -203,7 +205,7 @@ def _invoke_with_tools(
 
     messages.append(response)
     for tc in response.tool_calls:
-        result = _execute_tool_call(tc, user_timezone=user_timezone)
+        result = _execute_tool_call(tc, user_timezone=user_timezone, universe_id=universe_id)
         messages.append(ToolMessage(content=result, tool_call_id=tc["id"]))
 
     final = llm_with_tools.invoke(messages)
@@ -228,9 +230,10 @@ def ask(
     model: str = "gpt-5-mini",
     history: list[dict] | None = None,
     user_timezone: str | None = None,
+    universe_id: int | None = None,
 ) -> QueryResult:
     """Ask a question with RAG context and optional conversation history."""
-    retriever = get_retriever()
+    retriever = get_retriever(universe_id=universe_id)
     docs = retriever.invoke(question)
     context = _format_docs(docs)
 
@@ -242,7 +245,7 @@ def ask(
         messages.extend(_build_history(history))
     messages.append(HumanMessage(content=question))
 
-    return _invoke_with_tools(llm, messages, model, user_timezone=user_timezone)
+    return _invoke_with_tools(llm, messages, model, user_timezone=user_timezone, universe_id=universe_id or 1)
 
 
 def ask_direct(

@@ -505,7 +505,7 @@ function NoteActionItems({ noteId, categories }) {
 
 // ── Notes panel ───────────────────────────────────────
 
-function NotesPanel({ categories, selectedCategoryId, onPinChange, editNoteRequest, onEditNoteRequestHandled }) {
+function NotesPanel({ categories, selectedCategoryId, onPinChange, editNoteRequest, onEditNoteRequestHandled, universeId }) {
   const [notes, setNotes] = useState([])
   const [search, setSearch] = useState('')
   const [onlyLinked, setOnlyLinked] = useState(false)
@@ -524,6 +524,7 @@ function NotesPanel({ categories, selectedCategoryId, onPinChange, editNoteReque
     const params = new URLSearchParams()
     if (search) params.set('q', search)
     if (selectedCategoryId !== null) params.set('category_id', selectedCategoryId)
+    if (universeId) params.set('universe_id', universeId)
     fetch(`/api/notes?${params}`)
       .then(res => res.json())
       .then(data => setNotes(data))
@@ -537,11 +538,11 @@ function NotesPanel({ categories, selectedCategoryId, onPinChange, editNoteReque
       .catch(() => {})
   }
 
-  useEffect(() => { fetchNotes(); fetchLinkedIds() }, [])
+  useEffect(() => { fetchNotes(); fetchLinkedIds() }, [universeId])
   useEffect(() => {
     const timer = setTimeout(fetchNotes, 300)
     return () => clearTimeout(timer)
-  }, [search, selectedCategoryId])
+  }, [search, selectedCategoryId, universeId])
 
   // Open a note for editing when requested from outside (e.g. pinned chip)
   useEffect(() => {
@@ -577,7 +578,7 @@ function NotesPanel({ categories, selectedCategoryId, onPinChange, editNoteReque
     try {
       const payload = { title, body, category_id: categoryId }
       if (editing === 'new') {
-        const res = await fetch('/api/notes', {
+        const res = await fetch(`/api/notes?universe_id=${universeId || 1}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),

@@ -53,7 +53,7 @@ function MobileCategorySelect({ categories, value, onChange }) {
 
 // ── Notes view ────────────────────────────────────────
 
-function MobileNotes({ categories }) {
+function MobileNotes({ categories, universeId }) {
   const [notes, setNotes] = useState([])
   const [search, setSearch] = useState('')
   const [filterCatId, setFilterCatId] = useState(null)
@@ -178,21 +178,21 @@ function MobileNotes({ categories }) {
     const params = new URLSearchParams()
     if (search) params.set('q', search)
     if (filterCatId !== null) params.set('category_id', filterCatId)
+    if (universeId) params.set('universe_id', universeId)
     fetch(`/api/notes?${params}`)
       .then(r => r.json())
       .then(data => {
-        // pinned notes always on top
         data.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
         setNotes(data)
       })
       .catch(() => {})
-  }, [search, filterCatId])
+  }, [search, filterCatId, universeId])
 
-  useEffect(() => { fetchNotes() }, [])
+  useEffect(() => { fetchNotes() }, [universeId])
   useEffect(() => {
     const t = setTimeout(fetchNotes, 300)
     return () => clearTimeout(t)
-  }, [search, filterCatId])
+  }, [search, filterCatId, universeId])
 
   const startNew = () => {
     setEditing('new')
@@ -221,7 +221,7 @@ function MobileNotes({ categories }) {
     try {
       const payload = { title, body, category_id: categoryId }
       if (editing === 'new') {
-        await fetch('/api/notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        await fetch(`/api/notes?universe_id=${universeId || 1}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       } else {
         await fetch(`/api/notes/${editing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       }
@@ -365,7 +365,7 @@ function MobileNotes({ categories }) {
 
 // ── Action items view ─────────────────────────────────
 
-function MobileActions({ categories }) {
+function MobileActions({ categories, universeId }) {
   const [items, setItems] = useState([])
   const [search, setSearch] = useState('')
   const [showCompleted, setShowCompleted] = useState(false)
@@ -383,17 +383,18 @@ function MobileActions({ categories }) {
     const params = new URLSearchParams()
     if (search) params.set('q', search)
     if (showCompleted) params.set('show_completed', 'true')
+    if (universeId) params.set('universe_id', universeId)
     fetch(`/api/action-items?${params}`)
       .then(r => r.json())
       .then(setItems)
       .catch(() => {})
-  }, [search, showCompleted])
+  }, [search, showCompleted, universeId])
 
-  useEffect(() => { fetchItems() }, [])
+  useEffect(() => { fetchItems() }, [universeId])
   useEffect(() => {
     const t = setTimeout(fetchItems, 300)
     return () => clearTimeout(t)
-  }, [search, showCompleted])
+  }, [search, showCompleted, universeId])
 
   const startNew = () => {
     setEditing('new')
@@ -420,7 +421,7 @@ function MobileActions({ categories }) {
     setSaving(true)
     try {
       if (editing === 'new') {
-        await fetch('/api/action-items', {
+        await fetch(`/api/action-items?universe_id=${universeId || 1}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title: title.trim(), hot, due_date: dueDate || null, category_id: categoryId }),
@@ -578,6 +579,8 @@ function MobileApp() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [view, setView] = useState('chat')
   const [categories, setCategories] = useState([])
+  const [universes, setUniverses] = useState([])
+  const [currentUniverseId, setCurrentUniverseId] = useState(null)
   const [chatListening, setChatListening] = useState(false)
   const [voiceChat, setVoiceChat] = useState(false)
   const chatRecognitionRef = useRef(null)
@@ -594,6 +597,14 @@ function MobileApp() {
     fetch('/api/settings/chat_mode').then(r => r.json()).then(d => { if (d.value) setChatMode(d.value) }).catch(() => {})
     fetch('/api/settings/irc_channel').then(r => r.json()).then(d => { if (d.value) setIrcNick(d.value) }).catch(() => {})
     fetchIrcChannels()
+    fetch('/api/universes').then(r => r.json()).then(data => {
+      setUniverses(data)
+      fetch('/api/settings/selected_universe').then(r => r.json()).then(d => {
+        const saved = d.value ? Number(d.value) : null
+        if (saved && data.some(u => u.id === saved)) setCurrentUniverseId(saved)
+        else if (data.length > 0) setCurrentUniverseId(data[0].id)
+      }).catch(() => { if (data.length > 0) setCurrentUniverseId(data[0].id) })
+    }).catch(() => {})
   }, [])
 
   const [ircUsers, setIrcUsers] = useState([])
@@ -702,8 +713,10 @@ function MobileApp() {
   }, [])
 
   useEffect(() => {
-    fetch('/api/categories').then(r => r.json()).then(setCategories).catch(() => {})
-  }, [])
+    if (currentUniverseId === null) return
+    const params = `?universe_id=${currentUniverseId}`
+    fetch(`/api/categories${params}`).then(r => r.json()).then(setCategories).catch(() => {})
+  }, [currentUniverseId])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -817,7 +830,7 @@ function MobileApp() {
     setLoading(true)
     const history = messages.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({ role: m.role, content: m.content }))
     try {
-      const payload = { question, model, use_context: useContext, history, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, mode: chatMode }
+      const payload = { question, model, use_context: useContext, history, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, mode: chatMode, universe_id: currentUniverseId }
       const res = await fetch('/api/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Request failed') }
       const data = await res.json()
@@ -905,6 +918,16 @@ function MobileApp() {
             </div>
           </div>
         )}
+        <div className="m-menu-section">
+          <div className="m-menu-section-title">Universe</div>
+          {universes.map(u => (
+            <button key={u.id} className={`m-menu-item ${u.id === currentUniverseId ? 'active' : ''}`} onClick={() => {
+              setCurrentUniverseId(u.id)
+              fetch('/api/settings/selected_universe', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: String(u.id) }) }).catch(() => {})
+              setMenuOpen(false)
+            }}>{u.name}</button>
+          ))}
+        </div>
         {chatMode === 'llm' && (
           <div className="m-menu-section">
             <div className="m-menu-section-title">Model</div>
@@ -1044,8 +1067,8 @@ function MobileApp() {
             </footer>
           </div>
         )}
-        {view === 'notes' && <MobileNotes categories={categories} />}
-        {view === 'actions' && <MobileActions categories={categories} />}
+        {view === 'notes' && <MobileNotes categories={categories} universeId={currentUniverseId} />}
+        {view === 'actions' && <MobileActions categories={categories} universeId={currentUniverseId} />}
       </div>
 
       {/* Bottom tab bar */}

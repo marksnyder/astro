@@ -134,7 +134,7 @@ function LinkPicker({ actionItemId, links, onLinksChange }) {
 
 /* ── Main panel ──────────────────────────────────────────────────── */
 
-function ActionItemsPanel({ categories, onOpenNote }) {
+function ActionItemsPanel({ categories, onOpenNote, universeId }) {
   const [items, setItems] = useState([])
   const [search, setSearch] = useState('')
   const [showCompleted, setShowCompleted] = useState(false)
@@ -153,17 +153,18 @@ function ActionItemsPanel({ categories, onOpenNote }) {
     const params = new URLSearchParams()
     if (search) params.set('q', search)
     if (showCompleted) params.set('show_completed', 'true')
+    if (universeId) params.set('universe_id', universeId)
     fetch(`/api/action-items?${params}`)
       .then(res => res.json())
       .then(data => setItems(data))
       .catch(() => {})
   }
 
-  useEffect(() => { fetchItems() }, [])
+  useEffect(() => { fetchItems() }, [universeId])
   useEffect(() => {
     const timer = setTimeout(fetchItems, 300)
     return () => clearTimeout(timer)
-  }, [search, showCompleted])
+  }, [search, showCompleted, universeId])
 
   const fetchLinks = (itemId) => {
     fetch(`/api/action-items/${itemId}/links`)
@@ -199,7 +200,7 @@ function ActionItemsPanel({ categories, onOpenNote }) {
     setSaving(true)
     try {
       if (editing === 'new') {
-        const res = await fetch('/api/action-items', {
+        const res = await fetch(`/api/action-items?universe_id=${universeId || 1}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

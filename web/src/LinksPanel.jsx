@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { CategoryPicker } from './CategoryTree'
 
-function LinksPanel({ categories, selectedCategoryId, onPinChange }) {
+function LinksPanel({ categories, selectedCategoryId, onPinChange, universeId }) {
   const [links, setLinks] = useState([])
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState(null) // null | 'new' | link object
@@ -18,17 +18,18 @@ function LinksPanel({ categories, selectedCategoryId, onPinChange }) {
     const params = new URLSearchParams()
     if (search) params.set('q', search)
     if (selectedCategoryId !== null) params.set('category_id', selectedCategoryId)
+    if (universeId) params.set('universe_id', universeId)
     fetch(`/api/links?${params}`)
       .then(res => res.json())
       .then(data => setLinks(data))
       .catch(() => {})
   }
 
-  useEffect(() => { fetchLinks() }, [])
+  useEffect(() => { fetchLinks() }, [universeId])
   useEffect(() => {
     const timer = setTimeout(fetchLinks, 300)
     return () => clearTimeout(timer)
-  }, [search, selectedCategoryId])
+  }, [search, selectedCategoryId, universeId])
 
   const startNew = () => {
     setEditing('new')
@@ -54,7 +55,7 @@ function LinksPanel({ categories, selectedCategoryId, onPinChange }) {
     try {
       const payload = { title, url, category_id: categoryId }
       if (editing === 'new') {
-        await fetch('/api/links', {
+        await fetch(`/api/links?universe_id=${universeId || 1}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),

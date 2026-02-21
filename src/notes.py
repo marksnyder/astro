@@ -24,6 +24,14 @@ def get_openai_api_key() -> str:
 
 
 @dataclass
+class Universe:
+    id: int
+    name: str
+    created_at: str
+    updated_at: str
+
+
+@dataclass
 class Note:
     id: int | None
     title: str
@@ -32,6 +40,7 @@ class Note:
     pinned: bool
     created_at: str
     updated_at: str
+    universe_id: int = 1
 
 
 @dataclass
@@ -39,6 +48,7 @@ class Category:
     id: int
     name: str
     parent_id: int | None
+    universe_id: int = 1
 
 
 @dataclass
@@ -51,6 +61,7 @@ class ActionItem:
     category_id: int | None
     created_at: str
     updated_at: str
+    universe_id: int = 1
 
 
 @dataclass
@@ -62,6 +73,7 @@ class Link:
     pinned: bool
     created_at: str
     updated_at: str
+    universe_id: int = 1
 
 
 @dataclass
@@ -103,23 +115,116 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# ── Universes CRUD ────────────────────────────────────────────────────────
+
+
+def _row_to_universe(row: sqlite3.Row) -> Universe:
+    return Universe(id=row["id"], name=row["name"], created_at=row["created_at"], updated_at=row["updated_at"])
+
+
+def list_universes() -> list[Universe]:
+    conn = _get_conn()
+    rows = conn.execute("SELECT * FROM universes ORDER BY id").fetchall()
+    conn.close()
+    return [_row_to_universe(r) for r in rows]
+
+
+def get_universe(uid: int) -> Universe | None:
+    conn = _get_conn()
+    row = conn.execute("SELECT * FROM universes WHERE id = ?", (uid,)).fetchone()
+    conn.close()
+    return _row_to_universe(row) if row else None
+
+
+def create_universe(name: str) -> Universe:
+    now = _now()
+    conn = _get_conn()
+    cur = conn.execute(
+        "INSERT INTO universes (name, created_at, updated_at) VALUES (?, ?, ?)",
+        (name, now, now),
+    )
+    conn.commit()
+    uid = cur.lastrowid
+    conn.close()
+    return Universe(id=uid, name=name, created_at=now, updated_at=now)
+
+
+def rename_universe(uid: int, name: str) -> Universe | None:
+    now = _now()
+    conn = _get_conn()
+    cur = conn.execute("UPDATE universes SET name = ?, updated_at = ? WHERE id = ?", (name, now, uid))
+    conn.commit()
+    if cur.rowcount == 0:
+        conn.close()
+        return None
+    row = conn.execute("SELECT * FROM universes WHERE id = ?", (uid,)).fetchone()
+    conn.close()
+    return _row_to_universe(row)
+
+
+def delete_universe(uid: int) -> bool:
+    """Delete a universe and all its content. Returns False if it's the last universe."""
+    conn = _get_conn()
+    count = conn.execute("SELECT COUNT(*) FROM universes").fetchone()[0]
+    if count <= 1:
+        conn.close()
+        return False
+    conn.execute("DELETE FROM notes WHERE universe_id = ?", (uid,))
+    conn.execute("DELETE FROM links WHERE universe_id = ?", (uid,))
+    conn.execute("DELETE FROM action_items WHERE universe_id = ?", (uid,))
+    conn.execute("DELETE FROM document_meta WHERE universe_id = ?", (uid,))
+    conn.execute("DELETE FROM categories WHERE universe_id = ?", (uid,))
+    conn.execute("DELETE FROM universes WHERE id = ?", (uid,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+def get_universe_note_ids(uid: int) -> list[int]:
+    conn = _get_conn()
+    rows = conn.execute("SELECT id FROM notes WHERE universe_id = ?", (uid,)).fetchall()
+    conn.close()
+    return [r["id"] for r in rows]
+
+
+def get_universe_action_item_ids(uid: int) -> list[int]:
+    conn = _get_conn()
+    rows = conn.execute("SELECT id FROM action_items WHERE universe_id = ?", (uid,)).fetchall()
+    conn.close()
+    return [r["id"] for r in rows]
+
+
+def get_universe_document_paths(uid: int) -> list[str]:
+    conn = _get_conn()
+    rows = conn.execute("SELECT path FROM document_meta WHERE universe_id = ?", (uid,)).fetchall()
+    conn.close()
+    return [r["path"] for r in rows]
+
+
+def universe_to_dict(u: Universe) -> dict:
+    return asdict(u)
+
+
 # ── Categories CRUD ───────────────────────────────────────────────────────
 
 
-def list_categories() -> list[Category]:
+def list_categories(universe_id: int | None = None) -> list[Category]:
     conn = _get_conn()
-    rows = conn.execute("SELECT id, name, parent_id FROM categories ORDER BY name").fetchall()
+    if universe_id is not None:
+        rows = conn.execute("SELECT id, name, parent_id, universe_id FROM categories WHERE universe_id = ? ORDER BY name", (universe_id,)).fetchall()
+    else:
+        rows = conn.execute("SELECT id, name, parent_id, universe_id FROM categories ORDER BY name").fetchall()
     conn.close()
-    return [Category(id=r["id"], name=r["name"], parent_id=r["parent_id"]) for r in rows]
+    return [Category(id=r["id"], name=r["name"], parent_id=r["parent_id"], universe_id=r["universe_id"]) for r in rows]
 
 
-def create_category(name: str, parent_id: int | None = None) -> Category:
+def create_category(name: str, parent_id: int | None = None, universe_id: int = 1) -> Category:
     conn = _get_conn()
-    cur = conn.execute("INSERT INTO categories (name, parent_id) VALUES (?, ?)", (name, parent_id))
+    cur = conn.execute("INSERT INTO categories (name, parent_id, universe_id) VALUES (?, ?, ?)", (name, parent_id, universe_id))
     conn.commit()
     cat_id = cur.lastrowid
     conn.close()
-    return Category(id=cat_id, name=name, parent_id=parent_id)  # type: ignore[arg-type]
+    return Category(id=cat_id, name=name, parent_id=parent_id, universe_id=universe_id)  # type: ignore[arg-type]
 
 
 def rename_category(cat_id: int, name: str) -> Category | None:
@@ -174,13 +279,17 @@ def _row_to_note(row: sqlite3.Row) -> Note:
         pinned=bool(row["pinned"]),
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        universe_id=row["universe_id"],
     )
 
 
-def list_notes(query: str = "", category_id: int | None = None) -> list[Note]:
+def list_notes(query: str = "", category_id: int | None = None, universe_id: int | None = None) -> list[Note]:
     conn = _get_conn()
     conditions: list[str] = []
     params: list = []
+    if universe_id is not None:
+        conditions.append("universe_id = ?")
+        params.append(universe_id)
     if query:
         conditions.append("(title LIKE ? OR body LIKE ?)")
         params += [f"%{query}%", f"%{query}%"]
@@ -202,12 +311,12 @@ def get_note(note_id: int) -> Note | None:
     return _row_to_note(row) if row else None
 
 
-def create_note(title: str, body: str, category_id: int | None = None) -> Note:
+def create_note(title: str, body: str, category_id: int | None = None, universe_id: int = 1) -> Note:
     now = _now()
     conn = _get_conn()
     cur = conn.execute(
-        "INSERT INTO notes (title, body, category_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-        (title, body, category_id, now, now),
+        "INSERT INTO notes (title, body, category_id, universe_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (title, body, category_id, universe_id, now, now),
     )
     conn.commit()
     nid = cur.lastrowid
@@ -251,12 +360,24 @@ def get_document_category_id(path: str) -> int | None:
     return row["category_id"] if row else None
 
 
-def set_document_category(path: str, category_id: int | None) -> None:
+def set_document_universe(path: str, universe_id: int) -> None:
+    """Tag a document path with a universe (called at upload time)."""
     conn = _get_conn()
     conn.execute(
-        "INSERT INTO document_meta (path, category_id) VALUES (?, ?) "
+        "INSERT INTO document_meta (path, universe_id) VALUES (?, ?) "
+        "ON CONFLICT(path) DO UPDATE SET universe_id = excluded.universe_id",
+        (path, universe_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def set_document_category(path: str, category_id: int | None, universe_id: int = 1) -> None:
+    conn = _get_conn()
+    conn.execute(
+        "INSERT INTO document_meta (path, category_id, universe_id) VALUES (?, ?, ?) "
         "ON CONFLICT(path) DO UPDATE SET category_id = excluded.category_id",
-        (path, category_id),
+        (path, category_id, universe_id),
     )
     conn.commit()
     conn.close()
@@ -277,12 +398,15 @@ def get_all_document_categories() -> dict[str, int | None]:
     return {r["path"]: r["category_id"] for r in rows}
 
 
-def get_all_document_meta() -> dict[str, dict]:
-    """Return {path: {category_id, pinned}} for all documents with metadata."""
+def get_all_document_meta(universe_id: int | None = None) -> dict[str, dict]:
+    """Return {path: {category_id, pinned, universe_id}} for documents, optionally filtered by universe."""
     conn = _get_conn()
-    rows = conn.execute("SELECT path, category_id, pinned FROM document_meta").fetchall()
+    if universe_id is not None:
+        rows = conn.execute("SELECT path, category_id, pinned, universe_id FROM document_meta WHERE universe_id = ?", (universe_id,)).fetchall()
+    else:
+        rows = conn.execute("SELECT path, category_id, pinned, universe_id FROM document_meta").fetchall()
     conn.close()
-    return {r["path"]: {"category_id": r["category_id"], "pinned": bool(r["pinned"])} for r in rows}
+    return {r["path"]: {"category_id": r["category_id"], "pinned": bool(r["pinned"]), "universe_id": r["universe_id"]} for r in rows}
 
 
 def set_note_pinned(note_id: int, pinned: bool) -> bool:
@@ -293,28 +417,34 @@ def set_note_pinned(note_id: int, pinned: bool) -> bool:
     return cur.rowcount > 0
 
 
-def list_pinned_notes() -> list[Note]:
+def list_pinned_notes(universe_id: int | None = None) -> list[Note]:
     conn = _get_conn()
-    rows = conn.execute("SELECT * FROM notes WHERE pinned = 1 ORDER BY updated_at DESC").fetchall()
+    if universe_id is not None:
+        rows = conn.execute("SELECT * FROM notes WHERE pinned = 1 AND universe_id = ? ORDER BY updated_at DESC", (universe_id,)).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM notes WHERE pinned = 1 ORDER BY updated_at DESC").fetchall()
     conn.close()
     return [_row_to_note(r) for r in rows]
 
 
-def set_document_pinned(path: str, pinned: bool) -> None:
+def set_document_pinned(path: str, pinned: bool, universe_id: int = 1) -> None:
     conn = _get_conn()
     conn.execute(
-        "INSERT INTO document_meta (path, pinned) VALUES (?, ?) "
+        "INSERT INTO document_meta (path, pinned, universe_id) VALUES (?, ?, ?) "
         "ON CONFLICT(path) DO UPDATE SET pinned = excluded.pinned",
-        (path, int(pinned)),
+        (path, int(pinned), universe_id),
     )
     conn.commit()
     conn.close()
 
 
-def list_pinned_documents() -> list[tuple[str, bool]]:
-    """Return [(path, pinned)] for all pinned documents."""
+def list_pinned_documents(universe_id: int | None = None) -> list[str]:
+    """Return [path] for all pinned documents, optionally filtered by universe."""
     conn = _get_conn()
-    rows = conn.execute("SELECT path FROM document_meta WHERE pinned = 1").fetchall()
+    if universe_id is not None:
+        rows = conn.execute("SELECT path FROM document_meta WHERE pinned = 1 AND universe_id = ?", (universe_id,)).fetchall()
+    else:
+        rows = conn.execute("SELECT path FROM document_meta WHERE pinned = 1").fetchall()
     conn.close()
     return [r["path"] for r in rows]
 
@@ -348,13 +478,17 @@ def _row_to_bookmark(row: sqlite3.Row) -> Link:
         pinned=bool(row["pinned"]),
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        universe_id=row["universe_id"],
     )
 
 
-def list_links(query: str = "", category_id: int | None = None) -> list[Link]:
+def list_links(query: str = "", category_id: int | None = None, universe_id: int | None = None) -> list[Link]:
     conn = _get_conn()
     conditions: list[str] = []
     params: list = []
+    if universe_id is not None:
+        conditions.append("universe_id = ?")
+        params.append(universe_id)
     if query:
         conditions.append("(title LIKE ? OR url LIKE ?)")
         params += [f"%{query}%", f"%{query}%"]
@@ -376,12 +510,12 @@ def get_link(link_id: int) -> Link | None:
     return _row_to_bookmark(row) if row else None
 
 
-def create_link(title: str, url: str, category_id: int | None = None) -> Link:
+def create_link(title: str, url: str, category_id: int | None = None, universe_id: int = 1) -> Link:
     now = _now()
     conn = _get_conn()
     cur = conn.execute(
-        "INSERT INTO links (title, url, category_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-        (title, url, category_id, now, now),
+        "INSERT INTO links (title, url, category_id, universe_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (title, url, category_id, universe_id, now, now),
     )
     conn.commit()
     lid = cur.lastrowid
@@ -419,9 +553,12 @@ def set_link_pinned(link_id: int, pinned: bool) -> bool:
     return cur.rowcount > 0
 
 
-def list_pinned_links() -> list[Link]:
+def list_pinned_links(universe_id: int | None = None) -> list[Link]:
     conn = _get_conn()
-    rows = conn.execute("SELECT * FROM links WHERE pinned = 1 ORDER BY updated_at DESC").fetchall()
+    if universe_id is not None:
+        rows = conn.execute("SELECT * FROM links WHERE pinned = 1 AND universe_id = ? ORDER BY updated_at DESC", (universe_id,)).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM links WHERE pinned = 1 ORDER BY updated_at DESC").fetchall()
     conn.close()
     return [_row_to_bookmark(r) for r in rows]
 
@@ -517,13 +654,17 @@ def _row_to_action_item(row: sqlite3.Row) -> ActionItem:
         category_id=row["category_id"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        universe_id=row["universe_id"],
     )
 
 
-def list_action_items(query: str = "", show_completed: bool = False) -> list[ActionItem]:
+def list_action_items(query: str = "", show_completed: bool = False, universe_id: int | None = None) -> list[ActionItem]:
     conn = _get_conn()
     conditions: list[str] = []
     params: list = []
+    if universe_id is not None:
+        conditions.append("universe_id = ?")
+        params.append(universe_id)
     if not show_completed:
         conditions.append("completed = 0")
     if query:
@@ -544,12 +685,12 @@ def get_action_item(item_id: int) -> ActionItem | None:
     return _row_to_action_item(row) if row else None
 
 
-def create_action_item(title: str, hot: bool = False, due_date: str | None = None, category_id: int | None = None) -> ActionItem:
+def create_action_item(title: str, hot: bool = False, due_date: str | None = None, category_id: int | None = None, universe_id: int = 1) -> ActionItem:
     now = _now()
     conn = _get_conn()
     cur = conn.execute(
-        "INSERT INTO action_items (title, hot, completed, due_date, category_id, created_at, updated_at) VALUES (?, ?, 0, ?, ?, ?, ?)",
-        (title, int(hot), due_date, category_id, now, now),
+        "INSERT INTO action_items (title, hot, completed, due_date, category_id, universe_id, created_at, updated_at) VALUES (?, ?, 0, ?, ?, ?, ?, ?)",
+        (title, int(hot), due_date, category_id, universe_id, now, now),
     )
     conn.commit()
     item_id = cur.lastrowid

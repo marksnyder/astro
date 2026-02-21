@@ -74,7 +74,7 @@ const EXT_ICONS = {
 EXT_ICONS.xls = EXT_ICONS.xlsx
 EXT_ICONS.doc = EXT_ICONS.docx
 
-function ArchivePanel({ categories, selectedCategoryId, onPinChange }) {
+function ArchivePanel({ categories, selectedCategoryId, onPinChange, universeId }) {
   const [docs, setDocs] = useState([])
   const [search, setSearch] = useState('')
   const [onlyLinked, setOnlyLinked] = useState(false)
@@ -91,6 +91,7 @@ function ArchivePanel({ categories, selectedCategoryId, onPinChange }) {
     const params = new URLSearchParams()
     if (search) params.set('q', search)
     if (selectedCategoryId !== null) params.set('category_id', selectedCategoryId)
+    if (universeId) params.set('universe_id', universeId)
     fetch(`/api/documents?${params}`)
       .then(res => res.json())
       .then(data => setDocs(data))
@@ -104,11 +105,11 @@ function ArchivePanel({ categories, selectedCategoryId, onPinChange }) {
       .catch(() => {})
   }
 
-  useEffect(() => { fetchDocs(); fetchLinkedPaths() }, [])
+  useEffect(() => { fetchDocs(); fetchLinkedPaths() }, [universeId])
   useEffect(() => {
     const timer = setTimeout(fetchDocs, 300)
     return () => clearTimeout(timer)
-  }, [search, selectedCategoryId])
+  }, [search, selectedCategoryId, universeId])
 
   const openDoc = (e, doc) => {
     e.stopPropagation()
@@ -162,7 +163,7 @@ function ArchivePanel({ categories, selectedCategoryId, onPinChange }) {
         setUploadProgress(files.length > 1 ? `Uploading ${i + 1} of ${files.length}: ${file.name}` : `Uploading ${file.name}...`)
         const form = new FormData()
         form.append('file', file)
-        const res = await fetch('/api/documents/upload', { method: 'POST', body: form })
+        const res = await fetch(`/api/documents/upload?universe_id=${universeId || 1}`, { method: 'POST', body: form })
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
           errors.push(err.detail || `Failed to upload ${file.name}`)

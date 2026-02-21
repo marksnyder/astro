@@ -30,6 +30,7 @@ from src.notes import (
     create_category,
     create_link,
     create_note,
+    create_universe,
     delete_action_item,
     delete_action_item_link,
     delete_all_note_images,
@@ -38,6 +39,7 @@ from src.notes import (
     delete_link,
     delete_note,
     delete_note_image,
+    delete_universe,
     get_action_item,
     get_all_document_categories,
     get_all_document_meta,
@@ -46,6 +48,10 @@ from src.notes import (
     get_link,
     get_note,
     get_linked_targets,
+    get_universe,
+    get_universe_action_item_ids,
+    get_universe_document_paths,
+    get_universe_note_ids,
     list_action_item_links,
     list_action_items,
     list_links,
@@ -56,16 +62,20 @@ from src.notes import (
     list_pinned_documents,
     list_pinned_links,
     list_pinned_notes,
+    list_universes,
     link_to_dict,
     note_image_to_dict,
     note_to_dict,
     rename_category,
+    rename_universe,
     set_document_category,
     set_document_pinned,
+    set_document_universe,
     set_link_pinned,
     set_note_pinned,
     get_setting,
     set_setting,
+    universe_to_dict,
     update_action_item,
     update_link,
     update_note,
@@ -110,6 +120,7 @@ class QueryRequest(BaseModel):
     history: list[ChatMessage] = []
     timezone: Optional[str] = None
     mode: str = "llm"
+    universe_id: Optional[int] = None
 
 
 class QueryResponse(BaseModel):
@@ -136,6 +147,7 @@ class NoteResponse(BaseModel):
     pinned: bool
     created_at: str
     updated_at: str
+    universe_id: int = 1
 
 
 class CategoryRequest(BaseModel):
@@ -151,6 +163,7 @@ class CategoryResponse(BaseModel):
     id: int
     name: str
     parent_id: Optional[int]
+    universe_id: int = 1
 
 
 class DocumentInfo(BaseModel):
@@ -226,19 +239,77 @@ class LinkResponse(BaseModel):
     pinned: bool
     created_at: str
     updated_at: str
+    universe_id: int = 1
+
+
+# ── Universes ─────────────────────────────────────────────────────────────
+
+
+class UniverseRequest(BaseModel):
+    name: str
+
+
+class UniverseResponse(BaseModel):
+    id: int
+    name: str
+    created_at: str
+    updated_at: str
+
+
+@app.get("/api/universes", response_model=list[UniverseResponse])
+def api_list_universes():
+    return [universe_to_dict(u) for u in list_universes()]
+
+
+@app.post("/api/universes", response_model=UniverseResponse, status_code=201)
+def api_create_universe(req: UniverseRequest):
+    u = create_universe(req.name.strip())
+    return universe_to_dict(u)
+
+
+@app.put("/api/universes/{uid}", response_model=UniverseResponse)
+def api_rename_universe(uid: int, req: UniverseRequest):
+    u = rename_universe(uid, req.name.strip())
+    if not u:
+        raise HTTPException(status_code=404, detail="Universe not found")
+    return universe_to_dict(u)
+
+
+@app.delete("/api/universes/{uid}")
+def api_delete_universe(uid: int):
+    """Delete a universe and ALL its content. Cannot delete the last universe."""
+    u = get_universe(uid)
+    if not u:
+        raise HTTPException(status_code=404, detail="Universe not found")
+
+    # Clean up vector store entries before deleting DB rows
+    for nid in get_universe_note_ids(uid):
+        delete_note_from_store(nid)
+    for aid in get_universe_action_item_ids(uid):
+        delete_action_item_from_store(aid)
+    for path in get_universe_document_paths(uid):
+        delete_document_chunks(str(DOCUMENTS_DIR / path))
+        # Remove physical file
+        f = DOCUMENTS_DIR / path
+        if f.is_file():
+            f.unlink()
+
+    if not delete_universe(uid):
+        raise HTTPException(status_code=400, detail="Cannot delete the last universe")
+    return {"ok": True}
 
 
 # ── Categories ────────────────────────────────────────────────────────────
 
 
 @app.get("/api/categories", response_model=list[CategoryResponse])
-def api_list_categories():
-    return [category_to_dict(c) for c in list_categories()]
+def api_list_categories(universe_id: Optional[int] = None):
+    return [category_to_dict(c) for c in list_categories(universe_id=universe_id)]
 
 
 @app.post("/api/categories", response_model=CategoryResponse, status_code=201)
-def api_create_category(req: CategoryRequest):
-    cat = create_category(req.name, req.parent_id)
+def api_create_category(req: CategoryRequest, universe_id: int = 1):
+    cat = create_category(req.name, req.parent_id, universe_id=universe_id)
     return category_to_dict(cat)
 
 
@@ -261,8 +332,8 @@ def api_delete_category(cat_id: int):
 
 
 @app.get("/api/notes", response_model=list[NoteResponse])
-def api_list_notes(q: str = "", category_id: Optional[int] = None):
-    return [note_to_dict(n) for n in list_notes(q, category_id)]
+def api_list_notes(q: str = "", category_id: Optional[int] = None, universe_id: Optional[int] = None):
+    return [note_to_dict(n) for n in list_notes(q, category_id, universe_id=universe_id)]
 
 
 @app.get("/api/notes/{note_id}", response_model=NoteResponse)
@@ -274,9 +345,9 @@ def api_get_note(note_id: int):
 
 
 @app.post("/api/notes", response_model=NoteResponse, status_code=201)
-def api_create_note(req: NoteRequest):
-    note = create_note(req.title, req.body, req.category_id)
-    upsert_note(note.id, f"{note.title}\n\n{note.body}", note.title)
+def api_create_note(req: NoteRequest, universe_id: int = 1):
+    note = create_note(req.title, req.body, req.category_id, universe_id=universe_id)
+    upsert_note(note.id, f"{note.title}\n\n{note.body}", note.title, universe_id=universe_id)
     return note_to_dict(note)
 
 
@@ -285,7 +356,7 @@ def api_update_note(note_id: int, req: NoteRequest):
     note = update_note(note_id, req.title, req.body, req.category_id)
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
-    upsert_note(note.id, f"{note.title}\n\n{note.body}", note.title)
+    upsert_note(note.id, f"{note.title}\n\n{note.body}", note.title, universe_id=note.universe_id)
     return note_to_dict(note)
 
 
@@ -318,10 +389,10 @@ def api_toggle_document_pin(path: str, pinned: bool = True):
 
 
 @app.get("/api/pinned")
-def api_list_pinned():
+def api_list_pinned(universe_id: Optional[int] = None):
     """Return all pinned notes, documents, and links in one call."""
-    notes = [note_to_dict(n) for n in list_pinned_notes()]
-    doc_paths = list_pinned_documents()
+    notes = [note_to_dict(n) for n in list_pinned_notes(universe_id=universe_id)]
+    doc_paths = list_pinned_documents(universe_id=universe_id)
     docs = []
     for rel_str in doc_paths:
         f = DOCUMENTS_DIR / rel_str
@@ -332,7 +403,7 @@ def api_list_pinned():
                 "extension": f.suffix.lower().lstrip("."),
                 "size": f.stat().st_size,
             })
-    links = [link_to_dict(l) for l in list_pinned_links()]
+    links = [link_to_dict(l) for l in list_pinned_links(universe_id=universe_id)]
     return {"notes": notes, "documents": docs, "links": links}
 
 
@@ -340,8 +411,8 @@ def api_list_pinned():
 
 
 @app.get("/api/links", response_model=list[LinkResponse])
-def api_list_links(q: str = "", category_id: Optional[int] = None):
-    return [link_to_dict(l) for l in list_links(q, category_id)]
+def api_list_links(q: str = "", category_id: Optional[int] = None, universe_id: Optional[int] = None):
+    return [link_to_dict(l) for l in list_links(q, category_id, universe_id=universe_id)]
 
 
 @app.get("/api/links/{link_id}", response_model=LinkResponse)
@@ -353,8 +424,8 @@ def api_get_link(link_id: int):
 
 
 @app.post("/api/links", response_model=LinkResponse, status_code=201)
-def api_create_link(req: LinkRequest):
-    link = create_link(req.title, req.url, req.category_id)
+def api_create_link(req: LinkRequest, universe_id: int = 1):
+    link = create_link(req.title, req.url, req.category_id, universe_id=universe_id)
     return link_to_dict(link)
 
 
@@ -436,12 +507,12 @@ def api_note_action_items(note_id: int):
 
 
 @app.get("/api/documents", response_model=list[DocumentInfo])
-def api_list_documents(q: str = "", category_id: Optional[int] = None):
-    """List documents, optionally filtered by search and category (incl. descendants)."""
+def api_list_documents(q: str = "", category_id: Optional[int] = None, universe_id: Optional[int] = None):
+    """List documents, optionally filtered by search, category, and universe."""
     if not DOCUMENTS_DIR.exists():
         return []
 
-    meta_map = get_all_document_meta()
+    meta_map = get_all_document_meta(universe_id=universe_id)
 
     # If filtering by category, pre-compute the allowed paths
     allowed_paths: set[str] | None = None
@@ -460,6 +531,8 @@ def api_list_documents(q: str = "", category_id: Optional[int] = None):
         if q and q.lower() not in f.name.lower():
             continue
         if allowed_paths is not None and rel_str not in allowed_paths:
+            continue
+        if universe_id is not None and rel_str not in meta_map:
             continue
         meta = meta_map.get(rel_str, {})
         stat = f.stat()
@@ -580,7 +653,7 @@ def api_delete_document(path: str):
 
 
 @app.post("/api/documents/upload")
-def api_upload_document(file: UploadFile):
+def api_upload_document(file: UploadFile, universe_id: int = 1):
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
     ext = Path(file.filename).suffix.lower()
@@ -609,7 +682,7 @@ def api_upload_document(file: UploadFile):
         for doc in documents:
             doc.metadata["source"] = str(dest)
         chunks = chunk_documents(documents)
-        add_documents(chunks)
+        add_documents(chunks, universe_id=universe_id)
         shutil.move(tmp_path, str(dest))
     except HTTPException:
         Path(tmp_path).unlink(missing_ok=True)
@@ -618,6 +691,7 @@ def api_upload_document(file: UploadFile):
         Path(tmp_path).unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {e}")
     rel = dest.relative_to(DOCUMENTS_DIR)
+    set_document_universe(str(rel), universe_id)
     return {"name": dest.name, "path": str(rel), "chunks": len(chunks)}
 
 
@@ -654,17 +728,18 @@ def _vectorize_action_item(item) -> None:
         item.id, item.title,
         completed=item.completed, hot=item.hot,
         due_date=item.due_date, category_name=cat_name,
+        universe_id=item.universe_id,
     )
 
 
 @app.get("/api/action-items", response_model=list[ActionItemResponse])
-def api_list_action_items(q: str = "", show_completed: bool = False):
-    return [_enrich_action_item(i) for i in list_action_items(q, show_completed)]
+def api_list_action_items(q: str = "", show_completed: bool = False, universe_id: Optional[int] = None):
+    return [_enrich_action_item(i) for i in list_action_items(q, show_completed, universe_id=universe_id)]
 
 
 @app.post("/api/action-items", response_model=ActionItemResponse, status_code=201)
-def api_create_action_item(req: ActionItemRequest):
-    item = create_action_item(req.title, req.hot, req.due_date, req.category_id)
+def api_create_action_item(req: ActionItemRequest, universe_id: int = 1):
+    item = create_action_item(req.title, req.hot, req.due_date, req.category_id, universe_id=universe_id)
     _vectorize_action_item(item)
     return _enrich_action_item(item)
 
@@ -811,7 +886,7 @@ def api_reindex():
 
     # 2. Re-index notes
     for note in list_notes():
-        upsert_note(note.id, f"{note.title}\n\n{note.body}", note.title)
+        upsert_note(note.id, f"{note.title}\n\n{note.body}", note.title, universe_id=note.universe_id)
         counts["notes"] += 1
 
     # 3. Re-index action items
@@ -826,10 +901,12 @@ def api_reindex():
             item.id, item.title,
             completed=item.completed, hot=item.hot,
             due_date=item.due_date, category_name=cat_name,
+            universe_id=item.universe_id,
         )
         counts["action_items"] += 1
 
     # 4. Re-index documents from the documents/ folder
+    all_meta = get_all_document_meta()
     if DOCUMENTS_DIR.is_dir():
         for f in DOCUMENTS_DIR.rglob("*"):
             if not f.is_file():
@@ -837,12 +914,14 @@ def api_reindex():
             if f.suffix.lower() not in SUPPORTED_EXTENSIONS:
                 continue
             try:
+                rel = str(f.relative_to(DOCUMENTS_DIR))
+                uid = all_meta.get(rel, {}).get("universe_id", 1)
                 docs = load_document(str(f))
                 if docs:
                     for doc in docs:
                         doc.metadata["source"] = str(f)
                     chunks = chunk_documents(docs)
-                    add_docs(chunks)
+                    add_docs(chunks, universe_id=uid)
                     counts["document_chunks"] += len(chunks)
             except Exception as e:
                 print(f"[reindex] Error processing {f.name}: {e}")
@@ -1063,11 +1142,11 @@ def _start_ngircd():
 def api_query(req: QueryRequest):
     history = [{"role": m.role, "content": m.content} for m in req.history]
 
-    print(f"[Astro] Query: model={req.model}, use_context={req.use_context}, history_len={len(history)}, tz={req.timezone}")
+    print(f"[Astro] Query: model={req.model}, use_context={req.use_context}, history_len={len(history)}, tz={req.timezone}, universe={req.universe_id}")
     if req.use_context:
         if doc_count() == 0:
             raise HTTPException(status_code=400, detail="Vector store is empty. Ingest documents first or disable context.")
-        result = ask(req.question, model=req.model, history=history, user_timezone=req.timezone)
+        result = ask(req.question, model=req.model, history=history, user_timezone=req.timezone, universe_id=req.universe_id)
     else:
         result = ask_direct(req.question, model=req.model, history=history, user_timezone=req.timezone)
     return QueryResponse(answer=result.answer, model=result.model)

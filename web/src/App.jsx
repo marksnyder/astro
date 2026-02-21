@@ -106,7 +106,7 @@ function QuickView({ item, onClose }) {
   )
 }
 
-function SaveChatModal({ categories, messages, onClose, onSaved }) {
+function SaveChatModal({ categories, messages, onClose, onSaved, universeId }) {
   const [title, setTitle] = useState(`Chat ${new Date().toLocaleString()}`)
   const [categoryId, setCategoryId] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -121,7 +121,7 @@ function SaveChatModal({ categories, messages, onClose, onSaved }) {
       .map(m => `<p><strong>${m.role === 'user' ? 'You' : 'Astro'}:</strong> ${m.content}</p>`)
       .join('\n')
     try {
-      await fetch('/api/notes', {
+      await fetch(`/api/notes?universe_id=${universeId || 1}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: title.trim(), body, category_id: categoryId }),
@@ -164,6 +164,116 @@ function SaveChatModal({ categories, messages, onClose, onSaved }) {
               {saving ? 'Saving...' : 'Save'}
             </button>
             <button className="note-delete-btn" onClick={onClose}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function UniverseManager({ universes, currentId, onSwitch, onClose, onRefresh }) {
+  const [newName, setNewName] = useState('')
+  const [editingId, setEditingId] = useState(null)
+  const [editName, setEditName] = useState('')
+
+  const handleCreate = async () => {
+    const name = newName.trim()
+    if (!name) return
+    const res = await fetch('/api/universes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+    if (res.ok) {
+      const u = await res.json()
+      setNewName('')
+      onRefresh()
+      onSwitch(u.id)
+    }
+  }
+
+  const handleRename = async (uid) => {
+    const name = editName.trim()
+    if (!name) return
+    await fetch(`/api/universes/${uid}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+    setEditingId(null)
+    onRefresh()
+  }
+
+  const handleDelete = async (uid, uname) => {
+    if (universes.length <= 1) {
+      alert('Cannot delete the last universe.')
+      return
+    }
+    if (!confirm(`DELETE UNIVERSE "${uname}"?\n\nThis will permanently destroy ALL notes, documents, action items, links, and categories in this universe.\n\nThis action CANNOT be undone.`)) return
+    if (!confirm(`Are you absolutely sure? Type the universe name to confirm.\n\n(Click OK to proceed with deletion of "${uname}")`)) return
+    const res = await fetch(`/api/universes/${uid}`, { method: 'DELETE' })
+    if (res.ok) {
+      onRefresh()
+      if (uid === currentId) {
+        const remaining = universes.filter(u => u.id !== uid)
+        if (remaining.length > 0) onSwitch(remaining[0].id)
+      }
+    }
+  }
+
+  return (
+    <div className="quickview-overlay" onClick={onClose}>
+      <div className="save-chat-modal" onClick={e => e.stopPropagation()}>
+        <div className="quickview-header">
+          <span className="quickview-type">Manage</span>
+          <h3 className="quickview-title">Universes</h3>
+          <button className="quickview-close" onClick={onClose}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div className="save-chat-body">
+          <div className="universe-list">
+            {universes.map(u => (
+              <div key={u.id} className={`universe-row${u.id === currentId ? ' universe-active' : ''}`}>
+                {editingId === u.id ? (
+                  <input
+                    className="note-title-input"
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleRename(u.id); if (e.key === 'Escape') setEditingId(null) }}
+                    autoFocus
+                  />
+                ) : (
+                  <span className="universe-name" onClick={() => { onSwitch(u.id); onClose() }}>{u.name}</span>
+                )}
+                <div className="universe-row-actions">
+                  {editingId === u.id ? (
+                    <button className="irc-channel-btn" onClick={() => handleRename(u.id)} title="Save">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12" /></svg>
+                    </button>
+                  ) : (
+                    <button className="irc-channel-btn" onClick={() => { setEditingId(u.id); setEditName(u.name) }} title="Rename">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                    </button>
+                  )}
+                  <button className="irc-channel-btn" onClick={() => handleDelete(u.id, u.name)} title="Delete" style={{ color: '#f44' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="universe-create-row">
+            <input
+              className="note-title-input"
+              placeholder="New universe name..."
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleCreate() }}
+            />
+            <button className="note-save-btn" onClick={handleCreate} disabled={!newName.trim()}>Create</button>
           </div>
         </div>
       </div>
@@ -389,6 +499,8 @@ function App() {
   const [joiningChannel, setJoiningChannel] = useState(false)
   const [joinChannelName, setJoinChannelName] = useState('')
   const [ircUsers, setIrcUsers] = useState([])
+  const [universes, setUniverses] = useState([])
+  const [currentUniverseId, setCurrentUniverseId] = useState(null)
   const [sidebarTab, setSidebarTab] = useState('actions')
   const [categories, setCategories] = useState([])
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
@@ -457,6 +569,40 @@ function App() {
       .then(d => { if (d.value) setIrcNick(d.value) })
       .catch(() => {})
     fetchIrcChannels()
+    // Load universes and the saved selection
+    fetch('/api/universes').then(r => r.json()).then(data => {
+      setUniverses(data)
+      fetch('/api/settings/selected_universe').then(r => r.json()).then(d => {
+        const saved = d.value ? Number(d.value) : null
+        if (saved && data.some(u => u.id === saved)) {
+          setCurrentUniverseId(saved)
+        } else if (data.length > 0) {
+          setCurrentUniverseId(data[0].id)
+        }
+      }).catch(() => { if (data.length > 0) setCurrentUniverseId(data[0].id) })
+    }).catch(() => {})
+  }, [])
+
+  const fetchUniverses = useCallback(() => {
+    fetch('/api/universes')
+      .then(r => r.json())
+      .then(data => {
+        setUniverses(data)
+        setCurrentUniverseId(prev => {
+          if (prev && data.some(u => u.id === prev)) return prev
+          return data.length > 0 ? data[0].id : null
+        })
+      })
+      .catch(() => {})
+  }, [])
+
+  const switchUniverse = useCallback((uid) => {
+    setCurrentUniverseId(uid)
+    fetch('/api/settings/selected_universe', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: String(uid) }),
+    }).catch(() => {})
   }, [])
 
   const fetchIrcChannels = () => {
@@ -546,26 +692,28 @@ function App() {
     }
   }, [chatMode])
 
-  const fetchCategories = () => {
-    fetch('/api/categories')
+  const fetchCategories = useCallback(() => {
+    const params = currentUniverseId ? `?universe_id=${currentUniverseId}` : ''
+    fetch(`/api/categories${params}`)
       .then(res => res.json())
       .then(data => setCategories(data))
       .catch(() => {})
-  }
+  }, [currentUniverseId])
 
 
-  const fetchPinned = () => {
-    fetch('/api/pinned')
+  const fetchPinned = useCallback(() => {
+    const params = currentUniverseId ? `?universe_id=${currentUniverseId}` : ''
+    fetch(`/api/pinned${params}`)
       .then(res => res.json())
       .then(data => setPinnedItems(data))
       .catch(() => {})
-  }
+  }, [currentUniverseId])
 
   const handleCategoryAction = async (action, payload) => {
     if (action === 'add') {
       const name = payload.name || prompt('Category name:')
       if (!name?.trim()) return
-      await fetch('/api/categories', {
+      await fetch(`/api/categories?universe_id=${currentUniverseId || 1}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), parent_id: payload.parentId }),
@@ -589,9 +737,13 @@ function App() {
       .then(res => res.json())
       .then(data => setStats(data))
       .catch(() => setStats(null))
+  }, [])
+
+  useEffect(() => {
+    if (currentUniverseId === null) return
     fetchCategories()
     fetchPinned()
-  }, [])
+  }, [currentUniverseId, fetchCategories, fetchPinned])
 
   const toggleSidebar = () => {
     if (sidebarCollapsed) {
@@ -670,6 +822,7 @@ function App() {
         history,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         mode: chatMode,
+        universe_id: currentUniverseId,
       }
       const res = await fetch('/api/query', {
         method: 'POST',
@@ -708,6 +861,7 @@ function App() {
 
   const [showSaveChatModal, setShowSaveChatModal] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showUniverseManager, setShowUniverseManager] = useState(false)
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -721,6 +875,27 @@ function App() {
       <header className="header">
         <div className="header-brand">
           <AstroLogo className="header-logo" />
+        </div>
+        <div className="universe-selector">
+          <span className="universe-label">Universe</span>
+          <select
+            className="universe-select"
+            value={currentUniverseId || ''}
+            onChange={(e) => switchUniverse(Number(e.target.value))}
+          >
+            {universes.map(u => (
+              <option key={u.id} value={u.id}>{u.name}</option>
+            ))}
+          </select>
+          <button
+            className="universe-manage-btn"
+            title="Manage universes"
+            onClick={() => setShowUniverseManager(true)}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
+            </svg>
+          </button>
         </div>
         {(pinnedItems.notes.length > 0 || pinnedItems.documents.length > 0 || pinnedItems.links?.length > 0) && (
           <div className="pinned-bar">
@@ -946,6 +1121,7 @@ function App() {
               onPinChange={fetchPinned}
               editNoteRequest={editNoteRequest}
               onEditNoteRequestHandled={() => setEditNoteRequest(null)}
+              universeId={currentUniverseId}
             />
           )}
           {sidebarTab === 'archive' && (
@@ -953,6 +1129,7 @@ function App() {
               categories={categories}
               selectedCategoryId={selectedCategoryId}
               onPinChange={fetchPinned}
+              universeId={currentUniverseId}
             />
           )}
           {sidebarTab === 'links' && (
@@ -960,11 +1137,13 @@ function App() {
               categories={categories}
               selectedCategoryId={selectedCategoryId}
               onPinChange={fetchPinned}
+              universeId={currentUniverseId}
             />
           )}
           {sidebarTab === 'actions' && (
             <ActionItemsPanel
               categories={categories}
+              universeId={currentUniverseId}
               onOpenNote={(noteId) => {
                 fetch(`/api/notes/${noteId}`).then(r => {
                   if (!r.ok) return
@@ -1137,6 +1316,7 @@ function App() {
           messages={messages}
           onClose={() => setShowSaveChatModal(false)}
           onSaved={fetchPinned}
+          universeId={currentUniverseId}
         />
       )}
       {showSettings && (
@@ -1147,6 +1327,15 @@ function App() {
             fetchPinned()
             fetch('/api/stats').then(r => r.json()).then(d => setStats(d)).catch(() => {})
           }}
+        />
+      )}
+      {showUniverseManager && (
+        <UniverseManager
+          universes={universes}
+          currentId={currentUniverseId}
+          onSwitch={switchUniverse}
+          onClose={() => setShowUniverseManager(false)}
+          onRefresh={fetchUniverses}
         />
       )}
     </div>
