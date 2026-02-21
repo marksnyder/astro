@@ -1,0 +1,31 @@
+# Virtual environment
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Vector store data
+data/
+
+# User documents
+documents/
+
+# Environment
+.env
+
+# VS Code
+.vscode/*.log
+
+# Node modules (all)
+node_modules/
+
+# Web UI
+web/dist/
+
+# OS
+.DS_Store
+Thumbs.db

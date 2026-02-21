@@ -1,0 +1,53 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Ingest Documents",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "src.main",
+            "args": ["ingest"],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Query Session",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "src.main",
+            "args": ["query"],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Web UI (serve)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "src.main",
+            "args": ["serve", "--reload"],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Clear Vector Store",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "src.main",
+            "args": ["clear"],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Store Stats",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "src.main",
+            "args": ["stats"],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug current file",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        }
+    ],
+    "inputs": []
+}

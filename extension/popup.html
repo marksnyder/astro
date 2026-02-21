@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    :root {
+      --bg: #13141a;
+      --bg-secondary: #1a1b23;
+      --bg-tertiary: #22232e;
+      --border: #2d2e3a;
+      --text: #e1e2e8;
+      --text-secondary: #9ca0b0;
+      --accent: #7c83f7;
+      --accent-hover: #6a72e6;
+      --success: #48bb78;
+      --error: #e53e3e;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 370px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    /* ── Header ─────────────────────────────── */
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px 8px;
+    }
+
+    .header svg { color: var(--accent); flex-shrink: 0; }
+
+    .header-logo {
+      width: 22px;
+      height: 22px;
+      border-radius: 5px;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .header-title {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    .settings-toggle {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: 2px;
+      flex: none;
+      display: flex;
+      align-items: center;
+    }
+    .settings-toggle:hover { color: var(--text); }
+
+    .settings-panel {
+      display: none;
+      padding: 4px 16px 8px;
+    }
+    .settings-panel.open { display: block; }
+    .settings-panel label { margin-top: 4px; }
+    .settings-panel input { font-size: 11.5px; }
+
+    /* ── Tabs ───────────────────────────────── */
+
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      padding: 0 16px;
+    }
+
+    .tab-btn {
+      flex: none;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px 14px;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Shared form styles ─────────────────── */
+
+    label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 5px;
+    }
+    label:not(:first-child) { margin-top: 12px; }
+
+    input, select {
+      width: 100%;
+      padding: 8px 10px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus { border-color: var(--accent); }
+
+    input.url-input {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 11.5px;
+      color: var(--text-secondary);
+    }
+
+    select {
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239ca0b0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 28px;
+    }
+    select option { background: var(--bg-secondary); color: var(--text); }
+
+    button {
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    /* ── Save tab ───────────────────────────── */
+
+    .save-content { padding: 14px 16px 20px; }
+
+    .actions { margin-top: 16px; display: flex; gap: 8px; }
+
+    .btn-save {
+      flex: 1;
+      padding: 9px 14px;
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .btn-save:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+    .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .status {
+      margin-top: 10px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      display: none;
+    }
+    .status.success {
+      display: block;
+      background: rgba(72, 187, 120, 0.12);
+      color: var(--success);
+      border: 1px solid rgba(72, 187, 120, 0.25);
+    }
+    .status.error {
+      display: block;
+      background: rgba(229, 62, 62, 0.12);
+      color: var(--error);
+      border: 1px solid rgba(229, 62, 62, 0.25);
+    }
+
+    /* ── Browse tab ─────────────────────────── */
+
+    .browse-content { padding: 10px 0 16px; }
+
+    .browse-search {
+      padding: 0 16px 10px;
+    }
+
+    .browse-search input {
+      font-size: 12px;
+      padding: 7px 10px;
+    }
+
+    .browse-list {
+      max-height: 380px;
+      overflow-y: auto;
+      padding-bottom: 8px;
+    }
+
+    .browse-empty {
+      padding: 24px 16px;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 12px;
+    }
+
+    /* Groups */
+
+    .group-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 16px;
+      cursor: pointer;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+      user-select: none;
+      transition: background 0.1s;
+    }
+    .group-header:first-child { border-top: none; }
+    .group-header:hover { background: var(--bg-tertiary); }
+
+    .group-chevron {
+      flex-shrink: 0;
+      color: var(--text-secondary);
+      transition: transform 0.15s;
+    }
+    .group-chevron.open { transform: rotate(90deg); }
+
+    .group-name {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: var(--text-secondary);
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .group-count {
+      font-size: 11px;
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      padding: 1px 6px;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+
+    /* Link rows */
+
+    .link-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px 10px 28px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .link-row:hover { background: var(--bg-tertiary); }
+
+    .link-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .link-title {
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .link-domain {
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+  </style>
+</head>
+<body>
+  <div class="header">
+    <img class="header-logo" src="https://cdnb.artstation.com/p/assets/images/images/051/019/079/large/shawn-davis-vorlon3.jpg?1656269084" alt="Astro">
+    <span class="header-title">Astro Links</span>
+    <span style="flex:1"></span>
+    <button class="settings-toggle" id="settingsBtn" title="Settings">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="settings-panel" id="settingsPanel">
+    <label>Astro Server URL</label>
+    <input type="text" id="serverUrl" placeholder="http://localhost:8000">
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn" data-tab="save">Save</button>
+    <button class="tab-btn active" data-tab="browse">Browse</button>
+  </div>
+
+  <!-- Save tab -->
+  <div class="tab-panel" id="tab-save">
+    <div class="save-content">
+      <label>Title</label>
+      <input type="text" id="titleInput" placeholder="Page title">
+
+      <label>URL</label>
+      <input type="text" id="urlInput" class="url-input" placeholder="https://..." readonly>
+
+      <label>Category</label>
+      <select id="categorySelect">
+        <option value="">None</option>
+      </select>
+
+      <div class="actions">
+        <button class="btn-save" id="saveBtn">Save Link</button>
+      </div>
+
+      <div class="status" id="status"></div>
+    </div>
+  </div>
+
+  <!-- Browse tab -->
+  <div class="tab-panel active" id="tab-browse">
+    <div class="browse-content">
+      <div class="browse-search">
+        <input type="text" id="browseSearch" placeholder="Search links...">
+      </div>
+      <div class="browse-list" id="browseList">
+        <div class="browse-empty">Loading...</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
