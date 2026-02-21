@@ -808,7 +808,7 @@ def api_reindex():
     # 1. Clear existing vector store
     clear()
 
-    counts = {"notes": 0, "action_items": 0, "document_chunks": 0, "team_members": 0}
+    counts = {"notes": 0, "action_items": 0, "document_chunks": 0}
 
     # 2. Re-index notes
     for note in list_notes():
@@ -830,14 +830,7 @@ def api_reindex():
         )
         counts["action_items"] += 1
 
-    # 4. Re-index team member profiles
-    from src.team import list_team_members as _list_tm, _vectorize_member
-    for tm in _list_tm():
-        if tm.profile.strip():
-            _vectorize_member(tm)
-            counts["team_members"] += 1
-
-    # 5. Re-index documents from the documents/ folder
+    # 4. Re-index documents from the documents/ folder
     if DOCUMENTS_DIR.is_dir():
         for f in DOCUMENTS_DIR.rglob("*"):
             if not f.is_file():
@@ -858,28 +851,6 @@ def api_reindex():
     return {"ok": True, "reindexed": counts}
 
 
-# ── Team Members ──────────────────────────────────────────────────────────
-
-from src.team import (
-    activity_to_dict,
-    clear_activity_runs,
-    create_activity,
-    create_team_member,
-    delete_activity,
-    delete_activity_run,
-    delete_team_member,
-    get_activity,
-    get_activity_run,
-    get_team_member,
-    list_activities,
-    list_activity_runs,
-    list_team_members,
-    member_to_dict,
-    run_activity,
-    start_scheduler,
-    update_activity,
-    update_team_member,
-)
 
 
 class IrcSendRequest(BaseModel):
@@ -906,6 +877,78 @@ def api_irc_status():
     from src.irc_client import IRCClient
     client = IRCClient.get()
     return client.get_status()
+
+
+@app.get("/api/irc/users")
+def api_irc_users():
+    from src.irc_client import IRCClient
+    client = IRCClient.get()
+    return client.get_channel_users()
+
+
+@app.get("/api/irc/channels")
+def api_irc_channels():
+    from src.irc_client import IRCClient
+    client = IRCClient.get()
+    return client.list_channels()
+
+
+class IrcChannelRequest(BaseModel):
+    name: str
+
+
+@app.post("/api/irc/channels", status_code=201)
+def api_create_irc_channel(req: IrcChannelRequest):
+    """Create a channel by having the Astro client join it (IRC creates on join)."""
+    from src.irc_client import IRCClient
+    name = req.name.strip()
+    if not name.startswith("#"):
+        name = "#" + name
+    client = IRCClient.get()
+    if not client.connected or not client._sock:
+        raise HTTPException(status_code=503, detail="IRC not connected")
+    old_channel = client.channel
+    client._raw_send(f"JOIN {name}")
+    import time
+    time.sleep(0.5)
+    client._raw_send(f"PART {name}")
+    time.sleep(0.3)
+    if old_channel != name:
+        client._raw_send(f"JOIN {old_channel}")
+    return {"ok": True, "name": name}
+
+
+@app.delete("/api/irc/channels/{name:path}")
+def api_delete_irc_channel(name: str):
+    """Remove a channel by sending an IRC admin KILL — only works for empty channels on ngircd.
+    We write the updated config and reload ngircd to actually persist channel removal."""
+    import subprocess, re
+    name = name.strip()
+    if not name.startswith("#"):
+        name = "#" + name
+    conf_path = Path(__file__).resolve().parent.parent / "config" / "ngircd.conf"
+    if not conf_path.exists():
+        raise HTTPException(status_code=500, detail="ngircd.conf not found")
+    text = conf_path.read_text()
+    pattern = r'\[Channel\]\s*\n\s*Name\s*=\s*' + re.escape(name) + r'[^\[]*'
+    new_text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+    if new_text == text:
+        return {"ok": True, "message": "Channel not in config"}
+    conf_path.write_text(new_text.strip() + "\n")
+    subprocess.run(["pkill", "-HUP", "ngircd"], capture_output=True)
+    return {"ok": True}
+
+
+@app.put("/api/irc/switch")
+def api_irc_switch_channel(req: IrcChannelRequest):
+    from src.irc_client import IRCClient
+    name = req.name.strip()
+    if not name.startswith("#"):
+        name = "#" + name
+    client = IRCClient.get()
+    client.switch_channel(name)
+    set_setting("irc_channel", name)
+    return {"ok": True, "channel": name}
 
 
 @app.websocket("/ws/irc")
@@ -966,16 +1009,32 @@ async def ws_irc(ws: WebSocket):
             pass
 
 
+_ngircd_proc = None
+
+
 @app.on_event("startup")
 def on_startup():
-    start_scheduler()
     _start_ngircd()
     from src.irc_client import IRCClient
     IRCClient.get()
 
 
+@app.on_event("shutdown")
+def on_shutdown():
+    from src.irc_client import IRCClient
+    if IRCClient._instance:
+        IRCClient._instance.stop()
+    if _ngircd_proc:
+        _ngircd_proc.terminate()
+        try:
+            _ngircd_proc.wait(timeout=3)
+        except Exception:
+            _ngircd_proc.kill()
+
+
 def _start_ngircd():
     """Launch ngircd as a background process if not already running."""
+    global _ngircd_proc
     import subprocess, shutil, time
     if shutil.which("ngircd") is None:
         print("[IRC] ngircd not found — install it with: apt install ngircd")
@@ -985,7 +1044,7 @@ def _start_ngircd():
         print(f"[IRC] Config not found: {conf}")
         return
     try:
-        subprocess.Popen(
+        _ngircd_proc = subprocess.Popen(
             ["ngircd", "-n", "-f", str(conf)],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -996,164 +1055,6 @@ def _start_ngircd():
         print(f"[IRC] Failed to start ngircd: {e}")
 
 
-class TeamMemberRequest(BaseModel):
-    name: Optional[str] = None
-    title: str = ""
-    profile: str = ""
-    gender: Optional[str] = None
-    agent_name: str = ""
-
-
-class TeamMemberUpdateRequest(BaseModel):
-    name: Optional[str] = None
-    title: Optional[str] = None
-    profile: Optional[str] = None
-    agent_name: Optional[str] = None
-
-
-@app.get("/api/team-members")
-def api_list_team_members():
-    members = list_team_members()
-    return [member_to_dict(m) for m in members]
-
-
-@app.get("/api/team-members/{member_id}")
-def api_get_team_member(member_id: int):
-    m = get_team_member(member_id)
-    if not m:
-        raise HTTPException(status_code=404, detail="Team member not found")
-    return member_to_dict(m)
-
-
-@app.post("/api/team-members", status_code=201)
-def api_create_team_member(req: TeamMemberRequest):
-    m = create_team_member(
-        name=req.name,
-        title=req.title,
-        profile=req.profile,
-        gender=req.gender,
-        agent_name=req.agent_name,
-    )
-    return member_to_dict(m)
-
-
-@app.put("/api/team-members/{member_id}")
-def api_update_team_member(member_id: int, req: TeamMemberUpdateRequest):
-    m = update_team_member(member_id, name=req.name, title=req.title, profile=req.profile, agent_name=req.agent_name)
-    if not m:
-        raise HTTPException(status_code=404, detail="Team member not found")
-    return member_to_dict(m)
-
-
-@app.delete("/api/team-members/{member_id}")
-def api_delete_team_member(member_id: int):
-    if not delete_team_member(member_id):
-        raise HTTPException(status_code=404, detail="Team member not found")
-    return {"ok": True}
-
-
-# ── Activities ────────────────────────────────────────────────────────────
-
-
-class TaskEntry(BaseModel):
-    member_id: int
-    instruction: str = ""
-
-
-class ActivityRequest(BaseModel):
-    name: str
-    prompt: str = ""
-    schedule: str = "manual"
-    tasks: list[TaskEntry] = []
-
-
-class ActivityUpdateRequest(BaseModel):
-    name: Optional[str] = None
-    prompt: Optional[str] = None
-    schedule: Optional[str] = None
-    tasks: Optional[list[TaskEntry]] = None
-
-
-@app.get("/api/activities")
-def api_list_activities():
-    return [activity_to_dict(a) for a in list_activities()]
-
-
-@app.get("/api/activities/{activity_id}")
-def api_get_activity(activity_id: int):
-    a = get_activity(activity_id)
-    if not a:
-        raise HTTPException(status_code=404, detail="Activity not found")
-    return activity_to_dict(a)
-
-
-@app.post("/api/activities", status_code=201)
-def api_create_activity(req: ActivityRequest):
-    a = create_activity(
-        name=req.name,
-        prompt=req.prompt,
-        schedule=req.schedule,
-        tasks=[t.model_dump() for t in req.tasks],
-    )
-    return activity_to_dict(a)
-
-
-@app.put("/api/activities/{activity_id}")
-def api_update_activity(activity_id: int, req: ActivityUpdateRequest):
-    a = update_activity(
-        activity_id,
-        name=req.name,
-        prompt=req.prompt,
-        schedule=req.schedule,
-        tasks=[t.model_dump() for t in req.tasks] if req.tasks is not None else None,
-    )
-    if not a:
-        raise HTTPException(status_code=404, detail="Activity not found")
-    return activity_to_dict(a)
-
-
-@app.delete("/api/activities/{activity_id}")
-def api_delete_activity(activity_id: int):
-    if not delete_activity(activity_id):
-        raise HTTPException(status_code=404, detail="Activity not found")
-    return {"ok": True}
-
-
-@app.post("/api/activities/{activity_id}/run")
-def api_run_activity(activity_id: int):
-    import threading
-    threading.Thread(target=run_activity, args=(activity_id,), daemon=True).start()
-    return {"ok": True, "message": "Activity started"}
-
-
-@app.get("/api/activities/{activity_id}/runs")
-def api_list_activity_runs(activity_id: int, limit: int = 20):
-    runs = list_activity_runs(activity_id, limit=limit)
-    return [{"id": r.id, "activity_id": r.activity_id, "status": r.status,
-             "model": r.model, "started_at": r.started_at, "completed_at": r.completed_at}
-            for r in runs]
-
-
-@app.get("/api/activity-runs/{run_id}")
-def api_get_activity_run(run_id: int):
-    result = get_activity_run(run_id)
-    if not result:
-        raise HTTPException(status_code=404, detail="Run not found")
-    return result
-
-
-@app.delete("/api/activity-runs/{run_id}")
-def api_delete_activity_run(run_id: int):
-    deleted = delete_activity_run(run_id)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Run not found")
-    return {"ok": True}
-
-
-@app.delete("/api/activities/{activity_id}/runs")
-def api_clear_activity_runs(activity_id: int):
-    count = clear_activity_runs(activity_id)
-    return {"ok": True, "deleted": count}
 
 
 # ── Query & Stats ─────────────────────────────────────────────────────────

@@ -39,6 +39,10 @@ class IRCClient:
         self._joined = False
         self._listeners: list[asyncio.Queue] = []
         self._listeners_lock = threading.Lock()
+        self._list_channels: list[dict] = []
+        self._list_event: threading.Event | None = None
+        self._names_nicks: list[str] = []
+        self._names_event: threading.Event | None = None
 
     @classmethod
     def get(cls) -> "IRCClient":
@@ -63,15 +67,26 @@ class IRCClient:
                 pass
 
     def start(self):
+        self._stopping = False
         self._thread = threading.Thread(target=self._run, daemon=True, name="irc-client")
         self._thread.start()
 
+    def stop(self):
+        self._stopping = True
+        if self._sock:
+            try:
+                self._sock.close()
+            except Exception:
+                pass
+
     def _run(self):
-        while True:
+        while not self._stopping:
             try:
                 self._connect()
                 self._read_loop()
             except Exception as e:
+                if self._stopping:
+                    break
                 print(f"[IRC Client] Connection lost: {e}")
             finally:
                 self.connected = False
@@ -83,6 +98,8 @@ class IRCClient:
                     except Exception:
                         pass
                     self._sock = None
+            if self._stopping:
+                break
             time.sleep(RECONNECT_DELAY)
 
     def _connect(self):
@@ -124,13 +141,17 @@ class IRCClient:
         print(f"[IRC Client] Connected as {nick} to {self.channel}")
 
     def _read_loop(self):
-        while True:
-            self._sock.settimeout(300)
+        while not self._stopping:
+            self._sock.settimeout(30)
             try:
                 data = self._sock.recv(8192)
             except socket.timeout:
+                if self._stopping:
+                    break
                 self._raw_send(f"PING :{int(time.time())}")
                 continue
+            except OSError:
+                break
             if not data:
                 break
             self._recv_buf += data.decode("utf-8", errors="replace")
@@ -151,6 +172,28 @@ class IRCClient:
                 continue
             if " 366 " in line:
                 self._joined = True
+                if self._names_event:
+                    self._names_event.set()
+                continue
+            # RPL_LIST (322): channel list entry
+            if " 322 " in line:
+                parts = line.split()
+                if len(parts) >= 5:
+                    name = parts[3]
+                    count = int(parts[4]) if parts[4].isdigit() else 0
+                    topic = line.split(":", 2)[2] if line.count(":") >= 2 else ""
+                    self._list_channels.append({"name": name, "users": count, "topic": topic})
+                continue
+            # RPL_LISTEND (323)
+            if " 323 " in line:
+                if self._list_event:
+                    self._list_event.set()
+                continue
+            # RPL_NAMREPLY (353): names in channel
+            if " 353 " in line:
+                names_part = line.rsplit(":", 1)[-1] if ":" in line else ""
+                for n in names_part.split():
+                    self._names_nicks.append(n.lstrip("@+%~&"))
                 continue
             if " PRIVMSG " in line:
                 self._handle_privmsg(line)
@@ -227,6 +270,51 @@ class IRCClient:
     def get_messages(self, after_id: int = 0) -> list[dict]:
         with self._msg_lock:
             return [m for m in self.messages if m["id"] > after_id]
+
+    def switch_channel(self, new_channel: str):
+        """Leave current channel and join a new one, clearing message history."""
+        if not new_channel.startswith("#"):
+            new_channel = "#" + new_channel
+        if new_channel == self.channel:
+            return
+        if self.connected and self._sock:
+            self._raw_send(f"PART {self.channel}")
+            self._joined = False
+            self.channel = new_channel
+            self._raw_send(f"JOIN {self.channel}")
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                lines = self._recv_lines(timeout=2.0)
+                self._process_lines(lines)
+                if self._joined:
+                    break
+        else:
+            self.channel = new_channel
+        with self._msg_lock:
+            self.messages.clear()
+            self._msg_id = 0
+
+    def list_channels(self) -> list[dict]:
+        """Query the IRC server for its channel list via LIST."""
+        if not self.connected or not self._sock:
+            return []
+        self._list_channels = []
+        self._list_event = threading.Event()
+        self._raw_send("LIST")
+        self._list_event.wait(timeout=5.0)
+        self._list_event = None
+        return list(self._list_channels)
+
+    def get_channel_users(self) -> list[str]:
+        """Query NAMES for the current channel and return the nick list."""
+        if not self.connected or not self._sock:
+            return []
+        self._names_nicks = []
+        self._names_event = threading.Event()
+        self._raw_send(f"NAMES {self.channel}")
+        self._names_event.wait(timeout=5.0)
+        self._names_event = None
+        return list(self._names_nicks)
 
     def get_status(self) -> dict:
         return {

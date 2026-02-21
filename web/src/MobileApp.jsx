@@ -574,6 +574,9 @@ function MobileApp() {
   const [ircMessages, setIrcMessages] = useState([])
   const [ircStatus, setIrcStatus] = useState({ connected: false, nick: '', channel: '' })
   const ircWsRef = useRef(null)
+  const [ircChannels, setIrcChannels] = useState([])
+  const [showAddChannel, setShowAddChannel] = useState(false)
+  const [newChannelName, setNewChannelName] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [view, setView] = useState('chat')
   const [categories, setCategories] = useState([])
@@ -648,7 +651,35 @@ function MobileApp() {
     fetch('/api/settings/selected_model').then(r => r.json()).then(d => { if (d.value) setModel(d.value) }).catch(() => {})
     fetch('/api/settings/chat_mode').then(r => r.json()).then(d => { if (d.value) setChatMode(d.value) }).catch(() => {})
     fetch('/api/settings/irc_channel').then(r => r.json()).then(d => { if (d.value) setIrcNick(d.value) }).catch(() => {})
+    fetchIrcChannels()
   }, [])
+
+  const [ircUsers, setIrcUsers] = useState([])
+
+  const fetchIrcChannels = () => {
+    fetch('/api/irc/channels').then(r => r.json()).then(data => setIrcChannels(data.filter(c => !c.name.startsWith('&')))).catch(() => {})
+  }
+
+  const fetchIrcUsers = () => {
+    fetch('/api/irc/users').then(r => r.json()).then(setIrcUsers).catch(() => {})
+  }
+
+  const handleSwitchChannel = (channel) => {
+    if (!channel) return
+    const name = channel.startsWith('#') ? channel : '#' + channel
+    setIrcNick(name)
+    setIrcMessages([])
+    fetch('/api/irc/switch', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
+      .then(() => { setTimeout(fetchIrcUsers, 500); setTimeout(fetchIrcChannels, 1000) }).catch(() => {})
+  }
+
+  const handleJoinChannel = () => {
+    const name = newChannelName.trim()
+    if (!name) return
+    setNewChannelName('')
+    setShowAddChannel(false)
+    handleSwitchChannel(name)
+  }
 
   // IRC WebSocket
   useEffect(() => {
@@ -685,10 +716,13 @@ function MobileApp() {
       ws.onerror = () => {}
     }
     connect()
+    fetchIrcUsers()
+    const usersPoll = setInterval(fetchIrcUsers, 15000)
 
     return () => {
       cancelled = true
       clearTimeout(reconnectTimer)
+      clearInterval(usersPoll)
       if (ws) { ws.close(); ircWsRef.current = null }
     }
   }, [chatMode])
@@ -881,7 +915,7 @@ function MobileApp() {
               </svg>
             </button>
             <span className="m-model-label">
-              {chatMode === 'irc' ? 'IRC' : MODELS.find(m => m.id === model)?.label}
+              {chatMode === 'irc' ? 'Agent Network' : MODELS.find(m => m.id === model)?.label}
             </span>
           </>
         )}
@@ -899,21 +933,35 @@ function MobileApp() {
           <button className={`m-menu-item ${chatMode === 'irc' ? 'active' : ''}`} onClick={() => {
             setChatMode('irc')
             fetch('/api/settings/chat_mode', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: 'irc' }) }).catch(() => {})
-          }}>IRC</button>
+          }}>Agent Network</button>
         </div>
         {chatMode === 'irc' && (
           <div className="m-menu-section">
-            <div className="m-menu-section-title">IRC Channel</div>
-            <input
+            <div className="m-menu-section-title">Agent Network Channel</div>
+            <select
               className="m-menu-input"
-              type="text"
-              placeholder="#astro"
               value={ircNick}
-              onChange={(e) => {
-                setIrcNick(e.target.value)
-                fetch('/api/settings/irc_channel', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: e.target.value }) }).catch(() => {})
-              }}
-            />
+              onChange={(e) => { handleSwitchChannel(e.target.value); setMenuOpen(false) }}
+            >
+              {ircChannels.length === 0 && ircNick && <option value={ircNick}>{ircNick}</option>}
+              {ircChannels.length === 0 && !ircNick && <option value="">No channels</option>}
+              {ircChannels.map((ch) => (
+                <option key={ch.name} value={ch.name}>{ch.name}</option>
+              ))}
+            </select>
+            <div className="m-menu-section-title" style={{ marginTop: 8 }}>Join Channel</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                className="m-menu-input"
+                type="text"
+                placeholder="#channel-name"
+                value={newChannelName}
+                onChange={(e) => setNewChannelName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { handleJoinChannel(); setMenuOpen(false) } }}
+                style={{ flex: 1 }}
+              />
+              <button className="m-menu-item" onClick={() => { handleJoinChannel(); setMenuOpen(false) }} disabled={!newChannelName.trim()} style={{ flex: 'none', padding: '0 12px' }}>Join</button>
+            </div>
           </div>
         )}
         {chatMode === 'llm' && (
@@ -982,12 +1030,19 @@ function MobileApp() {
                 <span>{ircStatus.connected ? `${ircStatus.nick} on ${ircStatus.channel}` : 'Connecting...'}</span>
               </div>
             )}
+            {chatMode === 'irc' && ircUsers.length > 0 && (
+              <div className="irc-users-bar">
+                {ircUsers.map((nick) => (
+                  <span key={nick} className={`irc-user-chip ${nick.toLowerCase() === ircStatus.nick?.toLowerCase() ? 'irc-user-self' : ''}`}>{nick}</span>
+                ))}
+              </div>
+            )}
             <main className="m-messages">
               {chatMode === 'irc' ? (
                 ircMessages.length === 0 ? (
                   <div className="m-empty">
                     <img className="m-empty-logo" src={LOGO_URL} alt="Astro" />
-                    <h2>IRC Chat</h2>
+                    <h2>Agent Network</h2>
                     <p style={{ color: 'var(--text-secondary, #999)', fontSize: 14 }}>Messages from {ircStatus.channel || '#astro'} will appear here</p>
                   </div>
                 ) : (

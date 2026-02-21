@@ -7,8 +7,6 @@ import ActionItemsPanel from './ActionItemsPanel'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import CategoryTree, { CategoryPicker } from './CategoryTree'
-import TeamPanel from './TeamPanel'
-import ActivityPanel from './ActivityPanel'
 import { getMsalInstance } from './msalInstance'
 import { loginRequest } from './msalConfig'
 import BACKGROUNDS from './backgrounds'
@@ -16,7 +14,7 @@ import BACKGROUNDS from './backgrounds'
 const LOGO_URL = '/logo.png'
 
 function AstroLogo({ className }) {
-  return <img src={LOGO_URL} alt="Astro OS" className={`astro-logo ${className || ''}`} />
+  return <img src={LOGO_URL} alt="Astro" className={`astro-logo ${className || ''}`} />
 }
 
 function ChatMessage({ role, content, model }) {
@@ -389,6 +387,10 @@ function App() {
   const [ircMessages, setIrcMessages] = useState([])
   const [ircStatus, setIrcStatus] = useState({ connected: false, nick: '', channel: '' })
   const ircLastIdRef = useRef(0)
+  const [ircChannels, setIrcChannels] = useState([])
+  const [joiningChannel, setJoiningChannel] = useState(false)
+  const [joinChannelName, setJoinChannelName] = useState('')
+  const [ircUsers, setIrcUsers] = useState([])
   const [sidebarTab, setSidebarTab] = useState('actions')
   const [categories, setCategories] = useState([])
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
@@ -514,7 +516,48 @@ function App() {
       .then(r => r.json())
       .then(d => { if (d.value) setIrcNick(d.value) })
       .catch(() => {})
+    fetchIrcChannels()
   }, [])
+
+  const fetchIrcChannels = () => {
+    fetch('/api/irc/channels')
+      .then(r => r.json())
+      .then(data => {
+        const filtered = data.filter(c => !c.name.startsWith('&'))
+        setIrcChannels(filtered)
+      })
+      .catch(() => {})
+  }
+
+  const fetchIrcUsers = () => {
+    fetch('/api/irc/users')
+      .then(r => r.json())
+      .then(setIrcUsers)
+      .catch(() => {})
+  }
+
+  const handleSwitchChannel = (channel) => {
+    if (!channel) return
+    const name = channel.startsWith('#') ? channel : '#' + channel
+    setIrcNick(name)
+    setIrcMessages([])
+    fetch('/api/irc/switch', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    }).then(() => {
+      setTimeout(fetchIrcUsers, 500)
+      setTimeout(fetchIrcChannels, 1000)
+    }).catch(() => {})
+  }
+
+  const handleJoinChannel = () => {
+    const name = joinChannelName.trim()
+    if (!name) return
+    setJoinChannelName('')
+    setJoiningChannel(false)
+    handleSwitchChannel(name)
+  }
 
   // IRC WebSocket
   const ircWsRef = useRef(null)
@@ -552,10 +595,13 @@ function App() {
       ws.onerror = () => {}
     }
     connect()
+    fetchIrcUsers()
+    const usersPoll = setInterval(fetchIrcUsers, 15000)
 
     return () => {
       cancelled = true
       clearTimeout(reconnectTimer)
+      clearInterval(usersPoll)
       if (ws) { ws.close(); ircWsRef.current = null }
     }
   }, [chatMode])
@@ -737,7 +783,6 @@ function App() {
       <header className="header">
         <div className="header-brand">
           <AstroLogo className="header-logo" />
-          <h1>Astro OS</h1>
         </div>
         {(pinnedItems.notes.length > 0 || pinnedItems.documents.length > 0 || pinnedItems.links?.length > 0) && (
           <div className="pinned-bar">
@@ -785,9 +830,10 @@ function App() {
               onClick={() => {
                 setChatMode('irc')
                 fetch('/api/settings/chat_mode', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: 'irc' }) }).catch(() => {})
+                fetchIrcChannels()
               }}
               disabled={loading}
-            >IRC</button>
+            >Agent Network</button>
           </div>
           {chatMode === 'llm' && (
             <>
@@ -821,17 +867,54 @@ function App() {
             </>
           )}
           {chatMode === 'irc' && (
-            <input
-              className="irc-channel-input"
-              type="text"
-              placeholder="#astro"
-              value={ircNick}
-              onChange={(e) => {
-                setIrcNick(e.target.value)
-                fetch('/api/settings/irc_channel', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: e.target.value }) }).catch(() => {})
-              }}
-              disabled={loading}
-            />
+            <div className="irc-channel-controls">
+              {joiningChannel ? (
+                <>
+                  <input
+                    className="irc-channel-input"
+                    type="text"
+                    placeholder="#channel-name"
+                    value={joinChannelName}
+                    onChange={(e) => setJoinChannelName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleJoinChannel()
+                      if (e.key === 'Escape') { setJoiningChannel(false); setJoinChannelName('') }
+                    }}
+                    autoFocus
+                  />
+                  <button className="irc-channel-btn" onClick={handleJoinChannel} disabled={!joinChannelName.trim()} title="Join">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  </button>
+                  <button className="irc-channel-btn" onClick={() => { setJoiningChannel(false); setJoinChannelName('') }} title="Cancel">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <select
+                    className="irc-channel-select"
+                    value={ircNick}
+                    onChange={(e) => handleSwitchChannel(e.target.value)}
+                    disabled={loading}
+                  >
+                    {ircChannels.length === 0 && ircNick && <option value={ircNick}>{ircNick}</option>}
+                    {ircChannels.length === 0 && !ircNick && <option value="">No channels</option>}
+                    {ircChannels.map((ch) => (
+                      <option key={ch.name} value={ch.name}>{ch.name}</option>
+                    ))}
+                  </select>
+                  <button className="irc-channel-btn" onClick={() => setJoiningChannel(true)} disabled={loading} title="Join a channel">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  </button>
+                </>
+              )}
+            </div>
           )}
           {chatMode === 'llm' && stats !== null && (
             <div className="header-stats">
@@ -912,24 +995,13 @@ function App() {
                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
               </svg>
             </button>
-            <div className="rail-separator" />
-            <button className={`rail-tab ${sidebarTab === 'team' ? 'active' : ''}`} onClick={() => setSidebarTab('team')} title="Agents">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-            </button>
-            <button className={`rail-tab ${sidebarTab === 'activities' ? 'active' : ''}`} onClick={() => setSidebarTab('activities')} title="Activities">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-              </svg>
-            </button>
           </div>
           <div className="sidebar-content">
           {sidebarTab === 'categories' && (
             <div className="categories-panel">
+              <div className="notes-header">
+                <span className="notes-header-title">Categories</span>
+              </div>
               <CategoryTree
                 categories={categories}
                 selectedId={selectedCategoryId}
@@ -979,35 +1051,6 @@ function App() {
               }}
             />
           )}
-          {sidebarTab === 'team' && (
-            <TeamPanel />
-          )}
-          {sidebarTab === 'activities' && (
-            <ActivityPanel
-              onSaveAsNote={async (title, body) => {
-                try {
-                  const res = await fetch('/api/notes', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title, body }),
-                  })
-                  if (res.ok) {
-                    const note = await res.json()
-                    setSidebarTab('notes')
-                    setEditNoteRequest(note)
-                  }
-                } catch {}
-              }}
-              onTransferToChat={(activityName, content) => {
-                const prompt = `Here are the results from the "${activityName}" activity:\n\n${content}\n\nPlease review the above and let me know your thoughts. I'd like to continue the discussion.`
-                setMessages(prev => [
-                  ...prev,
-                  { role: 'user', content: prompt },
-                ])
-                setSidebarTab('actions')
-              }}
-            />
-          )}
           </div>
         </div>
         )}
@@ -1047,10 +1090,23 @@ function App() {
                 )}
               </div>
               <main className="chat-area irc-chat-area">
+                {ircUsers.length > 0 && (
+                  <div className="irc-users-bar">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                    {ircUsers.map((nick) => (
+                      <span key={nick} className={`irc-user-chip ${nick.toLowerCase() === ircStatus.nick?.toLowerCase() ? 'irc-user-self' : ''}`}>{nick}</span>
+                    ))}
+                  </div>
+                )}
                 {ircMessages.length === 0 ? (
                   <div className="empty-state">
                     <AstroLogo className="empty-logo" />
-                    <h2>IRC Chat</h2>
+                    <h2>Agent Network</h2>
                     <p className="irc-hint">Messages from {ircStatus.channel || '#astro'} will appear here</p>
                   </div>
                 ) : (
