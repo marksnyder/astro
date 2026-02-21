@@ -876,26 +876,11 @@ function App() {
         <div className="header-brand">
           <AstroLogo className="header-logo" />
         </div>
-        <div className="universe-selector">
+        <div className="universe-selector" onClick={() => setShowUniverseManager(true)} title="Manage universes">
           <span className="universe-label">Universe</span>
-          <select
-            className="universe-select"
-            value={currentUniverseId || ''}
-            onChange={(e) => switchUniverse(Number(e.target.value))}
-          >
-            {universes.map(u => (
-              <option key={u.id} value={u.id}>{u.name}</option>
-            ))}
-          </select>
-          <button
-            className="universe-manage-btn"
-            title="Manage universes"
-            onClick={() => setShowUniverseManager(true)}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
-            </svg>
-          </button>
+          <span className="universe-name-display">
+            {universes.find(u => u.id === currentUniverseId)?.name || '—'}
+          </span>
         </div>
         {(pinnedItems.notes.length > 0 || pinnedItems.documents.length > 0 || pinnedItems.links?.length > 0) && (
           <div className="pinned-bar">
