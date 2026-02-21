@@ -903,19 +903,6 @@ function MobileApp() {
                 <option key={ch.name} value={ch.name}>{ch.name}</option>
               ))}
             </select>
-            <div className="m-menu-section-title" style={{ marginTop: 8 }}>Join Channel</div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <input
-                className="m-menu-input"
-                type="text"
-                placeholder="#channel-name"
-                value={newChannelName}
-                onChange={(e) => setNewChannelName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { handleJoinChannel(); setMenuOpen(false) } }}
-                style={{ flex: 1 }}
-              />
-              <button className="m-menu-item" onClick={() => { handleJoinChannel(); setMenuOpen(false) }} disabled={!newChannelName.trim()} style={{ flex: 'none', padding: '0 12px' }}>Join</button>
-            </div>
           </div>
         )}
         <div className="m-menu-section">

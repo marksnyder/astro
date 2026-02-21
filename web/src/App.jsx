@@ -876,11 +876,26 @@ function App() {
         <div className="header-brand">
           <AstroLogo className="header-logo" />
         </div>
-        <div className="universe-selector" onClick={() => setShowUniverseManager(true)} title="Manage universes">
-          <span className="universe-label">Universe</span>
-          <span className="universe-name-display">
+        <div className="universe-selector">
+          <span className="universe-label" onClick={() => setShowUniverseManager(true)} title="Manage universes">Universe</span>
+          <span className="universe-name-display" onClick={() => setShowUniverseManager(true)} title="Manage universes">
             {universes.find(u => u.id === currentUniverseId)?.name || '—'}
           </span>
+          {universes.length > 1 && (
+            <button
+              className="universe-next-btn"
+              title="Next universe"
+              onClick={() => {
+                const idx = universes.findIndex(u => u.id === currentUniverseId)
+                const next = universes[(idx + 1) % universes.length]
+                if (next) switchUniverse(next.id)
+              }}
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          )}
         </div>
         {(pinnedItems.notes.length > 0 || pinnedItems.documents.length > 0 || pinnedItems.links?.length > 0) && (
           <div className="pinned-bar">

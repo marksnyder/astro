@@ -1,0 +1,48 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "IRC Agent",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "-m", "tools.irc_agent",
+                "--host", "${input:ircHost}",
+                "--port", "${input:ircPort}",
+                "--channel", "'${input:ircChannel}'"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "isBackground": true,
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated",
+                "clear": true
+            }
+        }
+    ],
+    "inputs": [
+        {
+            "id": "ircHost",
+            "type": "promptString",
+            "description": "IRC server hostname",
+            "default": "localhost"
+        },
+        {
+            "id": "ircPort",
+            "type": "promptString",
+            "description": "IRC server port",
+            "default": "6667"
+        },
+        {
+            "id": "ircChannel",
+            "type": "promptString",
+            "description": "IRC channel to join",
+            "default": "#astro"
+        }
+    ]
+}

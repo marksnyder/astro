@@ -12,6 +12,8 @@ const $settingsBtn   = document.getElementById('settingsBtn')
 const $settingsPanel = document.getElementById('settingsPanel')
 const $browseSearch  = document.getElementById('browseSearch')
 const $browseList    = document.getElementById('browseList')
+const $universeName  = document.getElementById('universeName')
+const $universeNext  = document.getElementById('universeNext')
 
 // ── Helpers ──────────────────────────────────────────
 
@@ -28,6 +30,61 @@ function showStatus(msg, type) {
 function formatDomain(rawUrl) {
   try { return new URL(rawUrl).hostname.replace(/^www\./, '') }
   catch { return rawUrl }
+}
+
+// ── Universe ─────────────────────────────────────────
+
+let allUniverses = []
+let currentUniverseId = null
+
+function getUniverseId() {
+  return currentUniverseId
+}
+
+function renderUniverseBar() {
+  const u = allUniverses.find(x => x.id === currentUniverseId)
+  $universeName.textContent = u ? u.name : '—'
+  const hasArrow = allUniverses.length > 1
+  $universeNext.style.display = hasArrow ? '' : 'none'
+  $universeName.style.borderRight = hasArrow ? 'none' : '1px solid #3949ab'
+  $universeName.style.borderRadius = hasArrow ? '0' : '0 6px 6px 0'
+}
+
+async function loadUniverses() {
+  try {
+    const res = await fetch(`${getServer()}/api/universes`)
+    if (!res.ok) throw new Error()
+    allUniverses = await res.json()
+    const stored = await chrome.storage.local.get('astroUniverse')
+    if (stored.astroUniverse && allUniverses.some(u => String(u.id) === stored.astroUniverse)) {
+      currentUniverseId = parseInt(stored.astroUniverse, 10)
+    } else if (allUniverses.length > 0) {
+      currentUniverseId = allUniverses[0].id
+    }
+    renderUniverseBar()
+  } catch {}
+}
+
+$universeNext.addEventListener('click', async () => {
+  if (allUniverses.length < 2) return
+  const idx = allUniverses.findIndex(u => u.id === currentUniverseId)
+  const next = allUniverses[(idx + 1) % allUniverses.length]
+  currentUniverseId = next.id
+  await chrome.storage.local.set({ astroUniverse: String(currentUniverseId) })
+  renderUniverseBar()
+  reloadForUniverse()
+})
+
+async function reloadForUniverse() {
+  try {
+    const uid = getUniverseId()
+    const qs = uid ? `?universe_id=${uid}` : ''
+    const res = await fetch(`${getServer()}/api/categories${qs}`)
+    if (!res.ok) throw new Error()
+    allCategories = await res.json()
+    populateCategorySelect(allCategories)
+  } catch {}
+  loadLinks()
 }
 
 // ── Tabs ─────────────────────────────────────────────
@@ -80,73 +137,63 @@ function populateCategorySelect(categories) {
 
 // ── Browse: build grouped link list ──────────────────
 
-let expandedGroup = null
+const $browsePills = document.getElementById('browsePills')
+let selectedCategory = '__all__'
 
-function buildGroups(links, catMap) {
-  const groupMap = {}
-  const groups = []
-  for (const link of links) {
-    const key = link.category_id ?? '__none__'
-    if (!groupMap[key]) {
-      const g = { key, name: link.category_id ? (catMap[link.category_id] || 'Unknown') : 'Uncategorized', items: [] }
-      groupMap[key] = g
-      groups.push(g)
-    }
-    groupMap[key].items.push(link)
+function buildCatMap() {
+  const m = {}
+  for (const c of allCategories) m[c.id] = c.name
+  return m
+}
+
+function renderPills() {
+  const catMap = buildCatMap()
+  const usedCats = new Set(allLinks.map(l => l.category_id ?? '__none__'))
+  $browsePills.innerHTML = ''
+
+  const allPill = document.createElement('button')
+  allPill.className = `browse-pill${selectedCategory === '__all__' ? ' active' : ''}`
+  allPill.textContent = 'All'
+  allPill.addEventListener('click', () => { selectedCategory = '__all__'; renderPills(); filterAndRender() })
+  $browsePills.appendChild(allPill)
+
+  const cats = allCategories.filter(c => usedCats.has(c.id)).sort((a, b) => a.name.localeCompare(b.name))
+  for (const c of cats) {
+    const pill = document.createElement('button')
+    pill.className = `browse-pill${selectedCategory === c.id ? ' active' : ''}`
+    pill.textContent = c.name
+    pill.addEventListener('click', () => { selectedCategory = c.id; renderPills(); filterAndRender() })
+    $browsePills.appendChild(pill)
   }
-  groups.sort((a, b) => a.name.localeCompare(b.name))
-  return groups
+
+  if (usedCats.has('__none__')) {
+    const pill = document.createElement('button')
+    pill.className = `browse-pill${selectedCategory === '__none__' ? ' active' : ''}`
+    pill.textContent = 'Uncategorized'
+    pill.addEventListener('click', () => { selectedCategory = '__none__'; renderPills(); filterAndRender() })
+    $browsePills.appendChild(pill)
+  }
 }
 
 function renderLinks(links) {
-  const catMap = {}
-  for (const c of allCategories) catMap[c.id] = c.name
-
   if (links.length === 0) {
     $browseList.innerHTML = '<div class="browse-empty">No links found.</div>'
     return
   }
 
-  const groups = buildGroups(links, catMap)
   $browseList.innerHTML = ''
-
-  for (const group of groups) {
-    const isOpen = expandedGroup === group.key
-
-    // Group header
-    const header = document.createElement('div')
-    header.className = 'group-header'
-    header.innerHTML = `
-      <svg class="group-chevron ${isOpen ? 'open' : ''}" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="9 18 15 12 9 6" />
-      </svg>
-      <span class="group-name">${escapeHtml(group.name)}</span>
-      <span class="group-count">${group.items.length}</span>
+  for (const link of links) {
+    const row = document.createElement('div')
+    row.className = 'link-row'
+    row.innerHTML = `
+      <div class="link-title">${escapeHtml(link.title || 'Untitled')}</div>
+      <div class="link-domain">${escapeHtml(formatDomain(link.url))}</div>
     `
-    header.addEventListener('click', () => {
-      expandedGroup = expandedGroup === group.key ? null : group.key
-      renderLinks(links)
+    row.addEventListener('click', () => {
+      chrome.tabs.update({ url: link.url })
+      window.close()
     })
-    $browseList.appendChild(header)
-
-    // Items (only if expanded)
-    if (isOpen) {
-      for (const link of group.items) {
-        const row = document.createElement('div')
-        row.className = 'link-row'
-        row.innerHTML = `
-          <div class="link-info">
-            <div class="link-title">${escapeHtml(link.title || 'Untitled')}</div>
-            <div class="link-domain">${escapeHtml(formatDomain(link.url))}</div>
-          </div>
-        `
-        row.addEventListener('click', () => {
-          chrome.tabs.update({ url: link.url })
-          window.close()
-        })
-        $browseList.appendChild(row)
-      }
-    }
+    $browseList.appendChild(row)
   }
 }
 
@@ -162,9 +209,12 @@ let allLinks = []
 
 async function loadLinks() {
   try {
-    const res = await fetch(`${getServer()}/api/links`)
+    const uid = getUniverseId()
+    const qs = uid ? `?universe_id=${uid}` : ''
+    const res = await fetch(`${getServer()}/api/links${qs}`)
     if (!res.ok) throw new Error()
     allLinks = await res.json()
+    renderPills()
     filterAndRender()
   } catch {
     $browseList.innerHTML = '<div class="browse-empty">Cannot reach Astro server.</div>'
@@ -173,9 +223,17 @@ async function loadLinks() {
 
 function filterAndRender() {
   const q = $browseSearch.value.toLowerCase().trim()
-  const filtered = q
-    ? allLinks.filter(l => (l.title || '').toLowerCase().includes(q) || (l.url || '').toLowerCase().includes(q))
-    : allLinks
+  let filtered = allLinks
+  if (selectedCategory !== '__all__') {
+    if (selectedCategory === '__none__') {
+      filtered = filtered.filter(l => !l.category_id)
+    } else {
+      filtered = filtered.filter(l => l.category_id === selectedCategory)
+    }
+  }
+  if (q) {
+    filtered = filtered.filter(l => (l.title || '').toLowerCase().includes(q) || (l.url || '').toLowerCase().includes(q))
+  }
   renderLinks(filtered)
 }
 
@@ -188,20 +246,24 @@ $browseSearch.addEventListener('input', () => {
 // ── Init ─────────────────────────────────────────────
 
 async function init() {
-  // Load saved server URL
   const stored = await chrome.storage.local.get('astroServer')
   if (stored.astroServer) $server.value = stored.astroServer
 
-  // Get current tab info
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
   if (tab) {
     $title.value = tab.title || ''
     $url.value = tab.url || ''
+    currentTabUrl = tab.url || ''
+    currentTabTitle = tab.title || ''
+    $readLaterUrl.textContent = currentTabUrl
   }
 
-  // Fetch categories
+  await loadUniverses()
+
   try {
-    const res = await fetch(`${getServer()}/api/categories`)
+    const uid = getUniverseId()
+    const qs = uid ? `?universe_id=${uid}` : ''
+    const res = await fetch(`${getServer()}/api/categories${qs}`)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     allCategories = await res.json()
     populateCategorySelect(allCategories)
@@ -209,7 +271,6 @@ async function init() {
     showStatus(`Cannot reach Astro server. Check settings.`, 'error')
   }
 
-  // Load links on init since Browse is the default tab
   loadLinks()
 }
 
@@ -229,10 +290,13 @@ $save.addEventListener('click', async () => {
 
   try {
     const categoryId = $category.value ? parseInt($category.value, 10) : null
-    const res = await fetch(`${getServer()}/api/links`, {
+    const universeId = getUniverseId()
+    const payload = { title: title || url, url, category_id: categoryId }
+    const qs = universeId ? `?universe_id=${universeId}` : ''
+    const res = await fetch(`${getServer()}/api/links${qs}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: title || url, url, category_id: categoryId }),
+      body: JSON.stringify(payload),
     })
 
     if (!res.ok) {
@@ -260,11 +324,9 @@ $server.addEventListener('input', () => {
   serverDebounce = setTimeout(async () => {
     $status.className = 'status'
     try {
-      const res = await fetch(`${getServer()}/api/categories`)
-      if (!res.ok) throw new Error()
-      allCategories = await res.json()
-      populateCategorySelect(allCategories)
       await chrome.storage.local.set({ astroServer: $server.value })
+      await loadUniverses()
+      await reloadForUniverse()
     } catch {
       showStatus('Cannot reach server at this URL.', 'error')
     }
@@ -276,6 +338,147 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && document.getElementById('tab-save').classList.contains('active') && !$save.disabled) {
     $save.click()
   }
+})
+
+// ── Tools: DOM refs ─────────────────────────────────
+
+const $readLaterUrl     = document.getElementById('readLaterUrl')
+const $readLaterBtn     = document.getElementById('readLaterBtn')
+const $readLaterStatus  = document.getElementById('readLaterStatus')
+const $summarizeBtn     = document.getElementById('summarizeBtn')
+const $summarizeStatus  = document.getElementById('summarizeStatus')
+const $summaryBox       = document.getElementById('summaryBox')
+const $saveNoteBtn      = document.getElementById('saveNoteBtn')
+const $saveNoteStatus   = document.getElementById('saveNoteStatus')
+
+let currentTabUrl = ''
+let currentTabTitle = ''
+let lastSummary = ''
+
+function toolStatus(el, msg, type) {
+  el.textContent = msg
+  el.className = `tool-status ${type}`
+}
+
+// ── Tools: Read Later ───────────────────────────────
+
+$readLaterBtn.addEventListener('click', async () => {
+  $readLaterBtn.disabled = true
+  $readLaterBtn.textContent = 'Adding...'
+  $readLaterStatus.className = 'tool-status'
+
+  try {
+    const payload = { title: `Read: ${currentTabTitle || currentTabUrl}`, hot: false }
+    const uid = getUniverseId()
+    const qs = uid ? `?universe_id=${uid}` : ''
+    const res = await fetch(`${getServer()}/api/action-items${qs}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    toolStatus($readLaterStatus, 'Action item created!', 'success')
+  } catch (e) {
+    toolStatus($readLaterStatus, `Error: ${e.message}`, 'error')
+  }
+  $readLaterBtn.disabled = false
+  $readLaterBtn.textContent = 'Add to Read Later'
+})
+
+// ── Tools: Summarize ────────────────────────────────
+
+async function extractPageContent() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+  if (!tab?.id) throw new Error('No active tab')
+
+  if (!chrome.scripting?.executeScript) {
+    throw new Error('Scripting API not available. Remove and re-add the extension in chrome://extensions.')
+  }
+
+  const results = await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: () => document.body.innerText,
+  })
+
+  if (!results?.[0]?.result) throw new Error('Could not extract page content')
+  return results[0].result
+}
+
+$summarizeBtn.addEventListener('click', async () => {
+  $summarizeBtn.disabled = true
+  $summarizeBtn.textContent = 'Extracting...'
+  $summarizeStatus.className = 'tool-status'
+  $summaryBox.className = 'summary-box'
+  $saveNoteBtn.style.display = 'none'
+  $saveNoteStatus.className = 'tool-status'
+
+  try {
+    toolStatus($summarizeStatus, 'Extracting page content...', 'info')
+    const content = await extractPageContent()
+
+    const trimmed = content.substring(0, 12000)
+    $summarizeBtn.textContent = 'Summarizing...'
+    toolStatus($summarizeStatus, 'Sending to LLM for summary...', 'info')
+
+    const res = await fetch(`${getServer()}/api/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question: `Summarize the following web page content concisely. Include key points and main takeaways. The page title is "${currentTabTitle}" and the URL is ${currentTabUrl}.\n\n---\n\n${trimmed}`,
+        model: 'gpt-5-mini',
+        use_context: false,
+        history: [],
+      }),
+    })
+
+    if (!res.ok) {
+      const errBody = await res.text()
+      throw new Error(`HTTP ${res.status}: ${errBody}`)
+    }
+    const data = await res.json()
+    console.log('LLM response:', JSON.stringify(data))
+    lastSummary = data.answer || data.text || ''
+
+    if (!lastSummary) throw new Error(`Empty response from LLM. Keys: ${Object.keys(data).join(', ')}. Raw: ${JSON.stringify(data).substring(0, 300)}`)
+
+    $summaryBox.textContent = lastSummary
+    $summaryBox.className = 'summary-box visible'
+    $saveNoteBtn.style.display = ''
+    $summarizeStatus.className = 'tool-status'
+  } catch (e) {
+    toolStatus($summarizeStatus, `Error: ${e.message}`, 'error')
+  }
+  $summarizeBtn.disabled = false
+  $summarizeBtn.textContent = 'Summarize This Page'
+})
+
+// ── Tools: Save summary as note ─────────────────────
+
+$saveNoteBtn.addEventListener('click', async () => {
+  $saveNoteBtn.disabled = true
+  $saveNoteBtn.textContent = 'Saving...'
+  $saveNoteStatus.className = 'tool-status'
+
+  try {
+    const body = `${lastSummary}\n\n---\nSource: ${currentTabUrl}`
+    const uid = getUniverseId()
+    const qs = uid ? `?universe_id=${uid}` : ''
+    const res = await fetch(`${getServer()}/api/notes${qs}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: `Summary: ${currentTabTitle || currentTabUrl}`,
+        body,
+        category_id: null,
+      }),
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    toolStatus($saveNoteStatus, 'Note saved!', 'success')
+  } catch (e) {
+    toolStatus($saveNoteStatus, `Error: ${e.message}`, 'error')
+  }
+  $saveNoteBtn.disabled = false
+  $saveNoteBtn.textContent = 'Save Summary as Note'
 })
 
 init()

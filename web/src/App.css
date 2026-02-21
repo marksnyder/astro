@@ -100,15 +100,41 @@
   align-items: center;
   padding: 4px 10px;
   border: 1px solid #3949ab;
-  border-radius: 0 8px 8px 0;
+  border-right: none;
+  border-radius: 0;
   background: rgba(57, 73, 171, 0.1);
   color: var(--text-primary);
   font-size: 12px;
   font-weight: 600;
   max-width: 200px;
+  cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.universe-selector:not(:has(.universe-next-btn)) .universe-name-display {
+  border-right: 1px solid #3949ab;
+  border-radius: 0 8px 8px 0;
+}
+
+.universe-next-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border: 1px solid #3949ab;
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  background: rgba(57, 73, 171, 0.15);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.universe-next-btn:hover {
+  background: #3949ab;
+  color: #fff;
 }
 
 .universe-list {

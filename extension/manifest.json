@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Astro Link Saver",
+  "name": "Astro Browse",
   "version": "1.0.0",
-  "description": "Save the current page as a link in Astro OS",
-  "permissions": ["activeTab", "storage"],
+  "description": "Save the current page as a link in Astro",
+  "permissions": ["activeTab", "storage", "scripting"],
+  "host_permissions": ["<all_urls>"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
