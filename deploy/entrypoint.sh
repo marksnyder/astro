@@ -44,6 +44,9 @@ if [ "${TS_SERVE_HTTPS}" = "true" ]; then
     echo "==> HTTPS available at https://${TS_HOSTNAME}.$(tailscale status --json | python3 -c "import sys,json; print(json.load(sys.stdin)['MagicDNSSuffix'])" 2>/dev/null || echo '<tailnet>.ts.net')"
 fi
 
+# Ensure the app user owns the mounted data/documents volumes
+chown -R astro:astro /app/data /app/documents
+
 # Drop privileges and run the app
 echo "==> Starting Astro..."
 exec su -s /bin/bash astro -c 'python -m src.main serve --port 8000'
