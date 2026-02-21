@@ -2,7 +2,7 @@ title: Astro
 tagline: "Your Universe, Organized."
 description: "An AI-powered workspace that brings chat, notes, documents, action items, and autonomous agents into one self-hosted platform."
 url: ""
-baseurl: ""
+baseurl: "/astro"
 
 markdown: kramdown
 highlighter: rouge
