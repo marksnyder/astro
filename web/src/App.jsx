@@ -13,7 +13,7 @@ import { getMsalInstance } from './msalInstance'
 import { loginRequest } from './msalConfig'
 import BACKGROUNDS from './backgrounds'
 
-const LOGO_URL = 'https://cdnb.artstation.com/p/assets/images/images/051/019/079/large/shawn-davis-vorlon3.jpg?1656269084'
+const LOGO_URL = '/logo.png'
 
 function AstroLogo({ className }) {
   return <img src={LOGO_URL} alt="Astro OS" className={`astro-logo ${className || ''}`} />

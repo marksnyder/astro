@@ -1,0 +1,14 @@
+title: Astro
+tagline: "Your Universe, Organized."
+description: "An AI-powered workspace that brings chat, notes, documents, action items, and autonomous agents into one self-hosted platform."
+url: ""
+baseurl: ""
+
+markdown: kramdown
+highlighter: rouge
+permalink: pretty
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - README.md

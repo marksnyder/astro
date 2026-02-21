@@ -3,10 +3,10 @@
 # Astro Installer
 #
 # One-liner:
-#   curl -fsSL https://raw.githubusercontent.com/marksnyder/AstroOS/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/marksnyder/astro/main/install.sh | bash
 #
 # With options:
-#   curl -fsSL https://raw.githubusercontent.com/marksnyder/AstroOS/main/install.sh | bash -s -- \
+#   curl -fsSL https://raw.githubusercontent.com/marksnyder/astro/main/install.sh | bash -s -- \
 #     --port 9000 --ts-authkey tskey-auth-... --ts-hostname my-astro
 #
 # Environment variables (alternative to flags):

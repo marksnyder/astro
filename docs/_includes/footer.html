@@ -1,0 +1,15 @@
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <img src="{{ '/assets/img/logo.png' | relative_url }}" alt="Astro" width="28" height="28">
+      <span>Astro</span>
+    </div>
+    <p class="footer-tagline">{{ site.tagline }}</p>
+    <div class="footer-links">
+      <a href="https://github.com/marksnyder/astro">GitHub</a>
+      <a href="{{ '/features/' | relative_url }}">Features</a>
+      <a href="{{ '/install/' | relative_url }}">Install</a>
+    </div>
+    <p class="footer-copy">&copy; {{ 'now' | date: "%Y" }} Astro. Open source under the MIT License.</p>
+  </div>
+</footer>

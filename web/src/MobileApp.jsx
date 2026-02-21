@@ -6,7 +6,7 @@ import { getMsalInstance } from './msalInstance'
 import { loginRequest } from './msalConfig'
 import BACKGROUNDS from './backgrounds'
 
-const LOGO_URL = 'https://cdnb.artstation.com/p/assets/images/images/051/019/079/large/shawn-davis-vorlon3.jpg?1656269084'
+const LOGO_URL = '/logo.png'
 
 const MODELS = [
   { id: 'gpt-5.2', label: 'GPT-5.2' },
