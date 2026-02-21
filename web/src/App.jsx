@@ -7,8 +7,6 @@ import ActionItemsPanel from './ActionItemsPanel'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import CategoryTree, { CategoryPicker } from './CategoryTree'
-import { getMsalInstance } from './msalInstance'
-import { loginRequest } from './msalConfig'
 import BACKGROUNDS from './backgrounds'
 
 const LOGO_URL = '/logo.png'
@@ -407,64 +405,6 @@ function App() {
   const inputRef = useRef(null)
   const resizing = useRef(false)
 
-  // ── Outlook / MSAL state ──────────────────────────────
-  const [outlookAccount, setOutlookAccount] = useState(null)
-
-  useEffect(() => {
-    const { msal, ready } = getMsalInstance()
-    ready.then(() => {
-      const accounts = msal.getAllAccounts()
-      if (accounts.length > 0) setOutlookAccount(accounts[0])
-    })
-  }, [])
-
-  const connectOutlook = useCallback(async () => {
-    // Save chat state so it survives the redirect to Microsoft login
-    sessionStorage.setItem('astro_chat', JSON.stringify({ messages, model, useContext, chatMode, ircNick }))
-    const { msal, ready } = getMsalInstance()
-    await ready
-    msal.loginRedirect(loginRequest)
-  }, [messages, model, useContext, chatMode, ircNick])
-
-  const disconnectOutlook = useCallback(async () => {
-    const { msal, ready } = getMsalInstance()
-    await ready
-    if (outlookAccount) {
-      await msal.clearCache()
-    }
-    setOutlookAccount(null)
-  }, [outlookAccount])
-
-  // Restore chat state after returning from Microsoft login redirect
-  useEffect(() => {
-    const saved = sessionStorage.getItem('astro_chat')
-    if (saved) {
-      try {
-        const state = JSON.parse(saved)
-        if (state.messages?.length) setMessages(state.messages)
-        if (state.model) setModel(state.model)
-        if (state.useContext !== undefined) setUseContext(state.useContext)
-        if (state.chatMode) setChatMode(state.chatMode)
-        if (state.ircNick) setIrcNick(state.ircNick)
-      } catch { /* ignore corrupt data */ }
-      sessionStorage.removeItem('astro_chat')
-    }
-  }, [])
-
-  const getGraphToken = useCallback(async () => {
-    if (!outlookAccount) return null
-    const { msal, ready } = getMsalInstance()
-    await ready
-    try {
-      const resp = await msal.acquireTokenSilent({ scopes: ['Mail.Read'], account: outlookAccount })
-      return resp.accessToken
-    } catch {
-      // Token expired and silent refresh failed — need to re-auth
-      setOutlookAccount(null)
-      return null
-    }
-  }, [outlookAccount])
-
   const BG_INTERVAL = 600_000 // 10 minutes
   const [chatBg, setChatBg] = useState({ current: null, next: null, fading: false, author: null, authorUrl: null })
 
@@ -723,13 +663,11 @@ function App() {
       .map(m => ({ role: m.role, content: m.content }))
 
     try {
-      const graphToken = await getGraphToken()
       const payload = {
         question,
         model,
         use_context: useContext,
         history,
-        graph_token: graphToken,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         mode: chatMode,
       }
@@ -921,17 +859,6 @@ function App() {
               {stats.chunks} chunks indexed
             </div>
           )}
-          <button
-            className={`outlook-btn${outlookAccount ? ' outlook-connected' : ''}`}
-            onClick={outlookAccount ? disconnectOutlook : connectOutlook}
-            title={outlookAccount ? `Outlook: ${outlookAccount.username} (click to disconnect)` : 'Connect Outlook email'}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-              <polyline points="22,6 12,13 2,6" />
-            </svg>
-            {outlookAccount ? '' : ''}
-          </button>
           <button className="backup-restore-btn" onClick={() => setShowSettings(true)} title="Settings">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="3" />

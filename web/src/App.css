@@ -3225,42 +3225,6 @@
   background: var(--bg-tertiary);
 }
 
-/* ── Outlook connect button ─────────────────────────── */
-
-.outlook-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: 12px;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
-}
-
-.outlook-btn:hover {
-  color: var(--text-primary);
-  border-color: var(--accent);
-  background: var(--bg-tertiary);
-}
-
-.outlook-btn.outlook-connected {
-  color: #0078d4;
-  border-color: #0078d4;
-  background: rgba(0, 120, 212, 0.08);
-}
-
-.outlook-btn.outlook-connected:hover {
-  background: rgba(0, 120, 212, 0.15);
-}
-
-.outlook-btn.outlook-connected svg {
-  fill: rgba(0, 120, 212, 0.2);
-}
-
 .br-modal {
   position: fixed;
   inset: 0;

@@ -108,7 +108,6 @@ class QueryRequest(BaseModel):
     model: str = "gpt-5-mini"
     use_context: bool = True
     history: list[ChatMessage] = []
-    graph_token: Optional[str] = None
     timezone: Optional[str] = None
     mode: str = "llm"
 
@@ -1063,15 +1062,14 @@ def _start_ngircd():
 @app.post("/api/query", response_model=QueryResponse)
 def api_query(req: QueryRequest):
     history = [{"role": m.role, "content": m.content} for m in req.history]
-    has_email = bool(req.graph_token)
 
-    print(f"[Astro] Query: model={req.model}, use_context={req.use_context}, history_len={len(history)}, outlook={has_email}, tz={req.timezone}")
+    print(f"[Astro] Query: model={req.model}, use_context={req.use_context}, history_len={len(history)}, tz={req.timezone}")
     if req.use_context:
         if doc_count() == 0:
             raise HTTPException(status_code=400, detail="Vector store is empty. Ingest documents first or disable context.")
-        result = ask(req.question, model=req.model, history=history, graph_token=req.graph_token, user_timezone=req.timezone)
+        result = ask(req.question, model=req.model, history=history, user_timezone=req.timezone)
     else:
-        result = ask_direct(req.question, model=req.model, history=history, graph_token=req.graph_token, user_timezone=req.timezone)
+        result = ask_direct(req.question, model=req.model, history=history, user_timezone=req.timezone)
     return QueryResponse(answer=result.answer, model=result.model)
 
 

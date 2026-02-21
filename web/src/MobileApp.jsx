@@ -2,8 +2,6 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import './MobileApp.css'
-import { getMsalInstance } from './msalInstance'
-import { loginRequest } from './msalConfig'
 import BACKGROUNDS from './backgrounds'
 
 const LOGO_URL = '/logo.png'
@@ -590,62 +588,6 @@ function MobileApp() {
   const inputRef = useRef(null)
   const [stats, setStats] = useState(null)
 
-  // ── Outlook / MSAL state ──────────────────────────────
-  const [outlookAccount, setOutlookAccount] = useState(null)
-
-  useEffect(() => {
-    const { msal, ready } = getMsalInstance()
-    ready.then(() => {
-      const accounts = msal.getAllAccounts()
-      if (accounts.length > 0) setOutlookAccount(accounts[0])
-    })
-  }, [])
-
-  const connectOutlook = useCallback(async () => {
-    sessionStorage.setItem('astro_chat', JSON.stringify({ messages, model, useContext, chatMode, ircNick }))
-    const { msal, ready } = getMsalInstance()
-    await ready
-    msal.loginRedirect(loginRequest)
-  }, [messages, model, useContext, chatMode, ircNick])
-
-  const disconnectOutlook = useCallback(async () => {
-    const { msal, ready } = getMsalInstance()
-    await ready
-    if (outlookAccount) {
-      await msal.clearCache()
-    }
-    setOutlookAccount(null)
-  }, [outlookAccount])
-
-  // Restore chat state after returning from Microsoft login redirect
-  useEffect(() => {
-    const saved = sessionStorage.getItem('astro_chat')
-    if (saved) {
-      try {
-        const state = JSON.parse(saved)
-        if (state.messages?.length) setMessages(state.messages)
-        if (state.model) setModel(state.model)
-        if (state.useContext !== undefined) setUseContext(state.useContext)
-        if (state.chatMode) setChatMode(state.chatMode)
-        if (state.ircNick) setIrcNick(state.ircNick)
-      } catch { /* ignore */ }
-      sessionStorage.removeItem('astro_chat')
-    }
-  }, [])
-
-  const getGraphToken = useCallback(async () => {
-    if (!outlookAccount) return null
-    const { msal, ready } = getMsalInstance()
-    await ready
-    try {
-      const resp = await msal.acquireTokenSilent({ scopes: ['Mail.Read'], account: outlookAccount })
-      return resp.accessToken
-    } catch {
-      setOutlookAccount(null)
-      return null
-    }
-  }, [outlookAccount])
-
   useEffect(() => {
     fetch('/api/stats').then(r => r.json()).then(setStats).catch(() => {})
     fetch('/api/settings/selected_model').then(r => r.json()).then(d => { if (d.value) setModel(d.value) }).catch(() => {})
@@ -875,8 +817,7 @@ function MobileApp() {
     setLoading(true)
     const history = messages.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({ role: m.role, content: m.content }))
     try {
-      const graphToken = await getGraphToken()
-      const payload = { question, model, use_context: useContext, history, graph_token: graphToken, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, mode: chatMode }
+      const payload = { question, model, use_context: useContext, history, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, mode: chatMode }
       const res = await fetch('/api/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Request failed') }
       const data = await res.json()
@@ -982,22 +923,6 @@ function MobileApp() {
             <button className={`m-menu-item ${!useContext ? 'active' : ''}`} onClick={() => { setUseContext(false); setMenuOpen(false) }}>Direct Chat</button>
           </div>
         )}
-        <div className="m-menu-section">
-          <div className="m-menu-section-title">Integrations</div>
-          <button
-            className={`m-menu-item ${outlookAccount ? 'active' : ''}`}
-            onClick={async () => {
-              if (outlookAccount) { await disconnectOutlook() } else { await connectOutlook() }
-              setMenuOpen(false)
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6, verticalAlign: -2 }}>
-              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-              <polyline points="22,6 12,13 2,6" />
-            </svg>
-            {outlookAccount ? `Outlook: ${outlookAccount.username}` : 'Connect Outlook'}
-          </button>
-        </div>
         <div className="m-menu-section">
           <div className="m-menu-section-title">Actions</div>
           <button className="m-menu-item m-menu-danger" onClick={clearChat}>Clear Chat</button>
