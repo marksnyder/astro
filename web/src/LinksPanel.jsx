@@ -12,7 +12,7 @@ function LinksPanel({ categories, selectedCategoryId, onPinChange, universeId })
   const [expandedGroup, setExpandedGroup] = useState(null) // group key or null
   const titleRef = useRef(null)
 
-  const catMap = Object.fromEntries(categories.map((c) => [c.id, c.name]))
+  const catMap = Object.fromEntries(categories.map((c) => [c.id, c.emoji ? `${c.emoji} ${c.name}` : c.name]))
 
   const fetchLinks = () => {
     const params = new URLSearchParams()

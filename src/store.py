@@ -65,6 +65,7 @@ def upsert_note(note_id: int, content: str, title: str, universe_id: int = 1) ->
         metadata={"source": f"note: {title}", "note_id": note_id, "universe_id": universe_id},
     )
     store.add_documents([doc], ids=[doc_id])
+    print(f"[Astro] Upserted note id={note_id} title={title!r} universe={universe_id} len={len(content)}")
 
 
 def delete_document_chunks(source_path: str) -> int:
@@ -138,7 +139,13 @@ def delete_action_item_from_store(item_id: int) -> None:
 
 
 def clear() -> None:
-    """Delete all persisted data."""
-    if PERSIST_DIR.exists():
-        shutil.rmtree(PERSIST_DIR)
+    """Delete all data from the vector store collection."""
+    store = get_vectorstore()
+    collection = store._collection
+    # Delete all documents in batches (Chroma requires explicit IDs)
+    while True:
+        batch = collection.get(limit=5000, include=[])
+        if not batch["ids"]:
+            break
+        collection.delete(ids=batch["ids"])
     print("Vector store cleared.")

@@ -66,7 +66,7 @@ from src.notes import (
     link_to_dict,
     note_image_to_dict,
     note_to_dict,
-    rename_category,
+    update_category,
     rename_universe,
     set_document_category,
     set_document_pinned,
@@ -153,10 +153,12 @@ class NoteResponse(BaseModel):
 class CategoryRequest(BaseModel):
     name: str
     parent_id: Optional[int] = None
+    emoji: Optional[str] = None
 
 
-class CategoryRenameRequest(BaseModel):
+class CategoryUpdateRequest(BaseModel):
     name: str
+    emoji: Optional[str] = None
 
 
 class CategoryResponse(BaseModel):
@@ -164,6 +166,7 @@ class CategoryResponse(BaseModel):
     name: str
     parent_id: Optional[int]
     universe_id: int = 1
+    emoji: Optional[str] = None
 
 
 class DocumentInfo(BaseModel):
@@ -309,13 +312,13 @@ def api_list_categories(universe_id: Optional[int] = None):
 
 @app.post("/api/categories", response_model=CategoryResponse, status_code=201)
 def api_create_category(req: CategoryRequest, universe_id: int = 1):
-    cat = create_category(req.name, req.parent_id, universe_id=universe_id)
+    cat = create_category(req.name, req.parent_id, universe_id=universe_id, emoji=req.emoji)
     return category_to_dict(cat)
 
 
 @app.put("/api/categories/{cat_id}", response_model=CategoryResponse)
-def api_rename_category(cat_id: int, req: CategoryRenameRequest):
-    cat = rename_category(cat_id, req.name)
+def api_update_category(cat_id: int, req: CategoryUpdateRequest):
+    cat = update_category(cat_id, name=req.name, emoji=req.emoji)
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found")
     return category_to_dict(cat)
@@ -347,7 +350,10 @@ def api_get_note(note_id: int):
 @app.post("/api/notes", response_model=NoteResponse, status_code=201)
 def api_create_note(req: NoteRequest, universe_id: int = 1):
     note = create_note(req.title, req.body, req.category_id, universe_id=universe_id)
-    upsert_note(note.id, f"{note.title}\n\n{note.body}", note.title, universe_id=universe_id)
+    try:
+        upsert_note(note.id, f"{note.title}\n\n{note.body}", note.title, universe_id=universe_id)
+    except Exception as e:
+        print(f"[Astro] WARNING: Failed to upsert note {note.id} into vector store: {e}")
     return note_to_dict(note)
 
 
@@ -356,7 +362,10 @@ def api_update_note(note_id: int, req: NoteRequest):
     note = update_note(note_id, req.title, req.body, req.category_id)
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
-    upsert_note(note.id, f"{note.title}\n\n{note.body}", note.title, universe_id=note.universe_id)
+    try:
+        upsert_note(note.id, f"{note.title}\n\n{note.body}", note.title, universe_id=note.universe_id)
+    except Exception as e:
+        print(f"[Astro] WARNING: Failed to upsert note {note.id} into vector store: {e}")
     return note_to_dict(note)
 
 
@@ -877,56 +886,68 @@ def api_reindex():
 
     Call this after a restore to re-create all embeddings.
     """
+    import traceback
     from src.store import clear, add_documents as add_docs, upsert_note, upsert_action_item
-
-    # 1. Clear existing vector store
-    clear()
 
     counts = {"notes": 0, "action_items": 0, "document_chunks": 0}
 
-    # 2. Re-index notes
-    for note in list_notes():
-        upsert_note(note.id, f"{note.title}\n\n{note.body}", note.title, universe_id=note.universe_id)
-        counts["notes"] += 1
+    try:
+        # 1. Clear existing vector store
+        print("[reindex] Clearing vector store...")
+        clear()
 
-    # 3. Re-index action items
-    for item in list_action_items("", show_completed=True):
-        cat_name = None
-        if item.category_id:
-            cats = list_categories()
-            cat = next((c for c in cats if c.id == item.category_id), None)
-            if cat:
-                cat_name = cat.name
-        upsert_action_item(
-            item.id, item.title,
-            completed=item.completed, hot=item.hot,
-            due_date=item.due_date, category_name=cat_name,
-            universe_id=item.universe_id,
-        )
-        counts["action_items"] += 1
+        # 2. Re-index notes
+        print("[reindex] Indexing notes...")
+        for note in list_notes():
+            upsert_note(note.id, f"{note.title}\n\n{note.body}", note.title, universe_id=note.universe_id)
+            counts["notes"] += 1
 
-    # 4. Re-index documents from the documents/ folder
-    all_meta = get_all_document_meta()
-    if DOCUMENTS_DIR.is_dir():
-        for f in DOCUMENTS_DIR.rglob("*"):
-            if not f.is_file():
-                continue
-            if f.suffix.lower() not in SUPPORTED_EXTENSIONS:
-                continue
-            try:
-                rel = str(f.relative_to(DOCUMENTS_DIR))
-                uid = all_meta.get(rel, {}).get("universe_id", 1)
-                docs = load_document(str(f))
-                if docs:
-                    for doc in docs:
-                        doc.metadata["source"] = str(f)
-                    chunks = chunk_documents(docs)
-                    add_docs(chunks, universe_id=uid)
-                    counts["document_chunks"] += len(chunks)
-            except Exception as e:
-                print(f"[reindex] Error processing {f.name}: {e}")
+        # 3. Re-index action items
+        print("[reindex] Indexing action items...")
+        cats = list_categories()
+        for item in list_action_items("", show_completed=True):
+            cat_name = None
+            if item.category_id:
+                cat = next((c for c in cats if c.id == item.category_id), None)
+                if cat:
+                    cat_name = cat.name
+            upsert_action_item(
+                item.id, item.title,
+                completed=item.completed, hot=item.hot,
+                due_date=item.due_date, category_name=cat_name,
+                universe_id=item.universe_id,
+            )
+            counts["action_items"] += 1
 
-    return {"ok": True, "reindexed": counts}
+        # 4. Re-index documents from the documents/ folder
+        print("[reindex] Indexing documents...")
+        all_meta = get_all_document_meta()
+        if DOCUMENTS_DIR.is_dir():
+            for f in DOCUMENTS_DIR.rglob("*"):
+                if not f.is_file():
+                    continue
+                if f.suffix.lower() not in SUPPORTED_EXTENSIONS:
+                    continue
+                try:
+                    rel = str(f.relative_to(DOCUMENTS_DIR))
+                    uid = all_meta.get(rel, {}).get("universe_id", 1)
+                    docs = load_document(str(f))
+                    if docs:
+                        for doc in docs:
+                            doc.metadata["source"] = str(f)
+                        chunks = chunk_documents(docs)
+                        add_docs(chunks, universe_id=uid)
+                        counts["document_chunks"] += len(chunks)
+                except Exception as e:
+                    print(f"[reindex] Error processing {f.name}: {e}")
+
+        print(f"[reindex] Done: {counts}")
+        return {"ok": True, "reindexed": counts}
+
+    except Exception as e:
+        print(f"[reindex] FATAL: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Reindex failed: {str(e)}")
 
 
 

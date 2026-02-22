@@ -518,7 +518,7 @@ function NotesPanel({ categories, selectedCategoryId, onPinChange, editNoteReque
   const [previewMode, setPreviewMode] = useState(false)
   const titleRef = useRef(null)
 
-  const catMap = Object.fromEntries(categories.map((c) => [c.id, c.name]))
+  const catMap = Object.fromEntries(categories.map((c) => [c.id, c.emoji ? `${c.emoji} ${c.name}` : c.name]))
 
   const fetchNotes = () => {
     const params = new URLSearchParams()

@@ -719,10 +719,18 @@ function App() {
         body: JSON.stringify({ name: name.trim(), parent_id: payload.parentId }),
       })
     } else if (action === 'rename') {
+      const cat = categories.find(c => c.id === payload.id)
       await fetch(`/api/categories/${payload.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: payload.name }),
+        body: JSON.stringify({ name: payload.name, emoji: cat?.emoji || null }),
+      })
+    } else if (action === 'emoji') {
+      const cat = categories.find(c => c.id === payload.id)
+      await fetch(`/api/categories/${payload.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: cat?.name || '', emoji: payload.emoji }),
       })
     } else if (action === 'delete') {
       if (!confirm(`Delete category "${payload.name}" and all its sub-categories?`)) return
@@ -1118,6 +1126,7 @@ function App() {
                 onAdd={(parentId, name) => handleCategoryAction('add', { parentId, name })}
                 onRename={(id, name) => handleCategoryAction('rename', { id, name })}
                 onDelete={(id, name) => handleCategoryAction('delete', { id, name })}
+                onUpdateEmoji={(id, emoji) => handleCategoryAction('emoji', { id, emoji })}
               />
             </div>
           )}

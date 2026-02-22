@@ -85,7 +85,7 @@ function ArchivePanel({ categories, selectedCategoryId, onPinChange, universeId 
   const [editingCat, setEditingCat] = useState(null) // doc path being category-edited
   const fileInputRef = useRef(null)
 
-  const catMap = Object.fromEntries(categories.map((c) => [c.id, c.name]))
+  const catMap = Object.fromEntries(categories.map((c) => [c.id, c.emoji ? `${c.emoji} ${c.name}` : c.name]))
 
   const fetchDocs = () => {
     const params = new URLSearchParams()

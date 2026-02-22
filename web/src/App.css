@@ -2649,6 +2649,75 @@
 
 .tree-add-input::placeholder { color: var(--text-secondary); }
 
+/* ── Emoji picker ─────────────────────────────────── */
+
+.emoji-popover-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.emoji-trigger-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  opacity: 0.6;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.emoji-trigger-btn:hover {
+  opacity: 1;
+  background: rgba(124, 131, 247, 0.12);
+}
+
+.tree-row .emoji-trigger-btn {
+  opacity: 0.35;
+}
+
+.tree-row .emoji-trigger-btn.has-emoji {
+  opacity: 1;
+}
+
+.tree-row:hover .emoji-trigger-btn {
+  opacity: 1;
+}
+
+.emoji-popover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 999;
+  margin-top: 4px;
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+}
+
+.emoji-clear-btn {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  border: none;
+  background: rgba(229, 62, 62, 0.1);
+  color: #e53e3e;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 0 0 10px 10px;
+  transition: background 0.15s;
+}
+
+.emoji-clear-btn:hover {
+  background: rgba(229, 62, 62, 0.2);
+}
+
 /* ── Category shared ──────────────────────────────── */
 
 .category-select {

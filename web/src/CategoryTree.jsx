@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import data from '@emoji-mart/data'
+import Picker from '@emoji-mart/react'
 
 // ── Build nested tree from flat list ──────────────────
 
@@ -36,16 +38,62 @@ export function CategoryPicker({ categories, value, onChange, className }) {
       <option value="">No category</option>
       {flat.map((c) => (
         <option key={c.id} value={c.id}>
-          {'\u00A0\u00A0'.repeat(c.depth)}{c.name}
+          {'\u00A0\u00A0'.repeat(c.depth)}{c.emoji ? `${c.emoji} ` : ''}{c.name}
         </option>
       ))}
     </select>
   )
 }
 
+// ── Emoji picker popover ─────────────────────────────
+
+function EmojiPopover({ emoji, onSelect, onClear }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  return (
+    <div className="emoji-popover-wrap" ref={ref}>
+      <button
+        className={`emoji-trigger-btn ${emoji ? 'has-emoji' : ''}`}
+        onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
+        title={emoji ? 'Change emoji' : 'Set emoji'}
+      >
+        {emoji || '🏷️'}
+      </button>
+      {open && (
+        <div className="emoji-popover" onClick={(e) => e.stopPropagation()}>
+          <Picker
+            data={data}
+            onEmojiSelect={(e) => { onSelect(e.native); setOpen(false) }}
+            theme="dark"
+            previewPosition="none"
+            skinTonePosition="search"
+            perLine={8}
+            maxFrequentRows={1}
+          />
+          {emoji && (
+            <button className="emoji-clear-btn" onClick={() => { onClear(); setOpen(false) }}>
+              Remove emoji
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Tree node (recursive) ─────────────────────────────
 
-function TreeNode({ node, depth, selectedId, onSelect, onAdd, onRename, onDelete }) {
+function TreeNode({ node, depth, selectedId, onSelect, onAdd, onRename, onDelete, onUpdateEmoji }) {
   const [expanded, setExpanded] = useState(true)
   const [renaming, setRenaming] = useState(false)
   const [renameVal, setRenameVal] = useState('')
@@ -78,6 +126,12 @@ function TreeNode({ node, depth, selectedId, onSelect, onAdd, onRename, onDelete
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </span>
+
+        <EmojiPopover
+          emoji={node.emoji}
+          onSelect={(emoji) => onUpdateEmoji(node.id, emoji)}
+          onClear={() => onUpdateEmoji(node.id, null)}
+        />
 
         {renaming ? (
           <input
@@ -135,6 +189,7 @@ function TreeNode({ node, depth, selectedId, onSelect, onAdd, onRename, onDelete
           onAdd={onAdd}
           onRename={onRename}
           onDelete={onDelete}
+          onUpdateEmoji={onUpdateEmoji}
         />
       ))}
     </>
@@ -143,8 +198,8 @@ function TreeNode({ node, depth, selectedId, onSelect, onAdd, onRename, onDelete
 
 // ── Main tree component ───────────────────────────────
 
-export default function CategoryTree({ categories, selectedId, onSelect, onAdd, onRename, onDelete }) {
-  const [adding, setAdding] = useState(false)   // showing root-add input
+export default function CategoryTree({ categories, selectedId, onSelect, onAdd, onRename, onDelete, onUpdateEmoji }) {
+  const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
   const tree = buildTree(categories)
 
@@ -186,6 +241,7 @@ export default function CategoryTree({ categories, selectedId, onSelect, onAdd, 
           onAdd={(parentId) => onAdd(parentId)}
           onRename={onRename}
           onDelete={onDelete}
+          onUpdateEmoji={onUpdateEmoji}
         />
       ))}
 

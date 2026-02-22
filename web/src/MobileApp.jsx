@@ -23,7 +23,7 @@ const MODELS = [
 // ── Shared mobile category picker ─────────────────────
 
 function MobileCategorySelect({ categories, value, onChange }) {
-  const buildOptions = (cats) => {
+  const buildOptions = (cats, depth = 0) => {
     const childMap = {}
     for (const c of cats) {
       const key = c.parent_id ?? '__root__'
@@ -35,7 +35,7 @@ function MobileCategorySelect({ categories, value, onChange }) {
       const children = childMap[parentId] || []
       children.sort((a, b) => a.name.localeCompare(b.name))
       for (const c of children) {
-        opts.push({ id: c.id, label: '\u00A0\u00A0'.repeat(depth) + c.name })
+        opts.push({ id: c.id, label: '\u00A0\u00A0'.repeat(depth) + (c.emoji ? c.emoji + ' ' : '') + c.name })
         walk(c.id, depth + 1)
       }
     }
@@ -82,6 +82,8 @@ function MobileNotes({ categories, universeId }) {
   }
 
   const catMap = Object.fromEntries(categories.map(c => [c.id, c.name]))
+  const catEmojiMap = Object.fromEntries(categories.map(c => [c.id, c.emoji]))
+  const catLabel = (id) => { const e = catEmojiMap[id]; const n = catMap[id]; return e ? `${e} ${n}` : n }
 
   const getLastCategoryId = () => {
     try { const v = localStorage.getItem('mn-last-category'); return v ? parseInt(v) : null } catch { return null }
@@ -286,7 +288,7 @@ function MobileNotes({ categories, universeId }) {
           <h2 className="mn-view-title">{viewing.title || 'Untitled'}</h2>
           <div className="mn-view-meta">
             <span>{formatDate(viewing.updated_at)}</span>
-            {viewing.category_id && catMap[viewing.category_id] && <span className="mn-cat-badge">{catMap[viewing.category_id]}</span>}
+            {viewing.category_id && catMap[viewing.category_id] && <span className="mn-cat-badge">{catLabel(viewing.category_id)}</span>}
           </div>
           <div className="mn-view-content markdown-body">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -354,7 +356,7 @@ function MobileNotes({ categories, universeId }) {
             <div className="mn-note-preview">{stripHtml(note.body).slice(0, 100)}</div>
             <div className="mn-note-card-footer">
               <span className="mn-note-date">{formatDate(note.updated_at)}</span>
-              {note.category_id && catMap[note.category_id] && <span className="mn-cat-badge small">{catMap[note.category_id]}</span>}
+              {note.category_id && catMap[note.category_id] && <span className="mn-cat-badge small">{catLabel(note.category_id)}</span>}
             </div>
           </div>
         ))}
@@ -378,6 +380,8 @@ function MobileActions({ categories, universeId }) {
   const titleRef = useRef(null)
 
   const catMap = Object.fromEntries(categories.map(c => [c.id, c.name]))
+  const catEmojiMap = Object.fromEntries(categories.map(c => [c.id, c.emoji]))
+  const catLabel = (id) => { const e = catEmojiMap[id]; const n = catMap[id]; return e ? `${e} ${n}` : n }
 
   const fetchItems = useCallback(() => {
     const params = new URLSearchParams()
@@ -529,7 +533,7 @@ function MobileActions({ categories, universeId }) {
           return order.map(key => (
             <div key={key} className="ma-group">
               <div className="ma-group-header">
-                {key === '__none__' ? 'Uncategorized' : catMap[key] || 'Unknown'}
+                {key === '__none__' ? 'Uncategorized' : catLabel(key) || 'Unknown'}
                 <span className="ma-group-count">{groups[key].length}</span>
               </div>
               {groups[key].map(item => (

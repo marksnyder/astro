@@ -49,6 +49,7 @@ class Category:
     name: str
     parent_id: int | None
     universe_id: int = 1
+    emoji: str | None = None
 
 
 @dataclass
@@ -211,32 +212,45 @@ def universe_to_dict(u: Universe) -> dict:
 def list_categories(universe_id: int | None = None) -> list[Category]:
     conn = _get_conn()
     if universe_id is not None:
-        rows = conn.execute("SELECT id, name, parent_id, universe_id FROM categories WHERE universe_id = ? ORDER BY name", (universe_id,)).fetchall()
+        rows = conn.execute("SELECT id, name, parent_id, universe_id, emoji FROM categories WHERE universe_id = ? ORDER BY name", (universe_id,)).fetchall()
     else:
-        rows = conn.execute("SELECT id, name, parent_id, universe_id FROM categories ORDER BY name").fetchall()
+        rows = conn.execute("SELECT id, name, parent_id, universe_id, emoji FROM categories ORDER BY name").fetchall()
     conn.close()
-    return [Category(id=r["id"], name=r["name"], parent_id=r["parent_id"], universe_id=r["universe_id"]) for r in rows]
+    return [Category(id=r["id"], name=r["name"], parent_id=r["parent_id"], universe_id=r["universe_id"], emoji=r["emoji"]) for r in rows]
 
 
-def create_category(name: str, parent_id: int | None = None, universe_id: int = 1) -> Category:
+def create_category(name: str, parent_id: int | None = None, universe_id: int = 1, emoji: str | None = None) -> Category:
     conn = _get_conn()
-    cur = conn.execute("INSERT INTO categories (name, parent_id, universe_id) VALUES (?, ?, ?)", (name, parent_id, universe_id))
+    cur = conn.execute("INSERT INTO categories (name, parent_id, universe_id, emoji) VALUES (?, ?, ?, ?)", (name, parent_id, universe_id, emoji))
     conn.commit()
     cat_id = cur.lastrowid
     conn.close()
-    return Category(id=cat_id, name=name, parent_id=parent_id, universe_id=universe_id)  # type: ignore[arg-type]
+    return Category(id=cat_id, name=name, parent_id=parent_id, universe_id=universe_id, emoji=emoji)  # type: ignore[arg-type]
 
 
-def rename_category(cat_id: int, name: str) -> Category | None:
+def update_category(cat_id: int, name: str | None = None, emoji: str | None = ...) -> Category | None:
+    """Update a category's name and/or emoji. Pass emoji=None to clear it."""
     conn = _get_conn()
-    cur = conn.execute("UPDATE categories SET name = ? WHERE id = ?", (name, cat_id))
+    fields = []
+    params = []
+    if name is not None:
+        fields.append("name = ?")
+        params.append(name)
+    if emoji is not ...:
+        fields.append("emoji = ?")
+        params.append(emoji)
+    if not fields:
+        conn.close()
+        return None
+    params.append(cat_id)
+    cur = conn.execute(f"UPDATE categories SET {', '.join(fields)} WHERE id = ?", params)
     conn.commit()
     if cur.rowcount == 0:
         conn.close()
         return None
-    row = conn.execute("SELECT id, name, parent_id FROM categories WHERE id = ?", (cat_id,)).fetchone()
+    row = conn.execute("SELECT id, name, parent_id, universe_id, emoji FROM categories WHERE id = ?", (cat_id,)).fetchone()
     conn.close()
-    return Category(id=row["id"], name=row["name"], parent_id=row["parent_id"])
+    return Category(id=row["id"], name=row["name"], parent_id=row["parent_id"], universe_id=row["universe_id"], emoji=row["emoji"])
 
 
 def delete_category(cat_id: int) -> bool:

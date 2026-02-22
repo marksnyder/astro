@@ -235,6 +235,10 @@ def ask(
     """Ask a question with RAG context and optional conversation history."""
     retriever = get_retriever(universe_id=universe_id)
     docs = retriever.invoke(question)
+    print(f"[Astro] RAG retrieved {len(docs)} docs for universe={universe_id}:")
+    for i, d in enumerate(docs):
+        src = d.metadata.get("source", "unknown")
+        print(f"  [{i}] source={src!r}, len={len(d.page_content)}, preview={d.page_content[:120]!r}")
     context = _format_docs(docs)
 
     llm = ChatOpenAI(model=model, api_key=get_openai_api_key())
