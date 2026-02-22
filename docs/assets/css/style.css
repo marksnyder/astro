@@ -91,7 +91,7 @@ img { max-width: 100%; height: auto; }
 /* ── Hero ───────────────────────────────────────────────── */
 
 .hero {
-  background: var(--hero-gradient);
+  background: url('../img/background.jpg') center center / cover no-repeat fixed;
   position: relative;
   overflow: hidden;
   padding: 6rem 2rem 5rem;
@@ -101,12 +101,8 @@ img { max-width: 100%; height: auto; }
 .hero::before {
   content: '';
   position: absolute;
-  top: -50%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 800px;
-  height: 800px;
-  background: radial-gradient(circle, rgba(88,166,255,.08) 0%, transparent 70%);
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,.45) 0%, rgba(0,0,0,.6) 50%, rgba(13,17,23,.95) 100%);
   pointer-events: none;
 }
 
@@ -231,12 +227,44 @@ img { max-width: 100%; height: auto; }
   flex-shrink: 0;
 }
 
+.copy-btn {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color .15s, border-color .15s;
+}
+
+.copy-btn:hover { color: var(--text); border-color: var(--text-muted); }
+
+.copy-btn .check-icon { display: none; }
+.copy-btn.copied .copy-icon { display: none; }
+.copy-btn.copied .check-icon { display: block; }
+.copy-btn.copied { color: var(--green); border-color: var(--green); }
+
 /* ── Feature pillars (home) ─────────────────────────────── */
 
 .pillars {
   padding: 5rem 2rem;
-  background: var(--bg);
+  background: url('../img/background.jpg') center center / cover no-repeat fixed;
+  position: relative;
 }
+
+.pillars::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(13, 17, 23, .85);
+  pointer-events: none;
+}
+
+.pillars-inner { position: relative; z-index: 1; }
 
 .pillars-inner {
   max-width: var(--max-width);
@@ -275,8 +303,7 @@ img { max-width: 100%; height: auto; }
 }
 
 .pillar:hover {
-  border-color: var(--accent);
-  transform: translateY(-2px);
+  border-color: var(--border);
 }
 
 .pillar-icon {
@@ -352,15 +379,34 @@ img { max-width: 100%; height: auto; }
 }
 
 .what-is-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: var(--accent-glow);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--accent);
   flex-shrink: 0;
+  transition: transform .2s, box-shadow .2s;
+}
+
+.what-is-point:hover .what-is-icon { transform: scale(1.12); }
+
+.wia-amber {
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  color: #fff;
+  box-shadow: 0 0 20px rgba(245, 158, 11, .35);
+}
+
+.wia-purple {
+  background: linear-gradient(135deg, #a78bfa, #8b5cf6);
+  color: #fff;
+  box-shadow: 0 0 20px rgba(139, 92, 246, .35);
+}
+
+.wia-green {
+  background: linear-gradient(135deg, #34d399, #10b981);
+  color: #fff;
+  box-shadow: 0 0 20px rgba(16, 185, 129, .35);
 }
 
 /* ── Screenshots gallery ───────────────────────────────── */
@@ -840,6 +886,7 @@ img { max-width: 100%; height: auto; }
 /* ── Responsive ─────────────────────────────────────────── */
 
 @media (max-width: 768px) {
+  .hero, .pillars { background-attachment: scroll; }
   .hero { padding: 4rem 1.5rem 3rem; }
   .hero h1 { font-size: 2.2rem; }
   .hero-tagline { font-size: 1.8rem; }
