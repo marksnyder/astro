@@ -81,6 +81,7 @@ if [ "$USE_TAILSCALE" = "yes" ]; then
         --cap-add=NET_ADMIN
         --cap-add=NET_RAW
         --device /dev/net/tun:/dev/net/tun
+        -e TS_ENABLED=true
         -e TS_AUTHKEY="${TS_AUTHKEY}"
         -e TS_HOSTNAME="${TS_HOSTNAME}"
         -e TS_SERVE_HTTPS="${TS_SERVE_HTTPS}"

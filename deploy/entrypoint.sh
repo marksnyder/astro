@@ -3,30 +3,47 @@
 # entrypoint.sh — Start Tailscale, then launch the Astro app.
 #
 # Environment variables:
-#   TS_AUTHKEY    — Tailscale auth key (required on first run)
-#   TS_HOSTNAME   — Tailscale hostname (default: "astro")
+#   TS_AUTHKEY     — Tailscale auth key (required on first run)
+#   TS_ENABLED     — Set to "true" to start Tailscale even without an auth key
+#   TS_HOSTNAME    — Tailscale hostname (default: "astro")
 #   TS_SERVE_HTTPS — Set to "true" to enable Tailscale HTTPS (default: true)
-#   TS_EXTRA_ARGS — Extra args passed to `tailscale up`
+#   TS_EXTRA_ARGS  — Extra args passed to `tailscale up`
 # ──────────────────────────────────────────────────────────────
 set -euo pipefail
 
 TS_HOSTNAME="${TS_HOSTNAME:-astro}"
 TS_SERVE_HTTPS="${TS_SERVE_HTTPS:-true}"
+TS_ENABLED="${TS_ENABLED:-}"
 TS_OK=false
 
-if [ -n "${TS_AUTHKEY:-}" ]; then
+HAS_STATE=false
+if [ -f /var/lib/tailscale/tailscaled.state ]; then
+    HAS_STATE=true
+fi
+
+# Start Tailscale if we have an auth key, persisted state, or TS_ENABLED=true
+if [ -n "${TS_AUTHKEY:-}" ] || [ "$HAS_STATE" = true ] || [ "${TS_ENABLED:-}" = "true" ]; then
     echo "==> Starting tailscaled..."
     tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/var/run/tailscale/tailscaled.sock &
     sleep 2
 
-    TS_UP_ARGS=(--hostname="${TS_HOSTNAME}" --authkey="${TS_AUTHKEY}")
+    TS_UP_ARGS=(--hostname="${TS_HOSTNAME}")
+
+    if [ -n "${TS_AUTHKEY:-}" ]; then
+        TS_UP_ARGS+=(--authkey="${TS_AUTHKEY}")
+    fi
 
     if [ -n "${TS_EXTRA_ARGS:-}" ]; then
         # shellcheck disable=SC2206
         TS_UP_ARGS+=(${TS_EXTRA_ARGS})
     fi
 
-    echo "==> Connecting to Tailscale as '${TS_HOSTNAME}'..."
+    if [ "$HAS_STATE" = true ] && [ -z "${TS_AUTHKEY:-}" ]; then
+        echo "==> Reconnecting to Tailscale using persisted state..."
+    else
+        echo "==> Connecting to Tailscale as '${TS_HOSTNAME}'..."
+    fi
+
     if tailscale up "${TS_UP_ARGS[@]}"; then
         TS_OK=true
         TS_IP=$(tailscale ip -4 2>/dev/null || echo 'pending')

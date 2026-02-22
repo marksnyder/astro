@@ -103,23 +103,32 @@ if [ -z "$USE_TAILSCALE" ]; then
 fi
 
 if [ "$USE_TAILSCALE" = "yes" ]; then
-    if [ -z "$TS_AUTHKEY" ]; then
-        if [ -t 0 ]; then
-            TTY_IN=/dev/stdin
-        elif [ -e /dev/tty ]; then
-            TTY_IN=/dev/tty
-        else
-            TTY_IN=""
-        fi
+    HAS_TS_STATE=false
+    if [ -d "${ASTRO_DATA_DIR}/tailscale" ] && [ -f "${ASTRO_DATA_DIR}/tailscale/tailscaled.state" ]; then
+        HAS_TS_STATE=true
+    fi
 
-        if [ -n "$TTY_IN" ]; then
-            read -rp "Tailscale auth key (tskey-auth-...): " TS_AUTHKEY < "$TTY_IN"
-            if [ -z "$TS_AUTHKEY" ]; then
-                echo "Warning: No auth key provided. Tailscale will need an existing state in ${ASTRO_DATA_DIR}/tailscale."
+    if [ -z "$TS_AUTHKEY" ]; then
+        if [ "$HAS_TS_STATE" = true ]; then
+            echo "==> Found existing Tailscale state — will reconnect automatically."
+        else
+            if [ -t 0 ]; then
+                TTY_IN=/dev/stdin
+            elif [ -e /dev/tty ]; then
+                TTY_IN=/dev/tty
+            else
+                TTY_IN=""
             fi
-            read -rp "Tailscale hostname [${TS_HOSTNAME}]: " ts_hn < "$TTY_IN"
-            if [ -n "$ts_hn" ]; then
-                TS_HOSTNAME="$ts_hn"
+
+            if [ -n "$TTY_IN" ]; then
+                read -rp "Tailscale auth key (tskey-auth-...): " TS_AUTHKEY < "$TTY_IN"
+                if [ -z "$TS_AUTHKEY" ]; then
+                    echo "Warning: No auth key provided and no existing state found. Tailscale may not connect."
+                fi
+                read -rp "Tailscale hostname [${TS_HOSTNAME}]: " ts_hn < "$TTY_IN"
+                if [ -n "$ts_hn" ]; then
+                    TS_HOSTNAME="$ts_hn"
+                fi
             fi
         fi
     fi
@@ -168,6 +177,7 @@ if [ "$USE_TAILSCALE" = "yes" ]; then
         --cap-add=NET_ADMIN
         --cap-add=NET_RAW
         --device /dev/net/tun:/dev/net/tun
+        -e TS_ENABLED=true
         -e TS_AUTHKEY="${TS_AUTHKEY}"
         -e TS_HOSTNAME="${TS_HOSTNAME}"
         -e TS_SERVE_HTTPS="${TS_SERVE_HTTPS}"
