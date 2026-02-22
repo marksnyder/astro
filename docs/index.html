@@ -147,9 +147,22 @@ layout: default
 {% if site.data.screenshots.size > 0 %}
 <section class="screenshots-section">
   <div class="screenshots-heading">
+    <button class="screenshots-arrow screenshots-arrow-left" onclick="scrollScreenshots(-1)" aria-label="Scroll left">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
     <h2>See It in Action</h2>
-    <p>Scroll through Astro's interface.</p>
+    <button class="screenshots-arrow screenshots-arrow-right" onclick="scrollScreenshots(1)" aria-label="Scroll right">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
   </div>
+  <script>
+  function scrollScreenshots(dir) {
+    var track = document.querySelector('.screenshots-track');
+    var card = track.querySelector('.screenshot-card');
+    var distance = card ? card.offsetWidth + 24 : 400;
+    track.scrollBy({ left: dir * distance, behavior: 'smooth' });
+  }
+  </script>
   <div class="screenshots-track">
     {% for shot in site.data.screenshots %}
     <figure class="screenshot-card" onclick="openLightbox(this)">

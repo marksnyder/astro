@@ -6,26 +6,29 @@
 #
 # Images display in the order listed. Remove or reorder entries to change.
 
-- file: placeholder.png
-  description: "AI Chat — conversational AI grounded in your documents"
+- file: llm-with-RAG.png
+  description: "LLM & RAG — Chat with AI grounded in your documents, notes, and action items"
 
 - file: action-items.png
-  description: "Track TODO items to stay on task"
+  description: "Action Items — Track tasks with priorities, due dates, and category organization"
 
-- file: action-items.png
-  description: "Track TODO items to stay on task"
+- file: note-markup.png
+  description: "Notes — Rich text notes with markup formatting and embedded images"
 
-- file: action-items.png
-  description: "Track TODO items to stay on task"
+- file: categories.png
+  description: "Categories — Hierarchical category tree to organize everything in one place"
 
-# - file: notes.png
-#   description: "Notes — rich text with images and categories"
+- file: manage-links.png
+  description: "Bookmarks — Save, organize, and search your links by category"
 
-# - file: documents.png
-#   description: "Document Archive — upload, ingest, and query files"
+- file: agent-network.png
+  description: "Agent Network — Built-in IRC server for coordinating AI agents across platforms"
 
-# - file: action-items.png
-#   description: "Action Items — tasks with priorities and due dates"
+- file: mobile.png
+  description: "Mobile — Full access to chat, notes, and tasks on the go"
 
-# - file: mobile.png
-#   description: "Mobile — full access on the go"
+- file: chrome-and-edge-browser-extension.png
+  description: "Browser Extension — Save pages to Astro with one click from Chrome or Edge"
+
+- file: settings.png
+  description: "Settings — Configure your OpenAI API key, backup & restore, and rebuild index"
