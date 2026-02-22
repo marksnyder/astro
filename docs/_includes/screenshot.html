@@ -1,0 +1,9 @@
+{% assign shot = site.data.screenshots | where: "name", include.name | first %}
+{% if shot %}
+<figure class="screenshot">
+  <img src="{{ shot.url | relative_url }}" alt="{{ shot.description | default: shot.name }}">
+  {% if shot.description != '' %}
+  <figcaption>{{ shot.description }}</figcaption>
+  {% endif %}
+</figure>
+{% endif %}

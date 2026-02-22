@@ -5,20 +5,46 @@ layout: default
 <section class="hero">
   <div class="hero-inner">
     <img src="{{ '/assets/img/logo.png' | relative_url }}" alt="Astro" class="hero-logo">
-    <h1>Astro</h1>
-    <p class="hero-tagline">{{ site.tagline }}</p>
-    <p class="hero-description">
-      An AI-powered, self-hosted workspace that brings chat, notes, documents,
-      action items, bookmarks, and autonomous agents into a single platform &mdash;
-      all running on your own hardware.
-    </p>
+    <p class="hero-tagline">Organize your Universe.</p>
     <div class="hero-actions">
       <a href="{{ '/install/' | relative_url }}" class="btn btn-primary">Get Started</a>
       <a href="{{ '/features/' | relative_url }}" class="btn btn-outline">Explore Features</a>
     </div>
     <div class="install-banner">
       <span class="label">Install</span>
-      <code>curl -fsSL https://raw.githubusercontent.com/marksnyder/astro/main/install.sh | bash</code>
+      <code>curl -fsSL https://runastro.sh/install.sh | bash</code>
+    </div>
+  </div>
+</section>
+
+<section class="what-is-astro">
+  <div class="what-is-inner">
+    <h2>What Is Astro?</h2>
+    <p class="what-is-lead">
+      A centralized system for notes, documents, tasks, links, AI conversations,
+      and agent communication. Everything lives inside <strong>Universes</strong>
+      &mdash; cleanly separated workspaces that keep your knowledge organized and
+      contained.
+    </p>
+    <div class="what-is-points">
+      <div class="what-is-point">
+        <span class="what-is-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </span>
+        Capture ideas when you have them
+      </div>
+      <div class="what-is-point">
+        <span class="what-is-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </span>
+        Stay Focused
+      </div>
+      <div class="what-is-point">
+        <span class="what-is-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </span>
+        Boost Productivity
+      </div>
     </div>
   </div>
 </section>
@@ -26,114 +52,192 @@ layout: default
 <section class="pillars">
   <div class="pillars-inner">
     <div class="pillars-heading">
-      <h2>Everything you need. Nothing you don't.</h2>
-      <p>One container. Zero cloud dependencies. Complete control.</p>
+      <h2>Core Features</h2>
+      <p>Structured organization meets retrieval-aware AI.</p>
     </div>
     <div class="pillars-grid">
       <div class="pillar">
         <div class="pillar-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <!-- brain / neural network -->
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5V5a2.5 2.5 0 0 1-4.96.44A2.5 2.5 0 0 1 4.5 3 2.5 2.5 0 0 1 7 .5"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5V5a2.5 2.5 0 0 0 4.96.44A2.5 2.5 0 0 0 19.5 3 2.5 2.5 0 0 0 17 .5"/><path d="M4.5 12a2.5 2.5 0 0 0 0 5 2.5 2.5 0 0 0 2.5-2.5"/><path d="M19.5 12a2.5 2.5 0 0 1 0 5 2.5 2.5 0 0 1-2.5-2.5"/><path d="M12 19.5V22"/><path d="M8 22h8"/><path d="M12 5v14.5"/></svg>
         </div>
-        <h3>AI Chat with RAG</h3>
+        <h3>LLM &amp; RAG</h3>
         <p>
-          Ask questions and get answers grounded in your own documents.
-          Powered by OpenAI with support for GPT-5, o3, and more &mdash;
-          switch models on the fly. Toggle between RAG-augmented and direct chat with one click.
+          Conversational AI with retrieval you can toggle per message. When enabled,
+          answers are grounded in your notes, documents, and action items &mdash;
+          building a persistent knowledgebase that grows with use.
         </p>
       </div>
       <div class="pillar">
         <div class="pillar-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <!-- pencil / edit -->
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </div>
-        <h3>Notes &amp; Documents</h3>
+        <h3>Notes</h3>
         <p>
-          Rich notes with image embedding, plus a full document archive supporting
-          PDF, DOCX, XLSX, and PPTX. Every document is automatically chunked and
-          indexed into the vector store for AI retrieval.
+          Create and organize structured notes with rich formatting, embedded images,
+          category assignment, and full-text search. Every note is included in
+          AI retrieval context automatically.
         </p>
       </div>
       <div class="pillar">
         <div class="pillar-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z"/></svg>
+          <!-- file stack / archive -->
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+        </div>
+        <h3>Documents</h3>
+        <p>
+          Upload PDF, DOCX, XLSX, PPTX, TXT, MD, and CSV files. Documents are
+          automatically ingested and embedded so they become queryable memory
+          &mdash; not just storage.
+        </p>
+      </div>
+      <div class="pillar">
+        <div class="pillar-icon">
+          <!-- checklist / checkbox -->
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         </div>
         <h3>Action Items</h3>
         <p>
-          Track tasks with priority flags, due dates, and category organization.
-          Link action items to related notes or documents. Everything is searchable
-          through the vector store.
+          Track tasks with priority flags, due dates, and categories. Tasks
+          integrate directly into your knowledge system and are included in
+          AI retrieval.
         </p>
       </div>
       <div class="pillar">
         <div class="pillar-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <!-- bookmark -->
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
         </div>
-        <h3>Autonomous Agents</h3>
+        <h3>Bookmarks</h3>
         <p>
-          Define AI team members with custom profiles and instructions.
-          Create multi-step activities that run on a schedule or on demand &mdash;
-          delegate research, analysis, and reporting to your agents.
+          Save and organize links inside your Universe with titles, URLs, and
+          categories. Links become part of your searchable knowledge base.
         </p>
       </div>
       <div class="pillar">
         <div class="pillar-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          <!-- bot / agent -->
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>
         </div>
-        <h3>Links &amp; Bookmarks</h3>
+        <h3>Agent Network</h3>
         <p>
-          Save and organize bookmarks with categories. A companion browser extension
-          lets you save links from any page with one click.
-          Pin your most important items to the header bar for quick access.
-        </p>
-      </div>
-      <div class="pillar">
-        <div class="pillar-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        </div>
-        <h3>Self-Hosted &amp; Secure</h3>
-        <p>
-          Runs entirely on your own infrastructure via Docker. Built-in Tailscale
-          integration provides secure remote access with automatic HTTPS &mdash;
-          no port forwarding or cloud services required.
+          A built-in IRC server enables communication with AI agents across
+          platforms. Coordinate agents, communicate across systems, and integrate
+          with external AI platforms from one central hub.
         </p>
       </div>
     </div>
   </div>
 </section>
 
+{% if site.data.screenshots.size > 0 %}
+<section class="screenshots-section">
+  <div class="screenshots-heading">
+    <h2>See It in Action</h2>
+    <p>Scroll through Astro's interface.</p>
+  </div>
+  <div class="screenshots-track">
+    {% for shot in site.data.screenshots %}
+    <figure class="screenshot-card" onclick="openLightbox(this)">
+      <img src="{{ '/assets/screenshots/' | append: shot.file | relative_url }}" alt="{{ shot.description }}" loading="lazy">
+      {% if shot.description %}
+      <figcaption>{{ shot.description }}</figcaption>
+      {% endif %}
+    </figure>
+    {% endfor %}
+  </div>
+</section>
+
+<div class="lightbox" id="screenshotLightbox" onclick="closeLightbox(event)">
+  <button class="lightbox-close" onclick="closeLightbox(event)" aria-label="Close">&times;</button>
+  <img class="lightbox-img" id="lightboxImg" src="" alt="">
+  <p class="lightbox-caption" id="lightboxCaption"></p>
+</div>
+
+<script>
+function openLightbox(card) {
+  var img = card.querySelector('img');
+  var cap = card.querySelector('figcaption');
+  document.getElementById('lightboxImg').src = img.src;
+  document.getElementById('lightboxImg').alt = img.alt;
+  document.getElementById('lightboxCaption').textContent = cap ? cap.textContent : '';
+  document.getElementById('screenshotLightbox').classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+function closeLightbox(e) {
+  if (e.target.classList.contains('lightbox-img')) return;
+  document.getElementById('screenshotLightbox').classList.remove('active');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeLightbox(e);
+});
+</script>
+{% endif %}
+
 <section class="highlight-section">
   <div class="highlight-inner">
     <div class="highlight-text">
-      <h2>Deploy in seconds</h2>
+      <h2>Organization &amp; Structure</h2>
       <p>
-        Astro ships as a single Docker image on Docker Hub. One command pulls
-        the latest version, sets up persistent volume mounts for your data,
-        and starts the container. Your notes, documents, and vector store survive
-        upgrades automatically.
+        Astro is designed for clarity at scale. A hierarchical category tree
+        organizes notes, documents, tasks, and links with consistent structure.
+        Pin important items to a unified header bar for quick access.
       </p>
       <p>
-        Need to update? Run the same command again. It removes the old container,
-        pulls the newest image, and relaunches &mdash; your data stays intact.
+        Unified search lets you find anything instantly. And a mobile-optimized
+        interface keeps your Universe accessible anywhere.
       </p>
-      <a href="{{ '/install/' | relative_url }}" class="btn btn-primary" style="margin-top: .5rem;">Installation Guide</a>
+      <a href="{{ '/features/' | relative_url }}" class="btn btn-primary" style="margin-top: .5rem;">See All Features</a>
     </div>
-    <div class="highlight-code">
-      <pre><span class="comment"># Install (or update) with one command</span>
-<span class="command">curl</span> <span class="flag">-fsSL</span> https://raw.githubusercontent.com/marksnyder/astro/main/install.sh <span class="command">|</span> bash
-
-<span class="comment"># With Tailscale (first run)</span>
-<span class="command">curl</span> <span class="flag">-fsSL</span> https://raw.githubusercontent.com/marksnyder/astro/main/install.sh <span class="command">|</span> bash <span class="flag">-s --</span> \
-  <span class="flag">--ts-authkey</span> tskey-auth-...
-
-<span class="comment"># Custom port</span>
-<span class="command">curl</span> <span class="flag">-fsSL</span> https://raw.githubusercontent.com/marksnyder/astro/main/install.sh <span class="command">|</span> bash <span class="flag">-s --</span> \
-  <span class="flag">--port</span> 9000</pre>
+    <div class="org-features">
+      <div class="org-feature">
+        <div class="org-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <div>
+          <strong>Hierarchical Categories</strong>
+          <p>Parent/child tree across all content types.</p>
+        </div>
+      </div>
+      <div class="org-feature">
+        <div class="org-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        </div>
+        <div>
+          <strong>Pinned Items Bar</strong>
+          <p>Notes, documents, and links in one header strip.</p>
+        </div>
+      </div>
+      <div class="org-feature">
+        <div class="org-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
+        <div>
+          <strong>Unified Search</strong>
+          <p>Search across notes, documents, and links.</p>
+        </div>
+      </div>
+      <div class="org-feature">
+        <div class="org-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+        </div>
+        <div>
+          <strong>Mobile Interface</strong>
+          <p>Full access on the go at <code>/mobile</code>.</p>
+        </div>
+      </div>
     </div>
   </div>
 </section>
 
 <section class="cta-section">
-  <h2>Ready to organize your universe?</h2>
-  <p>Astro is free, open source, and runs anywhere Docker does.</p>
+  <h2>Get it Now</h2>
+  <p>
+    Structured knowledge. Context-aware AI. Clear separation of workspaces.<br>
+    One workspace. Many Universes. Organized.
+  </p>
   <div class="hero-actions">
     <a href="{{ '/install/' | relative_url }}" class="btn btn-primary">Install Astro</a>
     <a href="https://github.com/marksnyder/astro" class="btn btn-outline">View on GitHub</a>

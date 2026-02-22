@@ -9,7 +9,7 @@ subtitle: Get Astro running in under a minute
 Make sure [Docker](https://docs.docker.com/get-docker/) is installed and running, then:
 
 ```
-curl -fsSL https://raw.githubusercontent.com/marksnyder/astro/main/install.sh | bash
+curl -fsSL https://runastro.sh/install.sh | bash
 ```
 
 That's it. Astro will be running at **http://localhost:8000**.
@@ -37,7 +37,7 @@ Your data is stored on the host at `~/astro-data` and mounted into the container
 To update to the latest version, just run the install command again:
 
 ```
-curl -fsSL https://raw.githubusercontent.com/marksnyder/astro/main/install.sh | bash
+curl -fsSL https://runastro.sh/install.sh | bash
 ```
 
 The installer automatically removes the old container and image before pulling the latest.
@@ -49,7 +49,7 @@ The installer accepts flags and environment variables:
 ### Flags
 
 ```
-curl -fsSL https://raw.githubusercontent.com/marksnyder/astro/main/install.sh | bash -s -- [OPTIONS]
+curl -fsSL https://runastro.sh/install.sh | bash -s -- [OPTIONS]
 ```
 
 | Flag | Default | Description |
@@ -66,7 +66,7 @@ Alternatively, set environment variables before piping to bash:
 
 ```
 PORT=9000 TS_AUTHKEY=tskey-auth-... \
-  curl -fsSL https://raw.githubusercontent.com/marksnyder/astro/main/install.sh | bash
+  curl -fsSL https://runastro.sh/install.sh | bash
 ```
 
 ## Tailscale Setup
@@ -74,7 +74,7 @@ PORT=9000 TS_AUTHKEY=tskey-auth-... \
 Astro includes built-in Tailscale support for secure remote access. On first run, provide your Tailscale auth key:
 
 ```
-curl -fsSL https://raw.githubusercontent.com/marksnyder/astro/main/install.sh | bash -s -- \
+curl -fsSL https://runastro.sh/install.sh | bash -s -- \
   --ts-authkey tskey-auth-XXXXXXX
 ```
 

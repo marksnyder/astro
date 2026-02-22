@@ -1,0 +1,12 @@
+{% if site.data.screenshots.size > 0 %}
+<div class="screenshots-gallery">
+  {% for shot in site.data.screenshots %}
+  <figure class="screenshot">
+    <img src="{{ shot.url | relative_url }}" alt="{{ shot.description | default: shot.name }}">
+    {% if shot.description != '' %}
+    <figcaption>{{ shot.description }}</figcaption>
+    {% endif %}
+  </figure>
+  {% endfor %}
+</div>
+{% endif %}

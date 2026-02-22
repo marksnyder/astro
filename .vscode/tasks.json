@@ -23,6 +23,27 @@
                 "panel": "dedicated",
                 "clear": true
             }
+        },
+        {
+            "label": "Docs Site (Jekyll serve)",
+            "type": "shell",
+            "command": "bundle exec jekyll serve --baseurl '' --livereload --open-url",
+            "args": [],
+            "options": {
+                "cwd": "${workspaceFolder}/docs",
+                "env": {
+                    "PATH": "${env:HOME}/.local/share/gem/ruby/3.3.0/bin:${env:PATH}"
+                }
+            },
+            "isBackground": true,
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated",
+                "clear": true
+            }
         }
     ],
     "inputs": [

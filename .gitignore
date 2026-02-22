@@ -26,6 +26,11 @@ node_modules/
 # Web UI
 web/dist/
 
+# Jekyll
+docs/vendor/
+docs/_site/
+docs/.bundle/
+
 # OS
 .DS_Store
 Thumbs.db

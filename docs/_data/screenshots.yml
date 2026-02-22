@@ -1,0 +1,31 @@
+# Screenshots gallery on the home page.
+# Add entries here and drop matching images into docs/assets/screenshots/.
+#
+#   - file: my-screenshot.png
+#     description: Short caption shown below the image
+#
+# Images display in the order listed. Remove or reorder entries to change.
+
+- file: placeholder.png
+  description: "AI Chat — conversational AI grounded in your documents"
+
+- file: action-items.png
+  description: "Track TODO items to stay on task"
+
+- file: action-items.png
+  description: "Track TODO items to stay on task"
+
+- file: action-items.png
+  description: "Track TODO items to stay on task"
+
+# - file: notes.png
+#   description: "Notes — rich text with images and categories"
+
+# - file: documents.png
+#   description: "Document Archive — upload, ingest, and query files"
+
+# - file: action-items.png
+#   description: "Action Items — tasks with priorities and due dates"
+
+# - file: mobile.png
+#   description: "Mobile — full access on the go"

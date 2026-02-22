@@ -4,93 +4,146 @@ title: Features
 subtitle: Everything Astro brings to your workflow
 ---
 
-<div class="feature-grid">
-  <div class="feature-card">
-    <h3>AI Chat</h3>
-    <p>Conversational AI powered by OpenAI. Choose from GPT-5, GPT-5 Mini, o3, GPT-4o, and more. Switch models mid-conversation. Full chat history with the ability to save conversations as notes.</p>
-  </div>
-  <div class="feature-card">
-    <h3>RAG Retrieval</h3>
-    <p>Every document, note, and action item is embedded into a ChromaDB vector store. Toggle RAG on or off per query &mdash; get answers grounded in your own data, or use direct chat when you don't need context.</p>
-  </div>
-  <div class="feature-card">
-    <h3>Notes</h3>
-    <p>Rich text notes with embedded images, category organization, pinning, and full-text search. Notes are automatically indexed into the vector store so the AI can reference them.</p>
-  </div>
-  <div class="feature-card">
-    <h3>Document Archive</h3>
-    <p>Upload and manage PDF, DOCX, XLSX, and PPTX files. Documents are automatically parsed, chunked, and indexed. View PDFs and spreadsheets inline in the browser.</p>
-  </div>
-</div>
+## AI Chat with Retrieval (RAG)
 
-## Organization
+Astro includes a conversational AI interface powered by OpenAI (with additional providers planned).
 
-### Categories
+- Chat-based interaction
+- Toggle Retrieval on/off per message
+- Answers grounded in your notes, documents, and action items
+- Persistent knowledgebase that grows with use
 
-A hierarchical category tree lets you organize everything in one place. Notes, documents, action items, and bookmarks can all be assigned to categories and sub-categories. Filter any panel by category to focus on what matters.
+When Retrieval is enabled, Astro pulls relevant context from your stored knowledge before generating a response — making conversations contextual and meaningful.
 
-### Pinned Items
+---
 
-Pin your most important notes, documents, and links to the header bar for instant access. Pinned items appear as compact chips across the top of the interface &mdash; one click to open.
+## Notes
 
-## Task Management
+Create and organize structured notes.
 
-### Action Items
+- Title + body
+- Category assignment
+- Rich formatting via markup
+- Embed images (PNG, JPG, GIF, WebP, BMP, SVG)
+- Fully searchable
+- Included in AI retrieval context
 
-Track tasks with title, priority flag (hot), due dates, and category assignment. Link action items to related notes or documents to keep context close at hand. Completed items can be hidden or shown as needed.
+Notes are first-class citizens in your Universe.
 
-### Action Item Links
+---
 
-Every action item can be linked to one or more notes or documents, creating a web of connected context. When you open an action item, its linked resources are right there.
+## Document Archive
 
-## AI Agents
+Upload and manage knowledge files directly inside Astro.
 
-### Team Members
+### Supported formats
 
-Define AI team members with names, titles, and detailed profile descriptions. Each member acts as a specialized persona when assigned to activities &mdash; a researcher, an analyst, a writer, or whatever your workflow needs.
+- PDF
+- DOCX / DOC
+- XLSX / XLS
+- PPTX
+- TXT
+- MD
+- CSV
 
-### Activities
+### Capabilities
 
-Create multi-step workflows that chain team members together. Each activity has a prompt and a sequence of tasks, each assigned to a specific team member with custom instructions. Run activities manually or on a schedule (hourly, daily, weekly). Results can be saved as notes or transferred to the chat for further discussion.
+- Automatic ingestion and embedding
+- Inline PDF viewing
+- Excel files rendered as styled tables
+- Pin important documents
+- Assign categories
+- Filter by name
+- Included in AI retrieval context
 
-## Communication
+Your documents become queryable memory — not just storage.
 
-### IRC Chat
+---
 
-A built-in IRC server (ngircd) ships inside the container. Switch to IRC mode in the UI to chat with anyone on the same channel. Great for team coordination alongside the AI workflow.
+## Action Items
 
-### Outlook Integration
+Track what matters.
 
-Connect your Microsoft Outlook account to give the AI access to your email context. The integration uses MSAL for secure OAuth authentication &mdash; the AI can reference recent emails when answering questions.
+- Create, edit, delete tasks
+- Priority ("hot") flag
+- Due dates
+- Categories
+- Included in AI retrieval
 
-## Bookmarks & Browser Extension
+Tasks integrate directly into your knowledge system.
 
-### Links Panel
+---
 
-Save and organize bookmarks with titles, URLs, and categories. Search across all saved links. Pin your favorites to the header bar.
+## Bookmarks
 
-### Chrome Extension
+Save and organize links inside your Universe.
 
-A companion browser extension lets you save the current page to Astro with one click. Browse your saved links directly from the extension popup, organized by category.
+- Title + URL
+- Category assignment
+- Edit / delete
+- Searchable panel
 
-## Data & Deployment
+Links become part of your searchable knowledge base.
 
-### Backup & Restore
+---
 
-Download a complete snapshot of your Astro data as a ZIP file &mdash; database, images, documents, and vector store included. Restore from any backup to roll back or migrate to a new machine.
+## Universes
 
-### Rebuild Index
+Universes isolate all content: notes, documents, tasks, links, and categories.
 
-If your vector store gets out of sync, rebuild it from existing data with one click. Re-indexes all notes, action items, team member profiles, and documents.
+Use separate Universes for:
 
-### Persistent Volumes
+- Work
+- Personal
+- Research
+- Clients
+- Agent environments
 
-All user data lives in `~/astro-data` on the host machine, mounted into the container as Docker volumes. Tear down and rebuild the container as often as you want &mdash; your data stays intact.
+Each Universe is independent.
 
-### Tailscale Networking
+---
 
-Built-in Tailscale support provides secure, encrypted access to your Astro instance from anywhere. Automatic HTTPS certificates through Tailscale Serve mean you get `https://astro.<your-tailnet>.ts.net` with zero configuration beyond an auth key.
+## Hierarchical Categories
 
-### Mobile UI
+Organize everything using a parent/child category tree.
 
-A dedicated mobile-optimized interface is available at `/mobile`, giving you full access to chat, notes, action items, and documents from your phone.
+Categories apply across:
+
+- Notes
+- Documents
+- Tasks
+- Links
+
+This creates consistent structure across your entire workspace.
+
+---
+
+## Pinned Items Bar
+
+Pin important notes, documents, and links. They appear in a unified header bar for quick access.
+
+---
+
+## Unified Search
+
+Quickly search across notes, documents, and links. Find what you need instantly.
+
+---
+
+## Mobile-Optimized Interface
+
+Astro includes a mobile-friendly version at `/mobile`, built for access on the go. Your Universe stays accessible anywhere.
+
+---
+
+## AI Agent Network
+
+Astro includes a built-in IRC server, enabling communication with AI agents across platforms.
+
+Use Astro as a central hub to:
+
+- Coordinate agents
+- Communicate across systems
+- Integrate with external AI platforms
+
+Astro becomes a shared control center between you and your agents.
