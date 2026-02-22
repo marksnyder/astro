@@ -12,36 +12,36 @@ set -euo pipefail
 
 TS_HOSTNAME="${TS_HOSTNAME:-astro}"
 TS_SERVE_HTTPS="${TS_SERVE_HTTPS:-true}"
-
-echo "==> Starting tailscaled..."
-tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/var/run/tailscale/tailscaled.sock &
-
-# Wait for tailscaled to be ready
-sleep 2
-
-# Build tailscale up command
-TS_UP_ARGS=(--hostname="${TS_HOSTNAME}")
+TS_OK=false
 
 if [ -n "${TS_AUTHKEY:-}" ]; then
-    TS_UP_ARGS+=(--authkey="${TS_AUTHKEY}")
-fi
+    echo "==> Starting tailscaled..."
+    tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/var/run/tailscale/tailscaled.sock &
+    sleep 2
 
-if [ -n "${TS_EXTRA_ARGS:-}" ]; then
-    # shellcheck disable=SC2206
-    TS_UP_ARGS+=(${TS_EXTRA_ARGS})
-fi
+    TS_UP_ARGS=(--hostname="${TS_HOSTNAME}" --authkey="${TS_AUTHKEY}")
 
-echo "==> Connecting to Tailscale as '${TS_HOSTNAME}'..."
-tailscale up "${TS_UP_ARGS[@]}"
+    if [ -n "${TS_EXTRA_ARGS:-}" ]; then
+        # shellcheck disable=SC2206
+        TS_UP_ARGS+=(${TS_EXTRA_ARGS})
+    fi
 
-TS_IP=$(tailscale ip -4 2>/dev/null || echo 'pending')
-echo "==> Tailscale is up. IP: ${TS_IP}"
+    echo "==> Connecting to Tailscale as '${TS_HOSTNAME}'..."
+    if tailscale up "${TS_UP_ARGS[@]}"; then
+        TS_OK=true
+        TS_IP=$(tailscale ip -4 2>/dev/null || echo 'pending')
+        echo "==> Tailscale is up. IP: ${TS_IP}"
 
-# Enable Tailscale HTTPS — proxies https://<hostname>.<tailnet>.ts.net → localhost:8000
-if [ "${TS_SERVE_HTTPS}" = "true" ]; then
-    echo "==> Enabling Tailscale HTTPS serve..."
-    tailscale serve --bg http://localhost:8000
-    echo "==> HTTPS available at https://${TS_HOSTNAME}.$(tailscale status --json | python3 -c "import sys,json; print(json.load(sys.stdin)['MagicDNSSuffix'])" 2>/dev/null || echo '<tailnet>.ts.net')"
+        if [ "${TS_SERVE_HTTPS}" = "true" ]; then
+            echo "==> Enabling Tailscale HTTPS serve..."
+            tailscale serve --bg http://localhost:8000
+            echo "==> HTTPS available at https://${TS_HOSTNAME}.$(tailscale status --json | python3 -c "import sys,json; print(json.load(sys.stdin)['MagicDNSSuffix'])" 2>/dev/null || echo '<tailnet>.ts.net')"
+        fi
+    else
+        echo "==> WARNING: Tailscale failed to connect. Continuing without it."
+    fi
+else
+    echo "==> No TS_AUTHKEY set — skipping Tailscale. App will be available on port 8000 only."
 fi
 
 # Ensure the app user owns the mounted data/documents volumes
