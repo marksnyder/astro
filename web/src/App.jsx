@@ -863,6 +863,13 @@ function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [showUniverseManager, setShowUniverseManager] = useState(false)
 
+  useEffect(() => {
+    fetch('/api/settings/openai_api_key')
+      .then(r => r.json())
+      .then(d => { if (!d.value || !d.value.trim()) setShowSettings(true) })
+      .catch(() => setShowSettings(true))
+  }, [])
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
