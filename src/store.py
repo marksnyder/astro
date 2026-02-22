@@ -43,9 +43,13 @@ def get_retriever(k: int = 4, universe_id: int | None = None):
     return get_vectorstore().as_retriever(search_kwargs=kwargs)
 
 
-def doc_count() -> int:
-    """Return the total number of chunks in the store."""
-    return get_vectorstore()._collection.count()
+def doc_count(universe_id: int | None = None) -> int:
+    """Return the number of chunks in the store, optionally filtered by universe."""
+    collection = get_vectorstore()._collection
+    if universe_id is not None:
+        results = collection.get(where={"universe_id": universe_id}, include=[])
+        return len(results["ids"])
+    return collection.count()
 
 
 def upsert_note(note_id: int, content: str, title: str, universe_id: int = 1) -> None:

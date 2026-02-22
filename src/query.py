@@ -127,11 +127,11 @@ def _build_history(history: list[dict]) -> list:
     return msgs
 
 
-def _resolve_category_id(name: str | None) -> int | None:
-    """Match a category name to its ID (case-insensitive)."""
+def _resolve_category_id(name: str | None, universe_id: int = 1) -> int | None:
+    """Match a category name to its ID (case-insensitive), scoped to universe."""
     if not name:
         return None
-    cats = list_categories()
+    cats = list_categories(universe_id=universe_id)
     lower = name.lower().strip()
     for c in cats:
         if c.name.lower() == lower:
@@ -149,7 +149,7 @@ def _execute_tool_call(tool_call, user_timezone: str | None = None, universe_id:
         hot = args.get("hot", False)
         due_date = args.get("due_date")
         category_name = args.get("category_name")
-        category_id = _resolve_category_id(category_name)
+        category_id = _resolve_category_id(category_name, universe_id=universe_id)
 
         item = create_action_item(title, hot=hot, due_date=due_date, category_id=category_id, universe_id=universe_id)
 
@@ -253,6 +253,7 @@ def ask_direct(
     model: str = "gpt-5-mini",
     history: list[dict] | None = None,
     user_timezone: str | None = None,
+    universe_id: int = 1,
 ) -> QueryResult:
     """Ask a question directly with optional conversation history."""
     llm = ChatOpenAI(model=model, api_key=get_openai_api_key())
@@ -263,4 +264,4 @@ def ask_direct(
         messages.extend(_build_history(history))
     messages.append(HumanMessage(content=question))
 
-    return _invoke_with_tools(llm, messages, model, user_timezone=user_timezone)
+    return _invoke_with_tools(llm, messages, model, user_timezone=user_timezone, universe_id=universe_id)

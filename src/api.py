@@ -1142,13 +1142,14 @@ def _start_ngircd():
 def api_query(req: QueryRequest):
     history = [{"role": m.role, "content": m.content} for m in req.history]
 
-    print(f"[Astro] Query: model={req.model}, use_context={req.use_context}, history_len={len(history)}, tz={req.timezone}, universe={req.universe_id}")
+    uid = req.universe_id or 1
+    print(f"[Astro] Query: model={req.model}, use_context={req.use_context}, history_len={len(history)}, tz={req.timezone}, universe={uid}")
     if req.use_context:
-        if doc_count() == 0:
-            raise HTTPException(status_code=400, detail="Vector store is empty. Ingest documents first or disable context.")
-        result = ask(req.question, model=req.model, history=history, user_timezone=req.timezone, universe_id=req.universe_id)
+        if doc_count(universe_id=uid) == 0:
+            raise HTTPException(status_code=400, detail="No documents in this universe. Ingest documents first or disable context.")
+        result = ask(req.question, model=req.model, history=history, user_timezone=req.timezone, universe_id=uid)
     else:
-        result = ask_direct(req.question, model=req.model, history=history, user_timezone=req.timezone)
+        result = ask_direct(req.question, model=req.model, history=history, user_timezone=req.timezone, universe_id=uid)
     return QueryResponse(answer=result.answer, model=result.model)
 
 
