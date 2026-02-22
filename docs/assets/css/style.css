@@ -216,6 +216,7 @@ img { max-width: 100%; height: auto; }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .install-banner .label {
@@ -906,5 +907,6 @@ img { max-width: 100%; height: auto; }
   .what-is-points { flex-direction: column; align-items: center; gap: 1rem; }
 
   .page-header h1 { font-size: 1.8rem; }
-  .install-banner { flex-direction: column; text-align: center; }
+  .install-banner { flex-direction: column; text-align: center; padding: 1rem; }
+  .install-banner code { white-space: normal; word-break: break-all; font-size: .75rem; }
 }
