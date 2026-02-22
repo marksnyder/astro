@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import data from '@emoji-mart/data'
-import Picker from '@emoji-mart/react'
+import { Picker } from 'emoji-mart'
 
 // ── Build nested tree from flat list ──────────────────
 
@@ -50,6 +50,7 @@ export function CategoryPicker({ categories, value, onChange, className }) {
 function EmojiPopover({ emoji, onSelect, onClear }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
+  const pickerRef = useRef(null)
 
   useEffect(() => {
     if (!open) return
@@ -59,6 +60,23 @@ function EmojiPopover({ emoji, onSelect, onClear }) {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
+
+  useEffect(() => {
+    if (!open || !pickerRef.current) return
+    const el = pickerRef.current
+    if (el.childElementCount > 0) return
+    const picker = new Picker({
+      data,
+      onEmojiSelect: (e) => { onSelect(e.native); setOpen(false) },
+      theme: 'dark',
+      previewPosition: 'none',
+      skinTonePosition: 'search',
+      perLine: 8,
+      maxFrequentRows: 1,
+    })
+    el.appendChild(picker)
+    return () => { el.replaceChildren() }
+  }, [open, onSelect, onClear])
 
   return (
     <div className="emoji-popover-wrap" ref={ref}>
@@ -71,15 +89,7 @@ function EmojiPopover({ emoji, onSelect, onClear }) {
       </button>
       {open && (
         <div className="emoji-popover" onClick={(e) => e.stopPropagation()}>
-          <Picker
-            data={data}
-            onEmojiSelect={(e) => { onSelect(e.native); setOpen(false) }}
-            theme="dark"
-            previewPosition="none"
-            skinTonePosition="search"
-            perLine={8}
-            maxFrequentRows={1}
-          />
+          <div ref={pickerRef} />
           {emoji && (
             <button className="emoji-clear-btn" onClick={() => { onClear(); setOpen(false) }}>
               Remove emoji
