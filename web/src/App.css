@@ -99,7 +99,9 @@
   display: flex;
   align-items: center;
   padding: 4px 10px;
-  border: 1px solid #3949ab;
+  border-top: 1px solid #3949ab;
+  border-bottom: 1px solid #3949ab;
+  border-left: none;
   border-right: none;
   border-radius: 0;
   background: rgba(57, 73, 171, 0.1);
@@ -118,20 +120,34 @@
   border-radius: 0 8px 8px 0;
 }
 
+.universe-selector:not(:has(.universe-prev-btn)) .universe-name-display {
+  border-left: 1px solid #3949ab;
+}
+
+.universe-prev-btn,
 .universe-next-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0 6px;
   border: 1px solid #3949ab;
-  border-left: none;
-  border-radius: 0 8px 8px 0;
   background: rgba(57, 73, 171, 0.15);
   color: var(--text-secondary);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
 
+.universe-prev-btn {
+  border-right: none;
+  border-left: none;
+}
+
+.universe-next-btn {
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+}
+
+.universe-prev-btn:hover,
 .universe-next-btn:hover {
   background: #3949ab;
   color: #fff;
@@ -1233,6 +1249,13 @@
 
 .sidebar-rail::-webkit-scrollbar { width: 0; }
 
+.rail-sep {
+  width: 20px;
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
 .rail-tab {
   position: relative;
   display: flex;
@@ -1378,7 +1401,7 @@
 }
 
 .note-card:hover {
-  background: var(--bg-tertiary);
+  background: rgba(236, 201, 75, 0.10);
 }
 
 .note-card-header {
@@ -2737,6 +2760,22 @@
 
 .category-select:focus { border-color: var(--accent); }
 
+.category-filter-select {
+  width: 100%;
+  padding: 5px 8px;
+  margin-top: 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 11px;
+  outline: none;
+  cursor: pointer;
+}
+
+.category-filter-select:focus { border-color: var(--accent); }
+
 .category-badge {
   display: inline-block;
   font-size: 10px;
@@ -2843,7 +2882,7 @@
 }
 
 .archive-card:hover {
-  background: var(--bg-tertiary);
+  background: rgba(236, 201, 75, 0.10);
 }
 
 .archive-card-icon {
@@ -2925,6 +2964,86 @@
   color: #e53e3e;
 }
 
+/* ── Document category modal ──────────────────────── */
+
+.doc-cat-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.doc-cat-modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 24px;
+  width: 340px;
+  max-width: 90vw;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+}
+
+.doc-cat-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.doc-cat-modal-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.doc-cat-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.doc-cat-modal-close:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.doc-cat-modal-name {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.doc-cat-modal-picker {
+  width: 100%;
+  font-size: 13px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.doc-cat-modal-picker:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
 /* ── Link cards ────────────────────────────────────── */
 
 .link-card {
@@ -2938,7 +3057,7 @@
 }
 
 .link-card:hover {
-  background: var(--bg-tertiary);
+  background: rgba(236, 201, 75, 0.10);
 }
 
 .link-card-icon {
@@ -3195,7 +3314,7 @@
 }
 
 .ai-card:hover {
-  background: var(--bg-tertiary);
+  background: rgba(236, 201, 75, 0.10);
 }
 
 .ai-card.ai-hot {
@@ -3369,15 +3488,22 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px 4px;
+  padding: 8px 16px;
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--bg-secondary);
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
 }
 
 .ai-group-header svg {
   color: var(--accent);
+  flex-shrink: 0;
+}
+
+.ai-group-emoji {
+  font-size: 18px;
+  line-height: 1;
   flex-shrink: 0;
 }
 

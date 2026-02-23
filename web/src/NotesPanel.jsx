@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { CategoryPicker } from './CategoryTree'
+import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
 
 // ── Markdown Editor ───────────────────────────────────
 
@@ -505,9 +505,10 @@ function NoteActionItems({ noteId, categories }) {
 
 // ── Notes panel ───────────────────────────────────────
 
-function NotesPanel({ categories, selectedCategoryId, onPinChange, editNoteRequest, onEditNoteRequestHandled, universeId }) {
+function NotesPanel({ categories, onPinChange, editNoteRequest, onEditNoteRequestHandled, universeId }) {
   const [notes, setNotes] = useState([])
   const [search, setSearch] = useState('')
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null)
   const [onlyLinked, setOnlyLinked] = useState(false)
   const [linkedNoteIds, setLinkedNoteIds] = useState(null) // Set or null
   const [editing, setEditing] = useState(null)
@@ -518,7 +519,8 @@ function NotesPanel({ categories, selectedCategoryId, onPinChange, editNoteReque
   const [previewMode, setPreviewMode] = useState(false)
   const titleRef = useRef(null)
 
-  const catMap = Object.fromEntries(categories.map((c) => [c.id, c.emoji ? `${c.emoji} ${c.name}` : c.name]))
+  const catMap = Object.fromEntries(categories.map((c) => [c.id, c.name]))
+  const catEmojiMap = Object.fromEntries(categories.map((c) => [c.id, c.emoji || null]))
 
   const fetchNotes = () => {
     const params = new URLSearchParams()
@@ -673,6 +675,7 @@ function NotesPanel({ categories, selectedCategoryId, onPinChange, editNoteReque
             </svg>
           </button>
         </div>
+        <CategoryFilterPicker categories={categories} value={selectedCategoryId} onChange={setSelectedCategoryId} />
       </div>
       <div className="notes-list">
         {(() => {
@@ -687,9 +690,7 @@ function NotesPanel({ categories, selectedCategoryId, onPinChange, editNoteReque
           return buildGroups(filtered, catMap).map((group) => (
             <div key={group.categoryId ?? '__none__'} className="ai-group">
               <div className="ai-group-header">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                </svg>
+                <span className="ai-group-emoji">{group.categoryId ? (catEmojiMap[group.categoryId] || '🏷️') : '🏷️'}</span>
                 <span className="ai-group-name">{group.name || 'Uncategorized'}</span>
                 <span className="ai-group-count">{group.items.length}</span>
               </div>

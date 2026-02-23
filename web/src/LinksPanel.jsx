@@ -1,18 +1,19 @@
 import { useState, useEffect, useRef } from 'react'
-import { CategoryPicker } from './CategoryTree'
+import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
 
-function LinksPanel({ categories, selectedCategoryId, onPinChange, universeId }) {
+function LinksPanel({ categories, onPinChange, universeId }) {
   const [links, setLinks] = useState([])
   const [search, setSearch] = useState('')
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null)
   const [editing, setEditing] = useState(null) // null | 'new' | link object
   const [title, setTitle] = useState('')
   const [url, setUrl] = useState('')
   const [categoryId, setCategoryId] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [expandedGroup, setExpandedGroup] = useState(null) // group key or null
   const titleRef = useRef(null)
 
-  const catMap = Object.fromEntries(categories.map((c) => [c.id, c.emoji ? `${c.emoji} ${c.name}` : c.name]))
+  const catMap = Object.fromEntries(categories.map((c) => [c.id, c.name]))
+  const catEmojiMap = Object.fromEntries(categories.map((c) => [c.id, c.emoji || null]))
 
   const fetchLinks = () => {
     const params = new URLSearchParams()
@@ -135,6 +136,7 @@ function LinksPanel({ categories, selectedCategoryId, onPinChange, universeId })
       </div>
       <div className="notes-search">
         <input className="notes-search-input" placeholder="Search links..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <CategoryFilterPicker categories={categories} value={selectedCategoryId} onChange={setSelectedCategoryId} />
       </div>
       <div className="notes-list">
         {(() => {
@@ -143,27 +145,15 @@ function LinksPanel({ categories, selectedCategoryId, onPinChange, universeId })
               {search || selectedCategoryId ? 'No matching links.' : 'No links yet. Click + to add one.'}
             </div>
           )
-          return buildGroups(links, catMap).map((group) => {
-            const groupKey = group.categoryId ?? '__none__'
-            const isOpen = expandedGroup === groupKey
-            return (
-            <div key={groupKey} className="ai-group">
-              <div className="ai-group-header" onClick={() => setExpandedGroup(isOpen ? null : groupKey)} style={{ cursor: 'pointer' }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                  style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}>
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
+          return buildGroups(links, catMap).map((group) => (
+            <div key={group.categoryId ?? '__none__'} className="ai-group">
+              <div className="ai-group-header">
+                <span className="ai-group-emoji">{group.categoryId ? (catEmojiMap[group.categoryId] || '🏷️') : '🏷️'}</span>
                 <span className="ai-group-name">{group.name || 'Uncategorized'}</span>
                 <span className="ai-group-count">{group.items.length}</span>
               </div>
-              {isOpen && group.items.map((link) => (
+              {group.items.map((link) => (
                 <div key={link.id} className="link-card" onClick={() => startEdit(link)} title={link.url}>
-                  <div className="link-card-icon">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                    </svg>
-                  </div>
                   <div className="link-card-info">
                     <div className="link-card-title">{link.title || 'Untitled'}</div>
                     <div className="link-card-url">{formatDomain(link.url)}</div>
@@ -174,7 +164,7 @@ function LinksPanel({ categories, selectedCategoryId, onPinChange, universeId })
                       <path d="M9 2h6l-1 7h4l-5 7H7l2-7H5l1-7z" />
                     </svg>
                   </button>
-                  <button className="link-launch-btn" onClick={(e) => openLink(e, link)} title="Open link">
+                  <button className="archive-action-btn" onClick={(e) => openLink(e, link)} title="Open link">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
                       <polyline points="15 3 21 3 21 9" />
@@ -192,8 +182,7 @@ function LinksPanel({ categories, selectedCategoryId, onPinChange, universeId })
                 </div>
               ))}
             </div>
-            )
-          })
+          ))
         })()}
       </div>
       {editing !== null && (

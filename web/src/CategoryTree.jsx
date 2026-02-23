@@ -45,6 +45,26 @@ export function CategoryPicker({ categories, value, onChange, className }) {
   )
 }
 
+// ── Category filter picker (for panel filtering) ─────
+
+export function CategoryFilterPicker({ categories, value, onChange }) {
+  const flat = flattenForSelect(categories)
+  return (
+    <select
+      className="category-filter-select"
+      value={value ?? ''}
+      onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
+    >
+      <option value="">All categories</option>
+      {flat.map((c) => (
+        <option key={c.id} value={c.id}>
+          {'\u00A0\u00A0'.repeat(c.depth)}{c.emoji ? `${c.emoji} ` : ''}{c.name}
+        </option>
+      ))}
+    </select>
+  )
+}
+
 // ── Emoji picker popover ─────────────────────────────
 
 function EmojiPopover({ emoji, onSelect, onClear }) {

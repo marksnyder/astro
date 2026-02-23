@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { CategoryPicker } from './CategoryTree'
+import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
 
 /* ── Small link-picker component ─────────────────────────────────── */
 
@@ -137,6 +137,7 @@ function LinkPicker({ actionItemId, links, onLinksChange }) {
 function ActionItemsPanel({ categories, onOpenNote, universeId }) {
   const [items, setItems] = useState([])
   const [search, setSearch] = useState('')
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null)
   const [showCompleted, setShowCompleted] = useState(false)
   const [editing, setEditing] = useState(null) // null | 'new' | item object
   const [formTitle, setFormTitle] = useState('')
@@ -147,7 +148,8 @@ function ActionItemsPanel({ categories, onOpenNote, universeId }) {
   const [saving, setSaving] = useState(false)
   const titleRef = useRef(null)
 
-  const catMap = Object.fromEntries(categories.map((c) => [c.id, c.emoji ? `${c.emoji} ${c.name}` : c.name]))
+  const catMap = Object.fromEntries(categories.map((c) => [c.id, c.name]))
+  const catEmojiMap = Object.fromEntries(categories.map((c) => [c.id, c.emoji || null]))
 
   const fetchItems = () => {
     const params = new URLSearchParams()
@@ -283,10 +285,10 @@ function ActionItemsPanel({ categories, onOpenNote, universeId }) {
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
-  const buildGroups = () => {
+  const buildGroups = (sourceItems) => {
     const groups = []
     const groupMap = {}
-    for (const item of items) {
+    for (const item of sourceItems) {
       const key = item.category_id ?? '__none__'
       if (!(key in groupMap)) {
         const group = { categoryId: item.category_id, name: item.category_id ? (catMap[item.category_id] || 'Unknown') : null, items: [] }
@@ -307,7 +309,10 @@ function ActionItemsPanel({ categories, onOpenNote, universeId }) {
   // Determine whether we can show the link picker (need a saved item id)
   const editingId = editing && editing !== 'new' ? editing.id : null
 
-  const groups = buildGroups()
+  const filteredItems = selectedCategoryId !== null
+    ? items.filter(i => i.category_id === selectedCategoryId)
+    : items
+  const groups = buildGroups(filteredItems)
 
   return (
     <div className="notes-panel">
@@ -337,20 +342,19 @@ function ActionItemsPanel({ categories, onOpenNote, universeId }) {
             </svg>
           </button>
         </div>
+        <CategoryFilterPicker categories={categories} value={selectedCategoryId} onChange={setSelectedCategoryId} />
       </div>
 
       <div className="notes-list">
-        {items.length === 0 ? (
+        {filteredItems.length === 0 ? (
           <div className="notes-empty">
-            {search ? 'No matching action items.' : showCompleted ? 'No action items.' : 'No open action items.'}
+            {search || selectedCategoryId ? 'No matching action items.' : showCompleted ? 'No action items.' : 'No open action items.'}
           </div>
         ) : (
           groups.map((group) => (
             <div key={group.categoryId ?? '__none__'} className="ai-group">
               <div className="ai-group-header">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                </svg>
+                <span className="ai-group-emoji">{group.categoryId ? (catEmojiMap[group.categoryId] || '🏷️') : '🏷️'}</span>
                 <span className="ai-group-name">{group.name || 'Uncategorized'}</span>
                 <span className="ai-group-count">{group.items.length}</span>
               </div>

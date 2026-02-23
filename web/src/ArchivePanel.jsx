@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { CategoryPicker } from './CategoryTree'
+import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
 
 function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`
@@ -74,9 +74,10 @@ const EXT_ICONS = {
 EXT_ICONS.xls = EXT_ICONS.xlsx
 EXT_ICONS.doc = EXT_ICONS.docx
 
-function ArchivePanel({ categories, selectedCategoryId, onPinChange, universeId }) {
+function ArchivePanel({ categories, onPinChange, universeId }) {
   const [docs, setDocs] = useState([])
   const [search, setSearch] = useState('')
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null)
   const [onlyLinked, setOnlyLinked] = useState(false)
   const [linkedDocPaths, setLinkedDocPaths] = useState(null) // Set or null
   const [uploading, setUploading] = useState(false)
@@ -85,7 +86,8 @@ function ArchivePanel({ categories, selectedCategoryId, onPinChange, universeId 
   const [editingCat, setEditingCat] = useState(null) // doc path being category-edited
   const fileInputRef = useRef(null)
 
-  const catMap = Object.fromEntries(categories.map((c) => [c.id, c.emoji ? `${c.emoji} ${c.name}` : c.name]))
+  const catMap = Object.fromEntries(categories.map((c) => [c.id, c.name]))
+  const catEmojiMap = Object.fromEntries(categories.map((c) => [c.id, c.emoji || null]))
 
   const fetchDocs = () => {
     const params = new URLSearchParams()
@@ -251,6 +253,7 @@ function ArchivePanel({ categories, selectedCategoryId, onPinChange, universeId 
             </svg>
           </button>
         </div>
+        <CategoryFilterPicker categories={categories} value={selectedCategoryId} onChange={setSelectedCategoryId} />
       </div>
       <div className="notes-list">
         {(() => {
@@ -265,45 +268,18 @@ function ArchivePanel({ categories, selectedCategoryId, onPinChange, universeId 
           return buildGroups(filtered, catMap).map((group) => (
             <div key={group.categoryId ?? '__none__'} className="ai-group">
               <div className="ai-group-header">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                </svg>
+                <span className="ai-group-emoji">{group.categoryId ? (catEmojiMap[group.categoryId] || '🏷️') : '🏷️'}</span>
                 <span className="ai-group-name">{group.name || 'Uncategorized'}</span>
                 <span className="ai-group-count">{group.items.length}</span>
               </div>
               {group.items.map((doc) => (
                 <div key={doc.path} className="archive-card" onClick={(e) => openDoc(e, doc)} title={['pdf', 'xlsx', 'xls'].includes(doc.extension) ? `View ${doc.name}` : `Download ${doc.name}`}>
-                  <div className="archive-card-icon">
-                    {EXT_ICONS[doc.extension] || EXT_ICONS.default}
-                  </div>
                   <div className="archive-card-info">
                     <div className="archive-card-name">{doc.name}</div>
                     <div className="archive-card-meta">
                       <span>{doc.extension.toUpperCase()}</span>
                       <span>{formatSize(doc.size)}</span>
                     </div>
-                    {editingCat === doc.path ? (
-                      <div className="category-inline-edit" onClick={(e) => e.stopPropagation()}>
-                        <CategoryPicker
-                          categories={categories}
-                          value={doc.category_id}
-                          onChange={(catId) => saveDocCategory(doc.path, catId)}
-                          className="category-inline-picker"
-                        />
-                        <button className="category-inline-cancel" onClick={(e) => { e.stopPropagation(); setEditingCat(null) }}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                          </svg>
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="category-badge-row" onClick={(e) => { e.stopPropagation(); setEditingCat(doc.path) }} title="Click to set category">
-                        {doc.category_id && catMap[doc.category_id]
-                          ? <span className="category-badge">{catMap[doc.category_id]}</span>
-                          : <span className="category-badge category-badge-empty">+ category</span>
-                        }
-                      </div>
-                    )}
                   </div>
                   <button
                     className={`archive-action-btn cat-btn ${editingCat === doc.path ? 'active' : ''}`}
@@ -341,6 +317,29 @@ function ArchivePanel({ categories, selectedCategoryId, onPinChange, universeId 
           ))
         })()}
       </div>
+      {editingCat && (
+        <div className="doc-cat-modal-overlay" onClick={() => setEditingCat(null)}>
+          <div className="doc-cat-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="doc-cat-modal-header">
+              <h3>Set Category</h3>
+              <button className="doc-cat-modal-close" onClick={() => setEditingCat(null)}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="doc-cat-modal-name">
+              {docs.find(d => d.path === editingCat)?.name}
+            </div>
+            <CategoryPicker
+              categories={categories}
+              value={docs.find(d => d.path === editingCat)?.category_id}
+              onChange={(catId) => saveDocCategory(editingCat, catId)}
+              className="doc-cat-modal-picker"
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
