@@ -1,5 +1,66 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
+
+function launchFireworks() {
+  const canvas = document.createElement('canvas')
+  canvas.style.cssText = 'position:fixed;bottom:0;right:0;width:280px;height:320px;pointer-events:none;z-index:99999'
+  document.body.appendChild(canvas)
+  const ctx = canvas.getContext('2d')
+  canvas.width = 280 * devicePixelRatio
+  canvas.height = 320 * devicePixelRatio
+  ctx.scale(devicePixelRatio, devicePixelRatio)
+
+  const particles = []
+  const colors = ['#FFD700','#FF6B6B','#4FC3F7','#81C784','#FF8A65','#BA68C8','#FFB74D','#F06292']
+  const origins = [
+    { x: 140, y: 260 },
+    { x: 80,  y: 240 },
+    { x: 200, y: 230 },
+  ]
+
+  for (const origin of origins) {
+    const count = 32 + Math.floor(Math.random() * 16)
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.3
+      const speed = 2.5 + Math.random() * 3.5
+      particles.push({
+        x: origin.x, y: origin.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 2,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        life: 1,
+        decay: 0.012 + Math.random() * 0.01,
+        size: 2 + Math.random() * 2.5,
+        delay: origins.indexOf(origin) * 8,
+      })
+    }
+  }
+
+  let frame = 0
+  const animate = () => {
+    frame++
+    ctx.clearRect(0, 0, 280, 320)
+    let alive = false
+    for (const p of particles) {
+      if (p.delay > 0) { p.delay--; alive = true; continue }
+      p.x += p.vx
+      p.y += p.vy
+      p.vy += 0.06
+      p.vx *= 0.985
+      p.life -= p.decay
+      if (p.life <= 0) continue
+      alive = true
+      ctx.globalAlpha = p.life
+      ctx.fillStyle = p.color
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    if (alive) requestAnimationFrame(animate)
+    else document.body.removeChild(canvas)
+  }
+  requestAnimationFrame(animate)
+}
 
 /* ── Small link-picker component ─────────────────────────────────── */
 
@@ -237,7 +298,15 @@ function ActionItemsPanel({ categories, onOpenNote, universeId }) {
     }
   }
 
+  const [flashingId, setFlashingId] = useState(null)
+
   const toggleCompleted = async (item) => {
+    const completing = !item.completed
+    if (completing) {
+      setFlashingId(item.id)
+      launchFireworks()
+      setTimeout(() => setFlashingId(null), 800)
+    }
     await fetch(`/api/action-items/${item.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -364,7 +433,7 @@ function ActionItemsPanel({ categories, onOpenNote, universeId }) {
                   className={`ai-card ${item.hot ? 'ai-hot' : ''} ${item.completed ? 'ai-completed' : ''}`}
                 >
                   <button
-                    className={`ai-check-btn ${item.completed ? 'checked' : ''}`}
+                    className={`ai-check-btn ${item.completed ? 'checked' : ''} ${flashingId === item.id ? 'ai-check-flash' : ''}`}
                     onClick={() => toggleCompleted(item)}
                     title={item.completed ? 'Mark incomplete' : 'Mark complete'}
                   >

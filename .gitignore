@@ -31,6 +31,9 @@ docs/vendor/
 docs/_site/
 docs/.bundle/
 
+# Packaged extension
+dist/astro-browse-extension.zip
+
 # OS
 .DS_Store
 Thumbs.db

@@ -34,6 +34,17 @@ function ChatMessage({ role, content, model }) {
   )
 }
 
+function ircTimestamp(ts) {
+  if (!ts) return ''
+  const d = new Date(ts * 1000)
+  const mon = d.toLocaleString(undefined, { month: 'short' })
+  const day = d.getDate()
+  const h = d.getHours()
+  const m = String(d.getMinutes()).padStart(2, '0')
+  const ampm = h >= 12 ? 'pm' : 'am'
+  return `${mon} ${day} ${h % 12 || 12}:${m}${ampm}`
+}
+
 function IrcMessage({ msg }) {
   if (msg.kind === 'join' || msg.kind === 'part' || msg.kind === 'quit') {
     return (
@@ -45,6 +56,7 @@ function IrcMessage({ msg }) {
   const isSelf = msg.self
   return (
     <div className={`irc-msg ${isSelf ? 'irc-self' : ''}`}>
+      <span className="irc-ts">{ircTimestamp(msg.timestamp)}</span>
       <span className="irc-nick">{msg.sender}</span>
       <span className="irc-text">{msg.text}</span>
     </div>
@@ -496,9 +508,16 @@ function App() {
   const [ircStatus, setIrcStatus] = useState({ connected: false, nick: '', channel: '' })
   const ircLastIdRef = useRef(0)
   const [ircChannels, setIrcChannels] = useState([])
+  const [ircHasMore, setIrcHasMore] = useState(false)
+  const [ircLoadingHistory, setIrcLoadingHistory] = useState(false)
+  const ircChatAreaRef = useRef(null)
   const [joiningChannel, setJoiningChannel] = useState(false)
   const [joinChannelName, setJoinChannelName] = useState('')
   const [ircUsers, setIrcUsers] = useState([])
+  const [hiddenChannels, setHiddenChannels] = useState([])
+  const [showHiddenChannels, setShowHiddenChannels] = useState(false)
+  const [unreadCounts, setUnreadCounts] = useState({})
+  const lastSeenTsRef = useRef({})
   const [universes, setUniverses] = useState([])
   const [currentUniverseId, setCurrentUniverseId] = useState(null)
   const [sidebarTab, setSidebarTab] = useState('actions')
@@ -568,6 +587,10 @@ function App() {
       .then(r => r.json())
       .then(d => { if (d.value) setIrcNick(d.value) })
       .catch(() => {})
+    fetch('/api/settings/irc_hidden_channels')
+      .then(r => r.json())
+      .then(d => { if (d.value) try { setHiddenChannels(JSON.parse(d.value)) } catch {} })
+      .catch(() => {})
     fetchIrcChannels()
     // Load universes and the saved selection
     fetch('/api/universes').then(r => r.json()).then(data => {
@@ -611,6 +634,12 @@ function App() {
       .then(data => {
         const filtered = data.filter(c => !c.name.startsWith('&'))
         setIrcChannels(filtered)
+        const now = Date.now() / 1000
+        for (const ch of filtered) {
+          if (!(ch.name in lastSeenTsRef.current)) {
+            lastSeenTsRef.current[ch.name] = now
+          }
+        }
       })
       .catch(() => {})
   }
@@ -622,16 +651,87 @@ function App() {
       .catch(() => {})
   }
 
+  const hideChannel = (name) => {
+    setHiddenChannels(prev => {
+      const next = prev.includes(name) ? prev : [...prev, name]
+      fetch('/api/settings/irc_hidden_channels', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: JSON.stringify(next) }),
+      }).catch(() => {})
+      return next
+    })
+  }
+
+  const unhideChannel = (name) => {
+    setHiddenChannels(prev => {
+      const next = prev.filter(c => c !== name)
+      fetch('/api/settings/irc_hidden_channels', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: JSON.stringify(next) }),
+      }).catch(() => {})
+      return next
+    })
+  }
+
+  const fetchIrcHistory = (channel, beforeId = null) => {
+    const params = new URLSearchParams({ channel, limit: '100' })
+    if (beforeId) params.set('before_id', beforeId)
+    setIrcLoadingHistory(true)
+    return fetch(`/api/irc/history?${params}`)
+      .then(r => r.json())
+      .then(data => {
+        setIrcHasMore(data.has_more)
+        return data.messages
+      })
+      .catch(() => [])
+      .finally(() => setIrcLoadingHistory(false))
+  }
+
+  const loadOlderHistory = () => {
+    if (ircLoadingHistory || !ircHasMore) return
+    const channel = ircStatus.channel || '#astro'
+    const oldestId = ircMessages.length > 0 ? ircMessages[0].id : null
+    if (!oldestId) return
+    const area = ircChatAreaRef.current
+    const prevScrollHeight = area ? area.scrollHeight : 0
+    fetchIrcHistory(channel, oldestId).then(older => {
+      if (older.length > 0) {
+        setIrcMessages(prev => [...older, ...prev])
+        requestAnimationFrame(() => {
+          if (area) area.scrollTop = area.scrollHeight - prevScrollHeight
+        })
+      }
+    })
+  }
+
+  const handleIrcScroll = (e) => {
+    if (e.target.scrollTop < 80) {
+      loadOlderHistory()
+    }
+  }
+
   const handleSwitchChannel = (channel) => {
     if (!channel) return
     const name = channel.startsWith('#') ? channel : '#' + channel
+    lastSeenTsRef.current[name] = Date.now() / 1000
+    setUnreadCounts(prev => { const n = { ...prev }; delete n[name]; return n })
     setIrcNick(name)
     setIrcMessages([])
+    setIrcHasMore(false)
+    ircHistoryTsRef.current = 0
     fetch('/api/irc/switch', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
     }).then(() => {
+      fetchIrcHistory(name).then(msgs => {
+        if (msgs.length > 0) {
+          ircHistoryTsRef.current = Math.max(...msgs.map(m => m.timestamp))
+        }
+        setIrcMessages(msgs)
+      })
       setTimeout(fetchIrcUsers, 500)
       setTimeout(fetchIrcChannels, 1000)
     }).catch(() => {})
@@ -647,14 +747,37 @@ function App() {
 
   // IRC WebSocket
   const ircWsRef = useRef(null)
+  const ircHistoryTsRef = useRef(0)
   useEffect(() => {
     if (chatMode !== 'irc') {
       if (ircWsRef.current) { ircWsRef.current.close(); ircWsRef.current = null }
+      ircHistoryTsRef.current = 0
       return
     }
     let cancelled = false
     let ws = null
     let reconnectTimer = null
+    let historyLoaded = false
+
+    // Load persisted history first, then connect WS for live updates
+    fetch('/api/irc/status').then(r => r.json()).then(status => {
+      if (cancelled) return
+      const channel = status.channel || '#astro'
+      setIrcNick(channel)
+      return fetch(`/api/irc/history?${new URLSearchParams({ channel, limit: '100' })}`)
+        .then(r => r.json())
+        .then(data => {
+          if (cancelled) return
+          const msgs = data.messages || []
+          setIrcHasMore(data.has_more || false)
+          if (msgs.length > 0) {
+            ircHistoryTsRef.current = Math.max(...msgs.map(m => m.timestamp))
+            setIrcMessages(msgs)
+          }
+          lastSeenTsRef.current[channel] = Date.now() / 1000
+          historyLoaded = true
+        })
+    }).catch(() => { historyLoaded = true })
 
     const connect = () => {
       if (cancelled) return
@@ -666,6 +789,7 @@ function App() {
         try {
           const data = JSON.parse(e.data)
           if (data.type === 'msg') {
+            if (data.timestamp && data.timestamp <= ircHistoryTsRef.current) return
             setIrcMessages(prev => [...prev, data])
           } else if (data.type === 'status') {
             setIrcStatus({ connected: data.connected, nick: data.nick, channel: data.channel })
@@ -682,15 +806,45 @@ function App() {
     }
     connect()
     fetchIrcUsers()
+    fetchIrcChannels()
     const usersPoll = setInterval(fetchIrcUsers, 15000)
+    const channelsPoll = setInterval(fetchIrcChannels, 10000)
 
     return () => {
       cancelled = true
       clearTimeout(reconnectTimer)
       clearInterval(usersPoll)
+      clearInterval(channelsPoll)
       if (ws) { ws.close(); ircWsRef.current = null }
     }
   }, [chatMode])
+
+  useEffect(() => {
+    if (chatMode !== 'irc') return
+    const poll = () => {
+      const since = lastSeenTsRef.current
+      const channels = Object.keys(since)
+      if (channels.length === 0) return
+      fetch('/api/irc/unread', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(since),
+      })
+        .then(r => r.json())
+        .then(counts => {
+          const active = ircNick || '#astro'
+          const filtered = {}
+          for (const [ch, cnt] of Object.entries(counts)) {
+            if (ch !== active && cnt > 0) filtered[ch] = cnt
+          }
+          setUnreadCounts(filtered)
+        })
+        .catch(() => {})
+    }
+    poll()
+    const iv = setInterval(poll, 5000)
+    return () => clearInterval(iv)
+  }, [chatMode, ircNick])
 
   const fetchCategories = useCallback(() => {
     const params = currentUniverseId ? `?universe_id=${currentUniverseId}` : ''
@@ -860,6 +1014,7 @@ function App() {
       if (ircMessages.length === 0) return
       if (!confirm('Clear IRC message history?')) return
       setIrcMessages([])
+      setIrcHasMore(false)
       return
     }
     if (messages.length === 0) return
@@ -1009,56 +1164,6 @@ function App() {
               </label>
             </>
           )}
-          {chatMode === 'irc' && (
-            <div className="irc-channel-controls">
-              {joiningChannel ? (
-                <>
-                  <input
-                    className="irc-channel-input"
-                    type="text"
-                    placeholder="#channel-name"
-                    value={joinChannelName}
-                    onChange={(e) => setJoinChannelName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleJoinChannel()
-                      if (e.key === 'Escape') { setJoiningChannel(false); setJoinChannelName('') }
-                    }}
-                    autoFocus
-                  />
-                  <button className="irc-channel-btn" onClick={handleJoinChannel} disabled={!joinChannelName.trim()} title="Join">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  </button>
-                  <button className="irc-channel-btn" onClick={() => { setJoiningChannel(false); setJoinChannelName('') }} title="Cancel">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </button>
-                </>
-              ) : (
-                <>
-                  <select
-                    className="irc-channel-select"
-                    value={ircNick}
-                    onChange={(e) => handleSwitchChannel(e.target.value)}
-                    disabled={loading}
-                  >
-                    {ircChannels.length === 0 && ircNick && <option value={ircNick}>{ircNick}</option>}
-                    {ircChannels.length === 0 && !ircNick && <option value="">No channels</option>}
-                    {ircChannels.map((ch) => (
-                      <option key={ch.name} value={ch.name}>{ch.name}</option>
-                    ))}
-                  </select>
-                  <button className="irc-channel-btn" onClick={() => setJoiningChannel(true)} disabled={loading} title="Join a channel">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
-                  </button>
-                </>
-              )}
-            </div>
-          )}
           {chatMode === 'llm' && stats !== null && (
             <div className="header-stats">
               {stats.chunks} chunks indexed
@@ -1203,57 +1308,107 @@ function App() {
 
         <div className="chat-container">
           {chatMode === 'irc' ? (
-            <>
-              <div className="chat-toolbar">
-                <div className={`irc-status-dot ${ircStatus.connected ? 'connected' : ''}`} />
-                <span className="irc-status-text">
-                  {ircStatus.connected ? `${ircStatus.nick} on ${ircStatus.channel}` : 'Connecting...'}
-                </span>
-                {ircMessages.length > 0 && (
-                  <>
-                    <button className="chat-toolbar-btn" onClick={clearChat} title="Clear IRC history">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="3 6 5 6 21 6" />
-                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                        <path d="M10 11v6" /><path d="M14 11v6" />
-                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                      </svg>
-                      Clear
-                    </button>
-                    <span className="chat-msg-count">{ircMessages.length} messages</span>
-                  </>
-                )}
-              </div>
-              <main className="chat-area irc-chat-area">
-                {ircUsers.length > 0 && (
-                  <div className="irc-users-bar">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                      <circle cx="9" cy="7" r="4" />
-                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                    </svg>
-                    {ircUsers.map((nick) => (
-                      <span key={nick} className={`irc-user-chip ${nick.toLowerCase() === ircStatus.nick?.toLowerCase() ? 'irc-user-self' : ''}`}>{nick}</span>
-                    ))}
-                  </div>
-                )}
-                {ircMessages.length === 0 ? (
-                  <div className="empty-state">
-                    <AstroLogo className="empty-logo" />
-                    <h2>Agent Network</h2>
-                    <p className="irc-hint">Messages from {ircStatus.channel || '#astro'} will appear here</p>
+            <div className="irc-layout">
+              <div className="irc-channel-tabs">
+                {(ircChannels.length > 0 ? ircChannels : (ircNick ? [{ name: ircNick }] : []))
+                  .filter(ch => !hiddenChannels.includes(ch.name))
+                  .map((ch) => (
+                  <button
+                    key={ch.name}
+                    className={`irc-channel-tab ${ch.name === ircNick ? 'active' : ''} ${unreadCounts[ch.name] ? 'irc-tab-unread' : ''}`}
+                    onClick={() => handleSwitchChannel(ch.name)}
+                    title={ch.name}
+                  >
+                    {ch.name}
+                    {unreadCounts[ch.name] > 0 && (
+                      <span className="irc-unread-badge">{unreadCounts[ch.name]}</span>
+                    )}
+                    <span
+                      className="irc-channel-hide-btn"
+                      onClick={(e) => { e.stopPropagation(); hideChannel(ch.name) }}
+                      title={`Hide ${ch.name}`}
+                    >&times;</span>
+                  </button>
+                ))}
+                {joiningChannel ? (
+                  <div className="irc-channel-tab-join">
+                    <input
+                      className="irc-channel-tab-input"
+                      type="text"
+                      placeholder="#channel"
+                      value={joinChannelName}
+                      onChange={(e) => setJoinChannelName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleJoinChannel()
+                        if (e.key === 'Escape') { setJoiningChannel(false); setJoinChannelName('') }
+                      }}
+                      autoFocus
+                    />
                   </div>
                 ) : (
-                  <div className="messages irc-messages">
-                    {ircMessages.map((msg) => (
-                      <IrcMessage key={msg.id} msg={msg} />
-                    ))}
-                    <div ref={messagesEndRef} />
-                  </div>
+                  <button
+                    className="irc-channel-tab irc-channel-tab-add"
+                    onClick={() => setJoiningChannel(true)}
+                    disabled={loading}
+                    title="Join a channel"
+                  >
+                    +
+                  </button>
                 )}
-              </main>
-            </>
+                {hiddenChannels.length > 0 && (
+                  <button
+                    className="irc-channel-tab irc-channel-tab-hidden-toggle"
+                    onClick={() => setShowHiddenChannels(true)}
+                    title={`${hiddenChannels.length} hidden channel(s)`}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" /><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" /><line x1="1" y1="1" x2="23" y2="23" />
+                    </svg>
+                    {hiddenChannels.length} hidden
+                  </button>
+                )}
+              </div>
+              <div className="irc-chat-body">
+                <div className="chat-toolbar">
+                  <div className={`irc-status-dot ${ircStatus.connected ? 'connected' : ''}`} />
+                  <span className="irc-status-text">
+                    {ircStatus.connected ? `${ircStatus.nick} on ${ircStatus.channel}` : 'Connecting...'}
+                  </span>
+                </div>
+                <main className="chat-area irc-chat-area" ref={ircChatAreaRef} onScroll={handleIrcScroll}>
+                  {ircUsers.length > 0 && (
+                    <div className="irc-users-bar">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                      </svg>
+                      {ircUsers.map((nick) => (
+                        <span key={nick} className={`irc-user-chip ${nick.toLowerCase() === ircStatus.nick?.toLowerCase() ? 'irc-user-self' : ''}`}>{nick}</span>
+                      ))}
+                    </div>
+                  )}
+                  {ircMessages.length === 0 && !ircLoadingHistory ? (
+                    <div className="empty-state">
+                      <AstroLogo className="empty-logo" />
+                      <h2>Agent Network</h2>
+                      <p className="irc-hint">Messages from {ircStatus.channel || '#astro'} will appear here</p>
+                    </div>
+                  ) : (
+                    <div className="messages irc-messages">
+                      {ircLoadingHistory && (
+                        <div className="irc-history-loading">Loading history...</div>
+                      )}
+                      {ircMessages.filter(msg => msg.kind !== 'join' && msg.kind !== 'part' && msg.kind !== 'quit').map((msg) => (
+                        <IrcMessage key={msg.id} msg={msg} />
+                      ))}
+                      <div ref={messagesEndRef} />
+                    </div>
+                  )}
+                </main>
+              </div>
+            </div>
           ) : (
             <>
               {messages.length > 0 && (
@@ -1366,6 +1521,35 @@ function App() {
           onClose={() => setShowUniverseManager(false)}
           onRefresh={fetchUniverses}
         />
+      )}
+      {showHiddenChannels && (
+        <div className="quickview-overlay" onClick={() => setShowHiddenChannels(false)}>
+          <div className="quickview-panel hidden-channels-modal" onClick={e => e.stopPropagation()}>
+            <div className="quickview-header">
+              <h3>Hidden Channels</h3>
+              <button className="quickview-close" onClick={() => setShowHiddenChannels(false)}>&times;</button>
+            </div>
+            <div className="hidden-channels-body">
+              {hiddenChannels.length === 0 ? (
+                <p className="hidden-channels-empty">No hidden channels.</p>
+              ) : (
+                <ul className="hidden-channels-list">
+                  {hiddenChannels.map(name => (
+                    <li key={name} className="hidden-channel-item">
+                      <span className="hidden-channel-name">{name}</span>
+                      <button className="hidden-channel-unhide-btn" onClick={() => unhideChannel(name)}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+                        </svg>
+                        Unhide
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

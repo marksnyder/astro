@@ -25,6 +25,22 @@
             }
         },
         {
+            "label": "Package Chrome Extension",
+            "type": "shell",
+            "command": "mkdir -p dist && cd extension && zip -r ../dist/astro-browse-extension.zip . -x '.*'",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
             "label": "Docs Site (Jekyll serve)",
             "type": "shell",
             "command": "bundle exec jekyll serve --baseurl '' --livereload --open-url",

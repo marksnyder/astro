@@ -6,6 +6,17 @@ import BACKGROUNDS from './backgrounds'
 
 const LOGO_URL = '/logo.png'
 
+function ircTimestamp(ts) {
+  if (!ts) return ''
+  const d = new Date(ts * 1000)
+  const mon = d.toLocaleString(undefined, { month: 'short' })
+  const day = d.getDate()
+  const h = d.getHours()
+  const m = String(d.getMinutes()).padStart(2, '0')
+  const ampm = h >= 12 ? 'pm' : 'am'
+  return `${mon} ${day} ${h % 12 || 12}:${m}${ampm}`
+}
+
 const MODELS = [
   { id: 'gpt-5.2', label: 'GPT-5.2' },
   { id: 'gpt-5.1', label: 'GPT-5.1' },
@@ -577,9 +588,15 @@ function MobileApp() {
   const [ircMessages, setIrcMessages] = useState([])
   const [ircStatus, setIrcStatus] = useState({ connected: false, nick: '', channel: '' })
   const ircWsRef = useRef(null)
+  const ircHistoryTsRef = useRef(0)
+  const [ircHasMore, setIrcHasMore] = useState(false)
+  const [ircLoadingHistory, setIrcLoadingHistory] = useState(false)
+  const ircChatAreaRef = useRef(null)
   const [ircChannels, setIrcChannels] = useState([])
   const [showAddChannel, setShowAddChannel] = useState(false)
   const [newChannelName, setNewChannelName] = useState('')
+  const [unreadCounts, setUnreadCounts] = useState({})
+  const lastSeenTsRef = useRef({})
   const [menuOpen, setMenuOpen] = useState(false)
   const [view, setView] = useState('chat')
   const [categories, setCategories] = useState([])
@@ -614,20 +631,73 @@ function MobileApp() {
   const [ircUsers, setIrcUsers] = useState([])
 
   const fetchIrcChannels = () => {
-    fetch('/api/irc/channels').then(r => r.json()).then(data => setIrcChannels(data.filter(c => !c.name.startsWith('&')))).catch(() => {})
+    fetch('/api/irc/channels').then(r => r.json()).then(data => {
+      const filtered = data.filter(c => !c.name.startsWith('&'))
+      setIrcChannels(filtered)
+      const now = Date.now() / 1000
+      for (const ch of filtered) {
+        if (!(ch.name in lastSeenTsRef.current)) lastSeenTsRef.current[ch.name] = now
+      }
+    }).catch(() => {})
   }
 
   const fetchIrcUsers = () => {
     fetch('/api/irc/users').then(r => r.json()).then(setIrcUsers).catch(() => {})
   }
 
+  const fetchIrcHistory = (channel, beforeId = null) => {
+    const params = new URLSearchParams({ channel, limit: '100' })
+    if (beforeId) params.set('before_id', beforeId)
+    setIrcLoadingHistory(true)
+    return fetch(`/api/irc/history?${params}`)
+      .then(r => r.json())
+      .then(data => {
+        setIrcHasMore(data.has_more || false)
+        return data.messages || []
+      })
+      .catch(() => [])
+      .finally(() => setIrcLoadingHistory(false))
+  }
+
+  const loadOlderHistory = () => {
+    if (ircLoadingHistory || !ircHasMore) return
+    const channel = ircStatus.channel || '#astro'
+    const oldestId = ircMessages.length > 0 ? ircMessages[0].id : null
+    if (!oldestId) return
+    const area = ircChatAreaRef.current
+    const prevScrollHeight = area ? area.scrollHeight : 0
+    fetchIrcHistory(channel, oldestId).then(older => {
+      if (older.length > 0) {
+        setIrcMessages(prev => [...older, ...prev])
+        requestAnimationFrame(() => {
+          if (area) area.scrollTop = area.scrollHeight - prevScrollHeight
+        })
+      }
+    })
+  }
+
+  const handleIrcScroll = (e) => {
+    if (e.target.scrollTop < 80) loadOlderHistory()
+  }
+
   const handleSwitchChannel = (channel) => {
     if (!channel) return
     const name = channel.startsWith('#') ? channel : '#' + channel
+    lastSeenTsRef.current[name] = Date.now() / 1000
+    setUnreadCounts(prev => { const n = { ...prev }; delete n[name]; return n })
     setIrcNick(name)
     setIrcMessages([])
+    setIrcHasMore(false)
+    ircHistoryTsRef.current = 0
     fetch('/api/irc/switch', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
-      .then(() => { setTimeout(fetchIrcUsers, 500); setTimeout(fetchIrcChannels, 1000) }).catch(() => {})
+      .then(() => {
+        fetchIrcHistory(name).then(msgs => {
+          if (msgs.length > 0) ircHistoryTsRef.current = Math.max(...msgs.map(m => m.timestamp))
+          setIrcMessages(msgs)
+        })
+        setTimeout(fetchIrcUsers, 500)
+        setTimeout(fetchIrcChannels, 1000)
+      }).catch(() => {})
   }
 
   const handleJoinChannel = () => {
@@ -642,11 +712,30 @@ function MobileApp() {
   useEffect(() => {
     if (chatMode !== 'irc') {
       if (ircWsRef.current) { ircWsRef.current.close(); ircWsRef.current = null }
+      ircHistoryTsRef.current = 0
       return
     }
     let cancelled = false
     let ws = null
     let reconnectTimer = null
+
+    fetch('/api/irc/status').then(r => r.json()).then(status => {
+      if (cancelled) return
+      const channel = status.channel || '#astro'
+      setIrcNick(channel)
+      return fetch(`/api/irc/history?${new URLSearchParams({ channel, limit: '100' })}`)
+        .then(r => r.json())
+        .then(data => {
+          if (cancelled) return
+          const msgs = data.messages || []
+          setIrcHasMore(data.has_more || false)
+          if (msgs.length > 0) {
+            ircHistoryTsRef.current = Math.max(...msgs.map(m => m.timestamp))
+            setIrcMessages(msgs)
+          }
+          lastSeenTsRef.current[channel] = Date.now() / 1000
+        })
+    }).catch(() => {})
 
     const connect = () => {
       if (cancelled) return
@@ -658,6 +747,7 @@ function MobileApp() {
         try {
           const data = JSON.parse(e.data)
           if (data.type === 'msg') {
+            if (data.timestamp && data.timestamp <= ircHistoryTsRef.current) return
             setIrcMessages(prev => [...prev, data])
           } else if (data.type === 'status') {
             setIrcStatus({ connected: data.connected, nick: data.nick, channel: data.channel })
@@ -674,15 +764,44 @@ function MobileApp() {
     }
     connect()
     fetchIrcUsers()
+    fetchIrcChannels()
     const usersPoll = setInterval(fetchIrcUsers, 15000)
+    const channelsPoll = setInterval(fetchIrcChannels, 10000)
 
     return () => {
       cancelled = true
       clearTimeout(reconnectTimer)
       clearInterval(usersPoll)
+      clearInterval(channelsPoll)
       if (ws) { ws.close(); ircWsRef.current = null }
     }
   }, [chatMode])
+
+  useEffect(() => {
+    if (chatMode !== 'irc') return
+    const poll = () => {
+      const since = lastSeenTsRef.current
+      if (Object.keys(since).length === 0) return
+      fetch('/api/irc/unread', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(since),
+      })
+        .then(r => r.json())
+        .then(counts => {
+          const active = ircNick || '#astro'
+          const filtered = {}
+          for (const [ch, cnt] of Object.entries(counts)) {
+            if (ch !== active && cnt > 0) filtered[ch] = cnt
+          }
+          setUnreadCounts(filtered)
+        })
+        .catch(() => {})
+    }
+    poll()
+    const iv = setInterval(poll, 5000)
+    return () => clearInterval(iv)
+  }, [chatMode, ircNick])
 
   const [chatBg, setChatBg] = useState({ current: null, next: null, fading: false, author: null, authorUrl: null })
 
@@ -904,7 +1023,7 @@ function MobileApp() {
               {ircChannels.length === 0 && ircNick && <option value={ircNick}>{ircNick}</option>}
               {ircChannels.length === 0 && !ircNick && <option value="">No channels</option>}
               {ircChannels.map((ch) => (
-                <option key={ch.name} value={ch.name}>{ch.name}</option>
+                <option key={ch.name} value={ch.name}>{ch.name}{unreadCounts[ch.name] ? ` (${unreadCounts[ch.name]})` : ''}</option>
               ))}
             </select>
           </div>
@@ -976,9 +1095,9 @@ function MobileApp() {
                 ))}
               </div>
             )}
-            <main className="m-messages">
+            <main className="m-messages" ref={chatMode === 'irc' ? ircChatAreaRef : undefined} onScroll={chatMode === 'irc' ? handleIrcScroll : undefined}>
               {chatMode === 'irc' ? (
-                ircMessages.length === 0 ? (
+                ircMessages.length === 0 && !ircLoadingHistory ? (
                   <div className="m-empty">
                     <img className="m-empty-logo" src={LOGO_URL} alt="Astro" />
                     <h2>Agent Network</h2>
@@ -986,15 +1105,15 @@ function MobileApp() {
                   </div>
                 ) : (
                   <>
-                    {ircMessages.map((msg) => (
-                      msg.kind === 'join' || msg.kind === 'part' || msg.kind === 'quit' ? (
-                        <div key={msg.id} className="m-irc-event"><span className="m-irc-event-nick">{msg.sender}</span> {msg.text}</div>
-                      ) : (
-                        <div key={msg.id} className={`m-irc-msg ${msg.self ? 'm-irc-self' : ''}`}>
-                          <span className="m-irc-nick">{msg.sender}</span>
-                          <span className="m-irc-text">{msg.text}</span>
-                        </div>
-                      )
+                    {ircLoadingHistory && (
+                      <div style={{ textAlign: 'center', padding: '8px 0', color: 'var(--text-secondary, #999)', fontSize: 12, opacity: 0.7 }}>Loading history...</div>
+                    )}
+                    {ircMessages.filter(msg => msg.kind !== 'join' && msg.kind !== 'part' && msg.kind !== 'quit').map((msg) => (
+                      <div key={msg.id} className={`m-irc-msg ${msg.self ? 'm-irc-self' : ''}`}>
+                        <span className="m-irc-ts">{ircTimestamp(msg.timestamp)}</span>
+                        <span className="m-irc-nick">{msg.sender}</span>
+                        <span className="m-irc-text">{msg.text}</span>
+                      </div>
                     ))}
                     <div ref={messagesEndRef} />
                   </>

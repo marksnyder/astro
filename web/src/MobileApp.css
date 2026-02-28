@@ -1276,6 +1276,15 @@
   word-break: break-word;
 }
 
+.m-irc-ts {
+  font-size: 9px;
+  color: var(--text-secondary, #888);
+  opacity: 0.6;
+  margin-right: 6px;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
 .m-irc-nick {
   font-weight: 600;
   margin-right: 8px;

@@ -971,6 +971,23 @@ def api_irc_messages(after: int = 0):
     return {"messages": client.get_messages(after)}
 
 
+@app.get("/api/irc/history")
+def api_irc_history(channel: str = "#astro", before_id: Optional[int] = None, limit: int = 100):
+    """Return persisted IRC history for a channel, paginated by message id."""
+    from src.irc_monitor import get_history
+    limit = min(limit, 200)
+    messages = get_history(channel, before_id=before_id, limit=limit)
+    has_more = len(messages) == limit
+    return {"messages": messages, "has_more": has_more}
+
+
+@app.post("/api/irc/unread")
+def api_irc_unread(since: dict[str, float]):
+    """Return unread message counts per channel since given timestamps."""
+    from src.irc_monitor import get_unread_counts
+    return get_unread_counts(since)
+
+
 @app.get("/api/irc/status")
 def api_irc_status():
     from src.irc_client import IRCClient
@@ -987,9 +1004,8 @@ def api_irc_users():
 
 @app.get("/api/irc/channels")
 def api_irc_channels():
-    from src.irc_client import IRCClient
-    client = IRCClient.get()
-    return client.list_channels()
+    from src.irc_monitor import IRCMonitor
+    return IRCMonitor.get().get_channels()
 
 
 class IrcChannelRequest(BaseModel):
@@ -1059,10 +1075,8 @@ async def ws_irc(ws: WebSocket):
     client = IRCClient.get()
     queue = client.subscribe()
 
-    # Send current status + backlog on connect
+    # Send current status (history is loaded from DB via /api/irc/history)
     await ws.send_json({"type": "status", **client.get_status()})
-    for msg in client.get_messages():
-        await ws.send_json({"type": "msg", **msg})
 
     async def _reader():
         """Read send commands from browser."""
@@ -1116,6 +1130,8 @@ def on_startup():
     _start_ngircd()
     from src.irc_client import IRCClient
     IRCClient.get()
+    from src.irc_monitor import IRCMonitor
+    IRCMonitor.get()
 
 
 @app.on_event("shutdown")
@@ -1123,6 +1139,9 @@ def on_shutdown():
     from src.irc_client import IRCClient
     if IRCClient._instance:
         IRCClient._instance.stop()
+    from src.irc_monitor import IRCMonitor
+    if IRCMonitor._instance:
+        IRCMonitor._instance.stop()
     if _ngircd_proc:
         _ngircd_proc.terminate()
         try:
