@@ -263,9 +263,8 @@ class IRCClient:
                 chunk = line[:400]
                 line = line[400:]
                 self._raw_send(f"PRIVMSG {self.channel} :{chunk}")
-                self._add_message(self.nick, chunk)
             self._raw_send(f"PRIVMSG {self.channel} :{line}")
-            self._add_message(self.nick, line)
+        self._add_message(self.nick, text)
 
     def get_messages(self, after_id: int = 0) -> list[dict]:
         with self._msg_lock:

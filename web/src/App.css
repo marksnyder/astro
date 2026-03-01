@@ -4814,6 +4814,7 @@
 
 .irc-text {
   color: var(--text-primary);
+  white-space: pre-wrap;
 }
 
 .irc-event {

@@ -1298,6 +1298,7 @@
 
 .m-irc-text {
   color: var(--text-primary);
+  white-space: pre-wrap;
 }
 
 .m-irc-event {

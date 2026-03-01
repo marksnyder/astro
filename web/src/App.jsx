@@ -957,6 +957,7 @@ function App() {
 
     if (chatMode === 'irc') {
       setInput('')
+      if (inputRef.current) inputRef.current.style.height = 'auto'
       const ws = ircWsRef.current
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'send', message: question }))
@@ -972,6 +973,7 @@ function App() {
     const updatedMessages = [...messages, userMsg]
     setMessages(updatedMessages)
     setInput('')
+    if (inputRef.current) inputRef.current.style.height = 'auto'
     setLoading(true)
 
     const history = messages
@@ -1503,7 +1505,12 @@ function App() {
                 rows="1"
                 placeholder={chatMode === 'irc' ? `Message ${ircStatus.channel || '#astro'}...` : 'Ask a question...'}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => {
+                  setInput(e.target.value)
+                  const ta = e.target
+                  ta.style.height = 'auto'
+                  ta.style.height = Math.min(ta.scrollHeight, 150) + 'px'
+                }}
                 onKeyDown={handleKeyDown}
                 disabled={chatMode !== 'irc' && loading}
               />
