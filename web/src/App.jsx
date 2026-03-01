@@ -661,8 +661,28 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value: JSON.stringify(next) }),
       }).catch(() => {})
+      fetch(`/api/irc/channels/${encodeURIComponent(name)}/hide`, { method: 'POST' }).catch(() => {})
       return next
     })
+  }
+
+  const deleteChannel = (name) => {
+    if (!confirm(`Permanently delete ${name}? This removes all history and the channel itself.`)) return
+    fetch(`/api/irc/channels/${encodeURIComponent(name)}`, { method: 'DELETE' })
+      .then(r => r.json())
+      .then(() => {
+        setHiddenChannels(prev => {
+          const next = prev.filter(c => c !== name)
+          fetch('/api/settings/irc_hidden_channels', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value: JSON.stringify(next) }),
+          }).catch(() => {})
+          return next
+        })
+        fetchIrcChannels()
+      })
+      .catch(() => {})
   }
 
   const unhideChannel = (name) => {
@@ -1037,6 +1057,11 @@ function App() {
       .catch(() => setShowSettings(true))
   }, [])
 
+  const IRC_MSG_LIMIT = 400
+  const ircByteCount = chatMode === 'irc' && input
+    ? new TextEncoder().encode(input.trim()).length
+    : 0
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -1404,8 +1429,22 @@ function App() {
                   <span className="irc-status-text">
                     {ircStatus.connected ? `${ircStatus.nick} on ${ircStatus.channel}` : 'Connecting...'}
                   </span>
-                </div>
-                <main className="chat-area irc-chat-area" ref={ircChatAreaRef} onScroll={handleIrcScroll}>
+                  <button className="chat-toolbar-btn" onClick={() => {
+                    const ch = ircNick || ircStatus.channel || '#astro'
+                    if (!confirm(`Purge all message history for ${ch}?`)) return
+                    fetch(`/api/irc/channels/${encodeURIComponent(ch)}/history`, { method: 'DELETE' })
+                      .then(r => r.json())
+                      .then(() => { setIrcMessages([]); setIrcHasMore(false) })
+                      .catch(() => {})
+                  }} title="Purge channel history">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                      <path d="M10 11v6" /><path d="M14 11v6" />
+                      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                    </svg>
+                    Purge History
+                  </button>
                   {ircUsers.length > 0 && (
                     <div className="irc-users-bar">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1419,6 +1458,8 @@ function App() {
                       ))}
                     </div>
                   )}
+                </div>
+                <main className="chat-area irc-chat-area" ref={ircChatAreaRef} onScroll={handleIrcScroll}>
                   {ircMessages.length === 0 && !ircLoadingHistory ? (
                     <div className="empty-state">
                       <AstroLogo className="empty-logo" />
@@ -1514,10 +1555,15 @@ function App() {
                 onKeyDown={handleKeyDown}
                 disabled={chatMode !== 'irc' && loading}
               />
+              {chatMode === 'irc' && input.trim() && (
+                <span className={`irc-byte-count ${ircByteCount > IRC_MSG_LIMIT ? 'over' : ircByteCount > IRC_MSG_LIMIT * 0.8 ? 'warn' : ''}`}>
+                  {ircByteCount}/{IRC_MSG_LIMIT}
+                </span>
+              )}
               <button
                 type="submit"
                 className="send-button"
-                disabled={(chatMode !== 'irc' && loading) || !input.trim()}
+                disabled={(chatMode !== 'irc' && loading) || !input.trim() || (chatMode === 'irc' && ircByteCount > IRC_MSG_LIMIT)}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="22" y1="2" x2="11" y2="13" />
@@ -1572,12 +1618,23 @@ function App() {
                   {hiddenChannels.map(name => (
                     <li key={name} className="hidden-channel-item">
                       <span className="hidden-channel-name">{name}</span>
-                      <button className="hidden-channel-unhide-btn" onClick={() => unhideChannel(name)}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
-                        </svg>
-                        Unhide
-                      </button>
+                      <div className="hidden-channel-actions">
+                        <button className="hidden-channel-unhide-btn" onClick={() => unhideChannel(name)}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+                          </svg>
+                          Unhide
+                        </button>
+                        <button className="hidden-channel-delete-btn" onClick={() => deleteChannel(name)}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                            <path d="M10 11v6" /><path d="M14 11v6" />
+                            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                          </svg>
+                          Delete
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>

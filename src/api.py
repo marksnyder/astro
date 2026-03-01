@@ -1269,24 +1269,70 @@ def api_create_irc_channel(req: IrcChannelRequest):
     return {"ok": True, "name": name}
 
 
-@app.delete("/api/irc/channels/{name:path}")
-def api_delete_irc_channel(name: str):
-    """Remove a channel by sending an IRC admin KILL — only works for empty channels on ngircd.
-    We write the updated config and reload ngircd to actually persist channel removal."""
-    import subprocess, re
+@app.post("/api/irc/channels/{name:path}/hide")
+def api_hide_irc_channel(name: str):
+    """Have both bots leave a channel immediately when it's hidden."""
+    from src.irc_client import IRCClient
+    from src.irc_monitor import IRCMonitor
     name = name.strip()
     if not name.startswith("#"):
         name = "#" + name
+    try:
+        client = IRCClient.get()
+        if client.connected and client._sock:
+            client._raw_send(f"PART {name}")
+    except Exception:
+        pass
+    try:
+        IRCMonitor.get().part_channel(name)
+    except Exception:
+        pass
+    return {"ok": True}
+
+
+@app.delete("/api/irc/channels/{name:path}/history")
+def api_purge_irc_channel_history(name: str):
+    """Delete all persisted message history for a channel."""
+    from src.irc_monitor import purge_history
+    name = name.strip()
+    if not name.startswith("#"):
+        name = "#" + name
+    count = purge_history(name)
+    return {"ok": True, "deleted": count}
+
+
+@app.delete("/api/irc/channels/{name:path}")
+def api_delete_irc_channel(name: str):
+    """Fully delete a channel: have bots leave, remove from ngircd config, purge DB history."""
+    import subprocess, re, time
+    from src.irc_client import IRCClient
+    from src.irc_monitor import IRCMonitor, delete_channel
+    name = name.strip()
+    if not name.startswith("#"):
+        name = "#" + name
+
+    # Have both IRC bots leave the channel first so ngircd can destroy it
+    try:
+        client = IRCClient.get()
+        if client.connected and client._sock:
+            client._raw_send(f"PART {name}")
+    except Exception:
+        pass
+    try:
+        IRCMonitor.get().part_channel(name)
+    except Exception:
+        pass
+    time.sleep(0.5)
+
+    delete_channel(name)
     conf_path = Path(__file__).resolve().parent.parent / "config" / "ngircd.conf"
-    if not conf_path.exists():
-        raise HTTPException(status_code=500, detail="ngircd.conf not found")
-    text = conf_path.read_text()
-    pattern = r'\[Channel\]\s*\n\s*Name\s*=\s*' + re.escape(name) + r'[^\[]*'
-    new_text = re.sub(pattern, '', text, flags=re.IGNORECASE)
-    if new_text == text:
-        return {"ok": True, "message": "Channel not in config"}
-    conf_path.write_text(new_text.strip() + "\n")
-    subprocess.run(["pkill", "-HUP", "ngircd"], capture_output=True)
+    if conf_path.exists():
+        text = conf_path.read_text()
+        pattern = r'\[Channel\]\s*\n\s*Name\s*=\s*' + re.escape(name) + r'[^\[]*'
+        new_text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+        if new_text != text:
+            conf_path.write_text(new_text.strip() + "\n")
+            subprocess.run(["pkill", "-HUP", "ngircd"], capture_output=True)
     return {"ok": True}
 
 

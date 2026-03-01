@@ -6,6 +6,7 @@ server. Periodically re-scans the channel list so newly created channels
 are picked up automatically.
 """
 
+import json
 import socket
 import sqlite3
 import threading
@@ -63,6 +64,21 @@ def _load_monitored_channels() -> set[str]:
         conn.close()
 
 
+def _load_hidden_channels() -> set[str]:
+    conn = _db()
+    try:
+        row = conn.execute(
+            "SELECT value FROM app_settings WHERE key = 'irc_hidden_channels'"
+        ).fetchone()
+        if row and row["value"]:
+            return set(json.loads(row["value"]))
+        return set()
+    except Exception:
+        return set()
+    finally:
+        conn.close()
+
+
 def get_history(channel: str, before_id: int | None = None, limit: int = PAGE_SIZE) -> list[dict]:
     """Return up to `limit` messages for a channel, ordered newest-first.
 
@@ -98,6 +114,29 @@ def get_history(channel: str, before_id: int | None = None, limit: int = PAGE_SI
         ]
     finally:
         conn.close()
+
+
+def purge_history(channel: str) -> int:
+    """Delete all irc_history rows for a channel. Returns the number of rows deleted."""
+    conn = _db()
+    try:
+        cur = conn.execute("DELETE FROM irc_history WHERE channel = ?", (channel,))
+        conn.commit()
+        return cur.rowcount
+    finally:
+        conn.close()
+
+
+def delete_channel(channel: str) -> int:
+    """Delete all history AND the monitored-channels entry for a channel."""
+    count = purge_history(channel)
+    conn = _db()
+    try:
+        conn.execute("DELETE FROM irc_monitored_channels WHERE channel = ?", (channel,))
+        conn.commit()
+    finally:
+        conn.close()
+    return count
 
 
 def get_unread_counts(since: dict[str, float]) -> dict[str, int]:
@@ -151,6 +190,12 @@ class IRCMonitor:
         """Return the most recently discovered channel list."""
         with self._lock:
             return list(self._known_channels)
+
+    def part_channel(self, channel: str):
+        """Leave a channel so ngircd can remove it."""
+        if self._sock and channel in self._joined_channels:
+            self._raw_send(f"PART {channel}")
+            self._joined_channels.discard(channel)
 
     def start(self):
         self._stopping = False
@@ -247,7 +292,10 @@ class IRCMonitor:
 
     def _rejoin_persisted(self):
         """Join all channels saved in the DB (re-creates them on the server if needed)."""
+        hidden = _load_hidden_channels()
         for ch in _load_monitored_channels():
+            if ch in hidden:
+                continue
             if ch not in self._joined_channels:
                 self._raw_send(f"JOIN {ch}")
                 self._joined_channels.add(ch)
@@ -263,6 +311,7 @@ class IRCMonitor:
     def _finish_scan(self):
         """Called when RPL_LISTEND (323) arrives — join new channels and update the known list."""
         self._scanning = False
+        hidden = _load_hidden_channels()
 
         # Merge: server-listed channels + all persisted channels
         persisted = _load_monitored_channels()
@@ -279,9 +328,17 @@ class IRCMonitor:
                 for ch, info in sorted(all_channels.items())
             ]
 
-        # Join anything we're not already in (including persisted channels
-        # that may have been destroyed — joining re-creates them)
+        # Leave hidden channels the monitor is still in
+        for ch in list(self._joined_channels):
+            if ch in hidden:
+                self._raw_send(f"PART {ch}")
+                self._joined_channels.discard(ch)
+                print(f"[IRC Monitor] Parted hidden {ch}")
+
+        # Join anything we're not already in, skipping hidden channels
         for ch in all_channels:
+            if ch in hidden:
+                continue
             if ch not in self._joined_channels:
                 self._raw_send(f"JOIN {ch}")
                 self._joined_channels.add(ch)

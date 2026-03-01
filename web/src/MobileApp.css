@@ -558,6 +558,25 @@
   opacity: 0.5;
 }
 
+.m-input-form .irc-byte-count {
+  font-size: 10px;
+  font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 0 2px;
+  transition: color 0.15s;
+}
+
+.m-input-form .irc-byte-count.warn {
+  color: #f0a030;
+}
+
+.m-input-form .irc-byte-count.over {
+  color: #f44;
+  font-weight: 600;
+}
+
 .m-send-btn {
   width: 38px;
   height: 38px;
@@ -1254,6 +1273,26 @@
   color: var(--text-secondary);
   position: relative;
   z-index: 1;
+}
+
+.m-irc-toolbar-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.m-irc-toolbar-btn + .m-irc-toolbar-btn {
+  margin-left: 2px;
+}
+
+.m-irc-toolbar-btn:active {
+  opacity: 0.6;
 }
 
 .m-irc-dot {

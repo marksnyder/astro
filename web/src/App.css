@@ -468,6 +468,32 @@
   border-color: var(--accent, #7c8aff);
 }
 
+.hidden-channel-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.hidden-channel-delete-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 500;
+  color: #f44;
+  background: rgba(255, 68, 68, 0.1);
+  border: 1px solid rgba(255, 68, 68, 0.25);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.hidden-channel-delete-btn:hover {
+  background: rgba(255, 68, 68, 0.22);
+  border-color: #f44;
+}
+
 .irc-chat-body {
   display: flex;
   flex-direction: column;
@@ -481,16 +507,12 @@
 .irc-users-bar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  background: rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  gap: 5px;
+  margin-left: auto;
   flex-wrap: wrap;
+  justify-content: flex-end;
   color: var(--text-secondary);
   font-size: 12px;
-  z-index: 1;
-  position: relative;
 }
 
 .irc-user-chip {
@@ -875,6 +897,7 @@
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   background: var(--bg-primary);
+  flex-wrap: wrap;
 }
 
 .chat-toolbar-btn {
@@ -1267,6 +1290,25 @@
 
 .input-field:disabled {
   opacity: 0.5;
+}
+
+.irc-byte-count {
+  font-size: 11px;
+  font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 0 2px;
+  transition: color 0.15s;
+}
+
+.irc-byte-count.warn {
+  color: #f0a030;
+}
+
+.irc-byte-count.over {
+  color: #f44;
+  font-weight: 600;
 }
 
 .send-button {

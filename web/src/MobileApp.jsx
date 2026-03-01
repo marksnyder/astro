@@ -1301,6 +1301,11 @@ function MobileApp() {
     setVoiceChat(v => !v)
   }
 
+  const IRC_MSG_LIMIT = 400
+  const ircByteCount = chatMode === 'irc' && input
+    ? new TextEncoder().encode(input.trim()).length
+    : 0
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     const question = input.trim()
@@ -1464,6 +1469,21 @@ function MobileApp() {
               <div className="m-irc-status-bar">
                 <div className={`m-irc-dot ${ircStatus.connected ? 'connected' : ''}`} />
                 <span>{ircStatus.connected ? `${ircStatus.nick} on ${ircStatus.channel}` : 'Connecting...'}</span>
+                <button className="m-irc-toolbar-btn" onClick={() => {
+                  const ch = ircNick || ircStatus.channel || '#astro'
+                  if (!confirm(`Purge all message history for ${ch}?`)) return
+                  fetch(`/api/irc/channels/${encodeURIComponent(ch)}/history`, { method: 'DELETE' })
+                    .then(r => r.json())
+                    .then(() => { setIrcMessages([]); setIrcHasMore(false) })
+                    .catch(() => {})
+                }} title="Purge channel history">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                    <path d="M10 11v6" /><path d="M14 11v6" />
+                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                  </svg>
+                </button>
               </div>
             )}
             {chatMode === 'irc' && ircUsers.length > 0 && (
@@ -1548,7 +1568,12 @@ function MobileApp() {
                   )}
                 </button>
                 <textarea ref={inputRef} className="m-input-field" rows="1" placeholder={chatMode === 'irc' ? `Message ${ircStatus.channel || '#astro'}...` : 'Ask a question...'} value={input} onChange={(e) => { setInput(e.target.value); const ta = e.target; ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 150) + 'px' }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(e) } }} disabled={chatMode !== 'irc' && loading} />
-                <button type="submit" className="m-send-btn" disabled={(chatMode !== 'irc' && loading) || !input.trim()}>
+                {chatMode === 'irc' && input.trim() && (
+                  <span className={`irc-byte-count ${ircByteCount > IRC_MSG_LIMIT ? 'over' : ircByteCount > IRC_MSG_LIMIT * 0.8 ? 'warn' : ''}`}>
+                    {ircByteCount}/{IRC_MSG_LIMIT}
+                  </span>
+                )}
+                <button type="submit" className="m-send-btn" disabled={(chatMode !== 'irc' && loading) || !input.trim() || (chatMode === 'irc' && ircByteCount > IRC_MSG_LIMIT)}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
                 </button>
               </form>
