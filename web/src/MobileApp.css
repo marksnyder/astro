@@ -1311,3 +1311,211 @@
 .m-irc-event-nick {
   font-weight: 600;
 }
+
+/* ── Feeds styles (mobile) ───────────────────────── */
+
+.mf-edit-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #888);
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.mf-edit-btn:hover {
+  color: var(--accent, #60a5fa);
+}
+
+.mf-api-info {
+  margin-top: 12px;
+  background: var(--bg-secondary, #1a1a2e);
+  border: 1px solid var(--border, #333);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.mf-api-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary, #888);
+  margin-bottom: 6px;
+}
+
+.mf-api-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.mf-api-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #888);
+  min-width: 44px;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.mf-api-code {
+  font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+  font-size: 11px;
+  color: var(--text-primary, #eee);
+  background: var(--bg-primary, #0e0e1a);
+  padding: 3px 6px;
+  border-radius: 4px;
+  word-break: break-all;
+  user-select: all;
+  -webkit-user-select: all;
+}
+
+.mf-api-key {
+  color: var(--accent, #60a5fa);
+}
+
+.mf-api-pre {
+  font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+  font-size: 10.5px;
+  color: var(--text-secondary, #888);
+  background: var(--bg-primary, #0e0e1a);
+  padding: 8px 10px;
+  border-radius: 6px;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+
+.mf-type-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--bg-secondary, #1a1a2e);
+  color: var(--text-secondary, #888);
+  flex-shrink: 0;
+}
+
+.mf-type-badge.markup {
+  background: rgba(100, 180, 255, 0.15);
+  color: #7ab8ff;
+}
+
+.mf-type-badge.file {
+  background: rgba(255, 180, 100, 0.15);
+  color: #ffb870;
+}
+
+.mf-total-badge {
+  font-size: 12px;
+  color: var(--text-secondary, #888);
+  background: var(--bg-secondary, #1a1a2e);
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: 8px;
+}
+
+.mf-card-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.mf-card-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #888);
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.mf-card-btn:hover {
+  color: var(--text-primary, #eee);
+}
+
+.mf-card-btn-danger:hover {
+  color: #f44;
+}
+
+.mf-card-btn:disabled {
+  opacity: 0.4;
+}
+
+.mf-markup-body {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-primary, #eee);
+}
+
+.mf-markup-body h2 { font-size: 1.2em; margin: 0.8em 0 0.4em; }
+.mf-markup-body h3 { font-size: 1.05em; margin: 0.6em 0 0.3em; }
+.mf-markup-body p { margin: 0.5em 0; }
+.mf-markup-body ul, .mf-markup-body ol { padding-left: 1.4em; margin: 0.5em 0; }
+.mf-markup-body li { margin-bottom: 0.25em; }
+.mf-markup-body hr { border: none; border-top: 1px solid var(--border, #333); margin: 1em 0; }
+.mf-markup-body code { background: var(--bg-secondary, #1a1a2e); padding: 1px 4px; border-radius: 3px; font-size: 0.9em; }
+
+.mf-file-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 16px;
+  color: var(--text-secondary, #888);
+}
+
+.mf-file-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #eee);
+  word-break: break-all;
+  text-align: center;
+}
+
+.mf-download-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 20px;
+  background: var(--accent, #60a5fa);
+  color: #fff;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.mf-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border, #333);
+  font-size: 13px;
+  color: var(--text-secondary, #888);
+}
+
+.mf-pagination button {
+  background: var(--bg-secondary, #1a1a2e);
+  border: 1px solid var(--border, #333);
+  color: var(--text-primary, #eee);
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.mf-pagination button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}

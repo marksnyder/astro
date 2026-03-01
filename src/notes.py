@@ -86,7 +86,32 @@ class NoteImage:
     created_at: str
 
 
+@dataclass
+class Feed:
+    id: int | None
+    title: str
+    category_id: int | None
+    universe_id: int
+    api_key: str
+    pinned: bool
+    created_at: str
+    updated_at: str
+
+
+@dataclass
+class FeedArtifact:
+    id: int | None
+    feed_id: int
+    title: str
+    content_type: str  # 'markup' or 'file'
+    markup: str | None
+    file_path: str | None
+    original_filename: str | None
+    created_at: str
+
+
 IMAGES_DIR = Path(__file__).resolve().parent.parent / "data" / "images"
+FEED_FILES_DIR = Path(__file__).resolve().parent.parent / "data" / "feed_files"
 
 
 # ── DB connection & schema ────────────────────────────────────────────────
@@ -170,6 +195,17 @@ def delete_universe(uid: int) -> bool:
     if count <= 1:
         conn.close()
         return False
+    feed_ids = [r["id"] for r in conn.execute("SELECT id FROM feeds WHERE universe_id = ?", (uid,)).fetchall()]
+    for fid in feed_ids:
+        rows = conn.execute(
+            "SELECT file_path FROM feed_artifacts WHERE feed_id = ? AND content_type = 'file' AND file_path IS NOT NULL", (fid,)
+        ).fetchall()
+        for r in rows:
+            fp = FEED_FILES_DIR / r["file_path"]
+            if fp.is_file():
+                fp.unlink()
+        conn.execute("DELETE FROM feed_artifacts WHERE feed_id = ?", (fid,))
+    conn.execute("DELETE FROM feeds WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM notes WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM links WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM action_items WHERE universe_id = ?", (uid,))
@@ -880,3 +916,228 @@ def set_setting(key: str, value: str) -> None:
     )
     conn.commit()
     conn.close()
+
+
+# ── Feeds CRUD ───────────────────────────────────────────────────────────
+
+
+def _row_to_feed(row: sqlite3.Row) -> Feed:
+    return Feed(
+        id=row["id"],
+        title=row["title"],
+        category_id=row["category_id"],
+        universe_id=row["universe_id"],
+        api_key=row["api_key"],
+        pinned=bool(row["pinned"]),
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )
+
+
+def list_feeds(query: str = "", category_id: int | None = None, universe_id: int | None = None) -> list[Feed]:
+    conn = _get_conn()
+    conditions: list[str] = []
+    params: list = []
+    if universe_id is not None:
+        conditions.append("universe_id = ?")
+        params.append(universe_id)
+    if query:
+        conditions.append("title LIKE ?")
+        params.append(f"%{query}%")
+    if category_id is not None:
+        ids = get_descendant_ids(category_id)
+        placeholders = ",".join("?" * len(ids))
+        conditions.append(f"category_id IN ({placeholders})")
+        params.extend(ids)
+    where = f" WHERE {' AND '.join(conditions)}" if conditions else ""
+    rows = conn.execute(f"SELECT * FROM feeds{where} ORDER BY updated_at DESC", params).fetchall()
+    conn.close()
+    return [_row_to_feed(r) for r in rows]
+
+
+def get_feed(feed_id: int) -> Feed | None:
+    conn = _get_conn()
+    row = conn.execute("SELECT * FROM feeds WHERE id = ?", (feed_id,)).fetchone()
+    conn.close()
+    return _row_to_feed(row) if row else None
+
+
+def get_feed_by_api_key(api_key: str) -> Feed | None:
+    conn = _get_conn()
+    row = conn.execute("SELECT * FROM feeds WHERE api_key = ?", (api_key,)).fetchone()
+    conn.close()
+    return _row_to_feed(row) if row else None
+
+
+def create_feed(title: str, category_id: int | None = None, universe_id: int = 1) -> Feed:
+    now = _now()
+    api_key = f"fk_{uuid.uuid4().hex}"
+    conn = _get_conn()
+    cur = conn.execute(
+        "INSERT INTO feeds (title, category_id, universe_id, api_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (title, category_id, universe_id, api_key, now, now),
+    )
+    conn.commit()
+    fid = cur.lastrowid
+    conn.close()
+    return get_feed(fid)  # type: ignore[return-value]
+
+
+def update_feed(feed_id: int, title: str, category_id: int | None = None) -> Feed | None:
+    now = _now()
+    conn = _get_conn()
+    cur = conn.execute(
+        "UPDATE feeds SET title = ?, category_id = ?, updated_at = ? WHERE id = ?",
+        (title, category_id, now, feed_id),
+    )
+    conn.commit()
+    conn.close()
+    if cur.rowcount == 0:
+        return None
+    return get_feed(feed_id)
+
+
+def delete_feed(feed_id: int) -> bool:
+    conn = _get_conn()
+    # Get file artifacts to clean up
+    rows = conn.execute(
+        "SELECT file_path FROM feed_artifacts WHERE feed_id = ? AND content_type = 'file' AND file_path IS NOT NULL",
+        (feed_id,),
+    ).fetchall()
+    for r in rows:
+        fp = FEED_FILES_DIR / r["file_path"]
+        if fp.is_file():
+            fp.unlink()
+    conn.execute("DELETE FROM feed_artifacts WHERE feed_id = ?", (feed_id,))
+    cur = conn.execute("DELETE FROM feeds WHERE id = ?", (feed_id,))
+    conn.commit()
+    conn.close()
+    return cur.rowcount > 0
+
+
+def get_feed_artifact_count(feed_id: int) -> int:
+    conn = _get_conn()
+    row = conn.execute("SELECT COUNT(*) AS cnt FROM feed_artifacts WHERE feed_id = ?", (feed_id,)).fetchone()
+    conn.close()
+    return row["cnt"]
+
+
+def feed_to_dict(feed: Feed) -> dict:
+    d = asdict(feed)
+    d["artifact_count"] = get_feed_artifact_count(feed.id)
+    return d
+
+
+def set_feed_pinned(feed_id: int, pinned: bool) -> bool:
+    conn = _get_conn()
+    cur = conn.execute("UPDATE feeds SET pinned = ? WHERE id = ?", (int(pinned), feed_id))
+    conn.commit()
+    conn.close()
+    return cur.rowcount > 0
+
+
+def list_pinned_feeds(universe_id: int | None = None) -> list[Feed]:
+    conn = _get_conn()
+    if universe_id is not None:
+        rows = conn.execute("SELECT * FROM feeds WHERE pinned = 1 AND universe_id = ? ORDER BY updated_at DESC", (universe_id,)).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM feeds WHERE pinned = 1 ORDER BY updated_at DESC").fetchall()
+    conn.close()
+    return [_row_to_feed(r) for r in rows]
+
+
+# ── Feed artifacts CRUD ──────────────────────────────────────────────────
+
+
+def _row_to_artifact(row: sqlite3.Row) -> FeedArtifact:
+    return FeedArtifact(
+        id=row["id"],
+        feed_id=row["feed_id"],
+        title=row["title"],
+        content_type=row["content_type"],
+        markup=row["markup"],
+        file_path=row["file_path"],
+        original_filename=row["original_filename"],
+        created_at=row["created_at"],
+    )
+
+
+def list_feed_artifacts(
+    feed_id: int,
+    query: str = "",
+    page: int = 1,
+    page_size: int = 100,
+) -> tuple[list[FeedArtifact], int]:
+    """Return (artifacts, total_count) for a feed, paginated."""
+    conn = _get_conn()
+    conditions = ["feed_id = ?"]
+    params: list = [feed_id]
+    if query:
+        conditions.append("title LIKE ?")
+        params.append(f"%{query}%")
+    where = f" WHERE {' AND '.join(conditions)}"
+    total = conn.execute(f"SELECT COUNT(*) AS cnt FROM feed_artifacts{where}", params).fetchone()["cnt"]
+    offset = (page - 1) * page_size
+    rows = conn.execute(
+        f"SELECT * FROM feed_artifacts{where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+        params + [page_size, offset],
+    ).fetchall()
+    conn.close()
+    return [_row_to_artifact(r) for r in rows], total
+
+
+def get_feed_artifact(artifact_id: int) -> FeedArtifact | None:
+    conn = _get_conn()
+    row = conn.execute("SELECT * FROM feed_artifacts WHERE id = ?", (artifact_id,)).fetchone()
+    conn.close()
+    return _row_to_artifact(row) if row else None
+
+
+def create_feed_artifact_markup(feed_id: int, title: str, markup: str) -> FeedArtifact:
+    now = _now()
+    conn = _get_conn()
+    cur = conn.execute(
+        "INSERT INTO feed_artifacts (feed_id, title, content_type, markup, created_at) VALUES (?, ?, 'markup', ?, ?)",
+        (feed_id, title, markup, now),
+    )
+    conn.commit()
+    aid = cur.lastrowid
+    conn.close()
+    return get_feed_artifact(aid)  # type: ignore[return-value]
+
+
+def create_feed_artifact_file(feed_id: int, title: str, original_filename: str, data: bytes) -> FeedArtifact:
+    FEED_FILES_DIR.mkdir(parents=True, exist_ok=True)
+    ext = Path(original_filename).suffix.lower()
+    stored = f"{uuid.uuid4().hex}{ext}"
+    (FEED_FILES_DIR / stored).write_bytes(data)
+    now = _now()
+    conn = _get_conn()
+    cur = conn.execute(
+        "INSERT INTO feed_artifacts (feed_id, title, content_type, file_path, original_filename, created_at) VALUES (?, ?, 'file', ?, ?, ?)",
+        (feed_id, title, stored, original_filename, now),
+    )
+    conn.commit()
+    aid = cur.lastrowid
+    conn.close()
+    return get_feed_artifact(aid)  # type: ignore[return-value]
+
+
+def delete_feed_artifact(artifact_id: int) -> bool:
+    conn = _get_conn()
+    row = conn.execute("SELECT content_type, file_path FROM feed_artifacts WHERE id = ?", (artifact_id,)).fetchone()
+    if not row:
+        conn.close()
+        return False
+    if row["content_type"] == "file" and row["file_path"]:
+        fp = FEED_FILES_DIR / row["file_path"]
+        if fp.is_file():
+            fp.unlink()
+    conn.execute("DELETE FROM feed_artifacts WHERE id = ?", (artifact_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+def feed_artifact_to_dict(art: FeedArtifact) -> dict:
+    return asdict(art)

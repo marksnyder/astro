@@ -575,6 +575,383 @@ function MobileActions({ categories, universeId }) {
   )
 }
 
+// ── Feeds view ───────────────────────────────────────
+
+function MobileFeeds({ categories, universeId }) {
+  const [feeds, setFeeds] = useState([])
+  const [search, setSearch] = useState('')
+  const [filterCatId, setFilterCatId] = useState(null)
+  const [editing, setEditing] = useState(null)
+  const [title, setTitle] = useState('')
+  const [categoryId, setCategoryId] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const titleRef = useRef(null)
+  const [artifactFeed, setArtifactFeed] = useState(null)
+
+  const catMap = Object.fromEntries(categories.map(c => [c.id, c.name]))
+  const catEmojiMap = Object.fromEntries(categories.map(c => [c.id, c.emoji]))
+  const catLabel = (id) => { const e = catEmojiMap[id]; const n = catMap[id]; return e ? `${e} ${n}` : n }
+
+  const fetchFeeds = useCallback(() => {
+    const params = new URLSearchParams()
+    if (search) params.set('q', search)
+    if (filterCatId !== null) params.set('category_id', filterCatId)
+    if (universeId) params.set('universe_id', universeId)
+    fetch(`/api/feeds?${params}`)
+      .then(r => r.json())
+      .then(setFeeds)
+      .catch(() => {})
+  }, [search, filterCatId, universeId])
+
+  useEffect(() => { fetchFeeds() }, [universeId])
+  useEffect(() => {
+    const t = setTimeout(fetchFeeds, 300)
+    return () => clearTimeout(t)
+  }, [search, filterCatId, universeId])
+
+  const startNew = () => {
+    setEditing('new')
+    setTitle('')
+    setCategoryId(filterCatId)
+    setTimeout(() => titleRef.current?.focus(), 80)
+  }
+
+  const startEdit = (feed) => {
+    setEditing(feed)
+    setTitle(feed.title)
+    setCategoryId(feed.category_id)
+    setTimeout(() => titleRef.current?.focus(), 80)
+  }
+
+  const cancelEdit = () => setEditing(null)
+
+  const save = async () => {
+    if (!title.trim()) return
+    setSaving(true)
+    try {
+      const payload = { title: title.trim(), category_id: categoryId }
+      if (editing === 'new') {
+        await fetch(`/api/feeds?universe_id=${universeId || 1}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      } else {
+        await fetch(`/api/feeds/${editing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      }
+      setEditing(null)
+      fetchFeeds()
+    } finally { setSaving(false) }
+  }
+
+  const remove = async (feed) => {
+    if (!confirm(`Delete "${feed.title}" and all its artifacts?`)) return
+    await fetch(`/api/feeds/${feed.id}`, { method: 'DELETE' })
+    setEditing(null)
+    fetchFeeds()
+  }
+
+  const baseUrl = `${window.location.origin}/api/feeds`
+
+  // Artifact browser
+  if (artifactFeed) {
+    return <MobileArtifactBrowser feed={artifactFeed} onBack={() => { setArtifactFeed(null); fetchFeeds() }} />
+  }
+
+  // Edit / New
+  if (editing) {
+    return (
+      <div className="mn-edit">
+        <div className="mn-view-header">
+          <button className="mn-back-btn" onClick={cancelEdit}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+          </button>
+          <span className="mn-view-header-title">{editing === 'new' ? 'New Feed' : 'Edit Feed'}</span>
+          <span style={{ flex: 1 }} />
+          {editing !== 'new' && (
+            <button className="mn-action-btn mn-action-danger" onClick={() => remove(editing)}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /></svg>
+            </button>
+          )}
+          <button className="mn-save-btn" onClick={save} disabled={saving || !title.trim()}>
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+        <div className="mn-edit-body">
+          <input ref={titleRef} className="mn-edit-title" placeholder="Feed title" value={title} onChange={e => setTitle(e.target.value)} />
+          <MobileCategorySelect categories={categories} value={categoryId} onChange={setCategoryId} />
+
+          {editing !== 'new' && editing.api_key && (
+            <div className="mf-api-info">
+              <div className="mf-api-section-title">API Endpoint</div>
+              <div className="mf-api-row">
+                <span className="mf-api-label">URL</span>
+                <code className="mf-api-code">{baseUrl}/{editing.id}/ingest</code>
+              </div>
+              <div className="mf-api-row">
+                <span className="mf-api-label">Key</span>
+                <code className="mf-api-code mf-api-key">{editing.api_key}</code>
+              </div>
+              <div className="mf-api-row">
+                <span className="mf-api-label">Header</span>
+                <code className="mf-api-code">X-Feed-Key: {editing.api_key}</code>
+              </div>
+
+              <div className="mf-api-section-title" style={{ marginTop: 12 }}>Send Markup</div>
+              <pre className="mf-api-pre">{`POST ${baseUrl}/${editing.id}/ingest
+Content-Type: multipart/form-data
+X-Feed-Key: ${editing.api_key}
+
+title=My Artifact&markup=<p>Hello</p>`}</pre>
+
+              <div className="mf-api-section-title" style={{ marginTop: 8 }}>Send File</div>
+              <pre className="mf-api-pre">{`POST ${baseUrl}/${editing.id}/ingest
+Content-Type: multipart/form-data
+X-Feed-Key: ${editing.api_key}
+
+title=Report&file=@report.pdf`}</pre>
+
+              <div className="mf-api-section-title" style={{ marginTop: 8 }}>Response</div>
+              <pre className="mf-api-pre">{`{
+  "ok": true,
+  "artifact_id": 42,
+  "content_type": "markup" | "file"
+}`}</pre>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // List
+  return (
+    <div className="mn-list-view">
+      <div className="mn-search-bar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+        <input className="mn-search-input" placeholder="Search feeds..." value={search} onChange={e => setSearch(e.target.value)} />
+        <button className="mn-new-btn" onClick={startNew} title="New feed">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+        </button>
+      </div>
+      <div className="mn-filter-bar">
+        <MobileCategorySelect categories={categories} value={filterCatId} onChange={setFilterCatId} />
+      </div>
+      <div className="mn-notes-list">
+        {feeds.length === 0 ? (
+          <div className="mn-empty">{search || filterCatId ? 'No matching feeds.' : 'No feeds yet. Tap + to create one.'}</div>
+        ) : (() => {
+          const groups = {}
+          const order = []
+          for (const feed of feeds) {
+            const key = feed.category_id ?? '__none__'
+            if (!groups[key]) { groups[key] = []; order.push(key) }
+            groups[key].push(feed)
+          }
+          order.sort((a, b) => {
+            if (a === '__none__') return 1
+            if (b === '__none__') return -1
+            return (catMap[a] || '').localeCompare(catMap[b] || '')
+          })
+          return order.map(key => (
+            <div key={key} className="ma-group">
+              <div className="ma-group-header">
+                {key === '__none__' ? 'Uncategorized' : catLabel(key) || 'Unknown'}
+                <span className="ma-group-count">{groups[key].length}</span>
+              </div>
+              {groups[key].map(feed => (
+                <div key={feed.id} className="mn-note-card" onClick={() => setArtifactFeed(feed)}>
+                  <div className="mn-note-title">{feed.title || 'Untitled'}</div>
+                  <div className="mn-note-card-footer">
+                    <span className="mn-note-date">{feed.artifact_count} artifact{feed.artifact_count !== 1 ? 's' : ''}</span>
+                    <button className="mf-edit-btn" onClick={e => { e.stopPropagation(); startEdit(feed) }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))
+        })()}
+      </div>
+    </div>
+  )
+}
+
+function MobileArtifactBrowser({ feed, onBack }) {
+  const [artifacts, setArtifacts] = useState([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const [search, setSearch] = useState('')
+  const [busy, setBusy] = useState({})
+  const [viewing, setViewing] = useState(null)
+
+  const fetchArtifacts = useCallback(() => {
+    const params = new URLSearchParams({ page: String(page), page_size: '100' })
+    if (search) params.set('q', search)
+    fetch(`/api/feeds/${feed.id}/artifacts?${params}`)
+      .then(r => r.json())
+      .then(data => {
+        setArtifacts(data.artifacts)
+        setTotal(data.total)
+        setHasMore(data.has_more)
+      })
+      .catch(() => {})
+  }, [feed.id, page, search])
+
+  useEffect(() => { fetchArtifacts() }, [feed.id, page])
+  useEffect(() => {
+    setPage(1)
+    const t = setTimeout(fetchArtifacts, 300)
+    return () => clearTimeout(t)
+  }, [search])
+
+  const deleteArtifact = async (id) => {
+    if (!confirm('Delete this artifact?')) return
+    setBusy(prev => ({ ...prev, [id]: 'deleting' }))
+    await fetch(`/api/feed-artifacts/${id}`, { method: 'DELETE' })
+    setBusy(prev => { const n = { ...prev }; delete n[id]; return n })
+    if (viewing?.id === id) setViewing(null)
+    fetchArtifacts()
+  }
+
+  const addAsNote = async (id) => {
+    setBusy(prev => ({ ...prev, [id]: 'note' }))
+    try {
+      const res = await fetch(`/api/feed-artifacts/${id}/to-note`, { method: 'POST' })
+      if (res.ok) {
+        if (viewing?.id === id) setViewing(null)
+        fetchArtifacts()
+        return
+      }
+      const err = await res.json(); alert(err.detail || 'Failed')
+    } catch { alert('Failed') }
+    setBusy(prev => { const n = { ...prev }; delete n[id]; return n })
+  }
+
+  const addAsDocument = async (id) => {
+    setBusy(prev => ({ ...prev, [id]: 'doc' }))
+    try {
+      const res = await fetch(`/api/feed-artifacts/${id}/to-document`, { method: 'POST' })
+      if (res.ok) {
+        if (viewing?.id === id) setViewing(null)
+        fetchArtifacts()
+        return
+      }
+      const err = await res.json(); alert(err.detail || 'Failed')
+    } catch { alert('Failed') }
+    setBusy(prev => { const n = { ...prev }; delete n[id]; return n })
+  }
+
+  const formatDate = (iso) => {
+    try {
+      const d = new Date(iso)
+      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    } catch { return iso }
+  }
+
+  const totalPages = Math.max(1, Math.ceil(total / 100))
+
+  // View single artifact
+  if (viewing) {
+    return (
+      <div className="mn-view">
+        <div className="mn-view-header">
+          <button className="mn-back-btn" onClick={() => setViewing(null)}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+          </button>
+          <span className="mn-view-header-title">Artifact</span>
+          <span style={{ flex: 1 }} />
+          {viewing.content_type === 'markup' && (
+            <button className="mn-action-btn" onClick={() => addAsNote(viewing.id)} disabled={!!busy[viewing.id]} title="Add as note">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+            </button>
+          )}
+          {viewing.content_type === 'file' && (
+            <button className="mn-action-btn" onClick={() => addAsDocument(viewing.id)} disabled={!!busy[viewing.id]} title="Add as document">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8" /><rect x="1" y="3" width="22" height="5" /></svg>
+            </button>
+          )}
+          <button className="mn-action-btn mn-action-danger" onClick={() => deleteArtifact(viewing.id)} disabled={!!busy[viewing.id]}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /></svg>
+          </button>
+        </div>
+        <div className="mn-view-body">
+          <h2 className="mn-view-title">{viewing.title || 'Untitled'}</h2>
+          <div className="mn-view-meta">
+            <span className={`mf-type-badge ${viewing.content_type}`}>{viewing.content_type}</span>
+            <span>{formatDate(viewing.created_at)}</span>
+          </div>
+          <div className="mn-view-content">
+            {viewing.content_type === 'markup' ? (
+              <div className="mf-markup-body" dangerouslySetInnerHTML={{ __html: viewing.markup || '<em>Empty</em>' }} />
+            ) : (
+              <div className="mf-file-preview">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+                <div className="mf-file-name">{viewing.original_filename}</div>
+                {viewing.file_path && (
+                  <a className="mf-download-btn" href={`/api/feed-files/${viewing.file_path}`} target="_blank" rel="noopener noreferrer">Download</a>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Artifact list
+  return (
+    <div className="mn-list-view">
+      <div className="mn-view-header">
+        <button className="mn-back-btn" onClick={onBack}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+        </button>
+        <span className="mn-view-header-title">{feed.title}</span>
+        <span className="mf-total-badge">{total}</span>
+      </div>
+      <div className="mn-search-bar" style={{ borderTop: '1px solid var(--border, #333)' }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+        <input className="mn-search-input" placeholder="Search artifacts..." value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+      <div className="mn-notes-list">
+        {artifacts.length === 0 ? (
+          <div className="mn-empty">{search ? 'No matching artifacts.' : 'No artifacts yet.'}</div>
+        ) : artifacts.map(art => (
+          <div key={art.id} className="mn-note-card" onClick={() => setViewing(art)}>
+            <div className="mn-note-title">{art.title || 'Untitled'}</div>
+            <div className="mn-note-card-footer">
+              <span className={`mf-type-badge ${art.content_type}`}>{art.content_type}</span>
+              {art.original_filename && <span className="mn-note-date">{art.original_filename}</span>}
+              <span className="mn-note-date">{formatDate(art.created_at)}</span>
+              <span style={{ flex: 1 }} />
+              <div className="mf-card-actions" onClick={e => e.stopPropagation()}>
+                {art.content_type === 'markup' && (
+                  <button className="mf-card-btn" onClick={() => addAsNote(art.id)} disabled={!!busy[art.id]} title="Add as note">
+                    {busy[art.id] === 'note' ? '...' : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>}
+                  </button>
+                )}
+                {art.content_type === 'file' && (
+                  <button className="mf-card-btn" onClick={() => addAsDocument(art.id)} disabled={!!busy[art.id]} title="Add as document">
+                    {busy[art.id] === 'doc' ? '...' : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="21 8 21 21 3 21 3 8" /><rect x="1" y="3" width="22" height="5" /></svg>}
+                  </button>
+                )}
+                <button className="mf-card-btn mf-card-btn-danger" onClick={() => deleteArtifact(art.id)} disabled={!!busy[art.id]} title="Delete">
+                  {busy[art.id] === 'deleting' ? '...' : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>}
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {totalPages > 1 && (
+        <div className="mf-pagination">
+          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Prev</button>
+          <span>Page {page} of {totalPages}</span>
+          <button disabled={!hasMore} onClick={() => setPage(p => p + 1)}>Next</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main mobile app ───────────────────────────────────
 
 function MobileApp() {
@@ -1179,6 +1556,7 @@ function MobileApp() {
         )}
         {view === 'notes' && <MobileNotes categories={categories} universeId={currentUniverseId} />}
         {view === 'actions' && <MobileActions categories={categories} universeId={currentUniverseId} />}
+        {view === 'feeds' && <MobileFeeds categories={categories} universeId={currentUniverseId} />}
       </div>
 
       {/* Bottom tab bar */}
@@ -1194,6 +1572,10 @@ function MobileApp() {
         <button className={`m-tab ${view === 'actions' ? 'active' : ''}`} onClick={() => setView('actions')}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z" /></svg>
           <span>Actions</span>
+        </button>
+        <button className={`m-tab ${view === 'feeds' ? 'active' : ''}`} onClick={() => setView('feeds')}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11a9 9 0 0 1 9 9" /><path d="M4 4a16 16 0 0 1 16 16" /><circle cx="5" cy="19" r="1" /></svg>
+          <span>Feeds</span>
         </button>
       </nav>
     </div>

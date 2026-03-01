@@ -6,6 +6,7 @@ from typing import Optional
 
 from datetime import datetime, timezone
 
+import fastapi
 from fastapi import FastAPI, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
@@ -20,6 +21,7 @@ load_dotenv()
 from src.backup import create_backup, restore_backup
 from src.ingest import SUPPORTED_EXTENSIONS, chunk_documents, load_document
 from src.notes import (
+    FEED_FILES_DIR,
     IMAGES_DIR,
     action_item_link_to_dict,
     action_item_to_dict,
@@ -28,6 +30,10 @@ from src.notes import (
     category_to_dict,
     create_action_item,
     create_category,
+    create_feed,
+    create_feed_artifact_file,
+    create_feed_artifact_markup,
+    list_pinned_feeds,
     create_link,
     create_note,
     create_universe,
@@ -36,15 +42,22 @@ from src.notes import (
     delete_all_note_images,
     delete_category,
     delete_document_meta,
+    delete_feed,
+    delete_feed_artifact,
     delete_link,
     delete_note,
     delete_note_image,
     delete_universe,
+    feed_artifact_to_dict,
+    feed_to_dict,
     get_action_item,
     get_all_document_categories,
     get_all_document_meta,
     get_document_paths_for_category,
     get_document_pinned,
+    get_feed,
+    get_feed_artifact,
+    set_feed_pinned,
     get_link,
     get_note,
     get_linked_targets,
@@ -54,6 +67,8 @@ from src.notes import (
     get_universe_note_ids,
     list_action_item_links,
     list_action_items,
+    list_feed_artifacts,
+    list_feeds,
     list_links,
     list_links_for_note,
     list_categories,
@@ -67,6 +82,7 @@ from src.notes import (
     note_image_to_dict,
     note_to_dict,
     update_category,
+    update_feed,
     rename_universe,
     set_document_category,
     set_document_pinned,
@@ -413,7 +429,8 @@ def api_list_pinned(universe_id: Optional[int] = None):
                 "size": f.stat().st_size,
             })
     links = [link_to_dict(l) for l in list_pinned_links(universe_id=universe_id)]
-    return {"notes": notes, "documents": docs, "links": links}
+    feeds = [feed_to_dict(f) for f in list_pinned_feeds(universe_id=universe_id)]
+    return {"notes": notes, "documents": docs, "links": links, "feeds": feeds}
 
 
 # ── Links (bookmarks) ───────────────────────────────────────────────────
@@ -950,6 +967,225 @@ def api_reindex():
         raise HTTPException(status_code=500, detail=f"Reindex failed: {str(e)}")
 
 
+
+
+# ── Feeds ─────────────────────────────────────────────────────────────────
+
+
+class FeedRequest(BaseModel):
+    title: str
+    category_id: Optional[int] = None
+
+
+class FeedResponse(BaseModel):
+    id: int
+    title: str
+    category_id: Optional[int]
+    universe_id: int
+    api_key: str
+    created_at: str
+    updated_at: str
+    artifact_count: int = 0
+
+
+class FeedArtifactResponse(BaseModel):
+    id: int
+    feed_id: int
+    title: str
+    content_type: str
+    markup: Optional[str]
+    file_path: Optional[str]
+    original_filename: Optional[str]
+    created_at: str
+
+
+@app.get("/api/feeds", response_model=list[FeedResponse])
+def api_list_feeds(q: str = "", category_id: Optional[int] = None, universe_id: Optional[int] = None):
+    return [feed_to_dict(f) for f in list_feeds(q, category_id, universe_id=universe_id)]
+
+
+@app.get("/api/feeds/{feed_id}", response_model=FeedResponse)
+def api_get_feed(feed_id: int):
+    feed = get_feed(feed_id)
+    if not feed:
+        raise HTTPException(status_code=404, detail="Feed not found")
+    return feed_to_dict(feed)
+
+
+@app.post("/api/feeds", response_model=FeedResponse, status_code=201)
+def api_create_feed(req: FeedRequest, universe_id: int = 1):
+    feed = create_feed(req.title, req.category_id, universe_id=universe_id)
+    return feed_to_dict(feed)
+
+
+@app.put("/api/feeds/{feed_id}", response_model=FeedResponse)
+def api_update_feed(feed_id: int, req: FeedRequest):
+    feed = update_feed(feed_id, req.title, req.category_id)
+    if not feed:
+        raise HTTPException(status_code=404, detail="Feed not found")
+    return feed_to_dict(feed)
+
+
+@app.delete("/api/feeds/{feed_id}")
+def api_delete_feed(feed_id: int):
+    if not delete_feed(feed_id):
+        raise HTTPException(status_code=404, detail="Feed not found")
+    return {"ok": True}
+
+
+@app.put("/api/feeds/{feed_id}/pin")
+def api_pin_feed(feed_id: int, pinned: bool = True):
+    if not set_feed_pinned(feed_id, pinned):
+        raise HTTPException(status_code=404, detail="Feed not found")
+    return {"ok": True}
+
+
+# ── Feed artifacts ────────────────────────────────────────────────────────
+
+
+@app.get("/api/feeds/{feed_id}/artifacts")
+def api_list_feed_artifacts(feed_id: int, q: str = "", page: int = 1, page_size: int = 100):
+    if not get_feed(feed_id):
+        raise HTTPException(status_code=404, detail="Feed not found")
+    page_size = min(page_size, 100)
+    artifacts, total = list_feed_artifacts(feed_id, q, page=page, page_size=page_size)
+    return {
+        "artifacts": [feed_artifact_to_dict(a) for a in artifacts],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "has_more": (page * page_size) < total,
+    }
+
+
+@app.delete("/api/feed-artifacts/{artifact_id}")
+def api_delete_feed_artifact(artifact_id: int):
+    if not delete_feed_artifact(artifact_id):
+        raise HTTPException(status_code=404, detail="Artifact not found")
+    return {"ok": True}
+
+
+@app.post("/api/feed-artifacts/{artifact_id}/to-note")
+def api_artifact_to_note(artifact_id: int):
+    """Convert a markup artifact into a note."""
+    art = get_feed_artifact(artifact_id)
+    if not art:
+        raise HTTPException(status_code=404, detail="Artifact not found")
+    if art.content_type != "markup":
+        raise HTTPException(status_code=400, detail="Only markup artifacts can be converted to notes")
+    feed = get_feed(art.feed_id)
+    uid = feed.universe_id if feed else 1
+    cat_id = feed.category_id if feed else None
+    note = create_note(art.title, art.markup or "", category_id=cat_id, universe_id=uid)
+    try:
+        upsert_note(note.id, f"{note.title}\n\n{note.body}", note.title, universe_id=uid)
+    except Exception as e:
+        print(f"[Astro] WARNING: Failed to upsert note {note.id} into vector store: {e}")
+    delete_feed_artifact(artifact_id)
+    return {"ok": True, "note_id": note.id}
+
+
+@app.post("/api/feed-artifacts/{artifact_id}/to-document")
+def api_artifact_to_document(artifact_id: int):
+    """Copy a file artifact into the document archive and ingest it."""
+    art = get_feed_artifact(artifact_id)
+    if not art:
+        raise HTTPException(status_code=404, detail="Artifact not found")
+    if art.content_type != "file":
+        raise HTTPException(status_code=400, detail="Only file artifacts can be converted to documents")
+    if not art.file_path:
+        raise HTTPException(status_code=400, detail="Artifact has no file")
+    src_path = FEED_FILES_DIR / art.file_path
+    if not src_path.is_file():
+        raise HTTPException(status_code=404, detail="Artifact file missing from disk")
+    feed = get_feed(art.feed_id)
+    uid = feed.universe_id if feed else 1
+    filename = art.original_filename or art.file_path
+    ext = Path(filename).suffix.lower()
+    if ext not in SUPPORTED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
+    archive_folder = ext.lstrip(".")
+    archive_dir = DOCUMENTS_DIR / archive_folder
+    archive_dir.mkdir(exist_ok=True)
+    dest = archive_dir / filename
+    counter = 1
+    while dest.exists():
+        stem = Path(filename).stem
+        dest = archive_dir / f"{stem}_{counter}{ext}"
+        counter += 1
+    shutil.copy2(str(src_path), str(dest))
+    try:
+        documents = load_document(str(dest))
+        if documents:
+            for doc in documents:
+                doc.metadata["source"] = str(dest)
+            chunks = chunk_documents(documents)
+            add_documents(chunks, universe_id=uid)
+    except Exception as e:
+        print(f"[Astro] WARNING: Failed to ingest artifact document: {e}")
+    rel = dest.relative_to(DOCUMENTS_DIR)
+    set_document_universe(str(rel), uid)
+    delete_feed_artifact(artifact_id)
+    return {"ok": True, "path": str(rel)}
+
+
+# ── Feed external ingest endpoint ─────────────────────────────────────────
+
+
+@app.post("/api/feeds/{feed_id}/ingest")
+async def api_feed_ingest(
+    feed_id: int,
+    title: str = fastapi.Form(""),
+    markup: Optional[str] = fastapi.Form(None),
+    file: Optional[UploadFile] = None,
+    x_feed_key: Optional[str] = fastapi.Header(None),
+):
+    """External endpoint for pushing artifacts into a feed.
+
+    Authenticate with the X-Feed-Key header matching the feed's api_key.
+
+    To send markup:
+      POST /api/feeds/{id}/ingest
+      Content-Type: multipart/form-data
+      X-Feed-Key: fk_...
+      title=...&markup=<html>...
+
+    To send a file:
+      POST /api/feeds/{id}/ingest
+      Content-Type: multipart/form-data
+      X-Feed-Key: fk_...
+      title=...
+      file=@document.pdf
+    """
+    feed = get_feed(feed_id)
+    if not feed:
+        raise HTTPException(status_code=404, detail="Feed not found")
+
+    if not x_feed_key:
+        raise HTTPException(status_code=401, detail="Missing X-Feed-Key header")
+    if x_feed_key != feed.api_key:
+        raise HTTPException(status_code=403, detail="Invalid API key")
+
+    if not title.strip():
+        title = "Untitled artifact"
+
+    if file and file.filename:
+        data = await file.read()
+        art = create_feed_artifact_file(feed_id, title.strip(), file.filename, data)
+        return {"ok": True, "artifact_id": art.id, "content_type": "file"}
+    elif markup is not None:
+        art = create_feed_artifact_markup(feed_id, title.strip(), markup)
+        return {"ok": True, "artifact_id": art.id, "content_type": "markup"}
+    else:
+        raise HTTPException(status_code=400, detail="Provide either 'markup' or 'file'")
+
+
+@app.get("/api/feed-files/{filename}")
+def api_serve_feed_file(filename: str):
+    safe = (FEED_FILES_DIR / filename).resolve()
+    if not str(safe).startswith(str(FEED_FILES_DIR.resolve())) or not safe.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(safe)
 
 
 class IrcSendRequest(BaseModel):

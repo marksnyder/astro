@@ -4,6 +4,7 @@ import NotesPanel from './NotesPanel'
 import ArchivePanel from './ArchivePanel'
 import LinksPanel from './LinksPanel'
 import ActionItemsPanel from './ActionItemsPanel'
+import FeedsPanel from './FeedsPanel'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import CategoryTree, { CategoryPicker } from './CategoryTree'
@@ -532,6 +533,7 @@ function App() {
   const [pinnedItems, setPinnedItems] = useState({ notes: [], documents: [], links: [] })
   const [quickView, setQuickView] = useState(null)
   const [editNoteRequest, setEditNoteRequest] = useState(null)
+  const [openFeedRequest, setOpenFeedRequest] = useState(null)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const resizing = useRef(false)
@@ -1082,7 +1084,7 @@ function App() {
             </button>
           )}
         </div>
-        {(pinnedItems.notes.length > 0 || pinnedItems.documents.length > 0 || pinnedItems.links?.length > 0) && (
+        {(pinnedItems.notes.length > 0 || pinnedItems.documents.length > 0 || pinnedItems.links?.length > 0 || pinnedItems.feeds?.length > 0) && (
           <div className="pinned-bar">
             {pinnedItems.notes.map((n) => (
               <button key={`n-${n.id}`} className="pinned-chip pinned-note" onClick={() => { setSidebarTab('notes'); setEditNoteRequest(n); }} title={n.title || 'Untitled'}>
@@ -1109,6 +1111,16 @@ function App() {
                   <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
                 </svg>
                 <span className="pinned-chip-label">{l.title || l.url}</span>
+              </button>
+            ))}
+            {(pinnedItems.feeds || []).map((f) => (
+              <button key={`f-${f.id}`} className="pinned-chip pinned-feed" onClick={() => { setSidebarTab('feeds'); setOpenFeedRequest(f); }} title={f.title}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 11a9 9 0 0 1 9 9" />
+                  <path d="M4 4a16 16 0 0 1 16 16" />
+                  <circle cx="5" cy="19" r="1" />
+                </svg>
+                <span className="pinned-chip-label">{f.title}</span>
               </button>
             ))}
           </div>
@@ -1227,6 +1239,13 @@ function App() {
                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
               </svg>
             </button>
+            <button className={`rail-tab ${sidebarTab === 'feeds' ? 'active' : ''}`} onClick={() => setSidebarTab('feeds')} title="Feeds">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 11a9 9 0 0 1 9 9" />
+                <path d="M4 4a16 16 0 0 1 16 16" />
+                <circle cx="5" cy="19" r="1" />
+              </svg>
+            </button>
             <div className="rail-sep" />
             <button className={`rail-tab ${sidebarTab === 'categories' ? 'active' : ''}`} onClick={() => setSidebarTab('categories')} title="Categories">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1272,6 +1291,15 @@ function App() {
               categories={categories}
               onPinChange={fetchPinned}
               universeId={currentUniverseId}
+            />
+          )}
+          {sidebarTab === 'feeds' && (
+            <FeedsPanel
+              categories={categories}
+              universeId={currentUniverseId}
+              onPinChange={fetchPinned}
+              openFeedRequest={openFeedRequest}
+              onOpenFeedRequestHandled={() => setOpenFeedRequest(null)}
             />
           )}
           {sidebarTab === 'actions' && (
