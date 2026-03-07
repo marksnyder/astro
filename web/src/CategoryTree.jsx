@@ -71,6 +71,10 @@ function EmojiPopover({ emoji, onSelect, onClear }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   const pickerRef = useRef(null)
+  const onSelectRef = useRef(onSelect)
+  const onClearRef = useRef(onClear)
+  onSelectRef.current = onSelect
+  onClearRef.current = onClear
 
   useEffect(() => {
     if (!open) return
@@ -87,7 +91,7 @@ function EmojiPopover({ emoji, onSelect, onClear }) {
     if (el.childElementCount > 0) return
     const picker = new Picker({
       data,
-      onEmojiSelect: (e) => { onSelect(e.native); setOpen(false) },
+      onEmojiSelect: (e) => { onSelectRef.current(e.native); setOpen(false) },
       theme: 'dark',
       previewPosition: 'none',
       skinTonePosition: 'search',
@@ -96,7 +100,7 @@ function EmojiPopover({ emoji, onSelect, onClear }) {
     })
     el.appendChild(picker)
     return () => { el.replaceChildren() }
-  }, [open, onSelect, onClear])
+  }, [open])
 
   return (
     <div className="emoji-popover-wrap" ref={ref}>

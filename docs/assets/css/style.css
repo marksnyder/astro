@@ -84,9 +84,9 @@ img { max-width: 100%; height: auto; }
 .nav-links a:hover,
 .nav-links a.active { color: var(--text); }
 
-.nav-github { display: flex; align-items: center; }
-.nav-github svg { color: var(--text-muted); transition: color .15s; }
-.nav-github:hover svg { color: var(--text); }
+.nav-chrome, .nav-github { display: flex; align-items: center; }
+.nav-chrome svg, .nav-github svg { color: var(--text-muted); transition: color .15s; }
+.nav-chrome:hover svg, .nav-github:hover svg { color: var(--text); }
 
 /* ── Hero ───────────────────────────────────────────────── */
 

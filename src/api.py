@@ -983,6 +983,7 @@ class FeedResponse(BaseModel):
     category_id: Optional[int]
     universe_id: int
     api_key: str
+    pinned: bool = False
     created_at: str
     updated_at: str
     artifact_count: int = 0

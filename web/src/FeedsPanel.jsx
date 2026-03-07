@@ -433,7 +433,10 @@ function ArtifactDialog({ feed, onClose }) {
               </div>
               <div className="feed-artifact-preview-content">
                 {viewingArt.content_type === 'markup' ? (
-                  <div className="feed-artifact-markup" dangerouslySetInnerHTML={{ __html: viewingArt.markup || '<em>Empty</em>' }} />
+                  <div className="feed-artifact-markup" dangerouslySetInnerHTML={{ __html: viewingArt.markup || '<em>Empty</em>' }} onClick={e => {
+                    const a = e.target.closest('a[href]')
+                    if (a) { e.preventDefault(); window.open(a.href, '_blank', 'noopener') }
+                  }} />
                 ) : (
                   <div className="feed-artifact-file-preview">
                     <div className="feed-artifact-file-icon">
