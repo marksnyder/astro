@@ -647,6 +647,52 @@
   margin-bottom: 6px;
 }
 
+.schedule-item-inline-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.schedule-item:hover .schedule-item-inline-actions {
+  opacity: 1;
+}
+
+.schedule-inline-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 3px 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.schedule-inline-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.schedule-inline-btn.run:hover {
+  border-color: #4caf50;
+  color: #4caf50;
+}
+
+.schedule-inline-btn.delete:hover {
+  border-color: #f44336;
+  color: #f44336;
+}
+
+.schedule-inline-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .schedule-filter-select {
   font-size: 12px;
   font-family: inherit;

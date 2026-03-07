@@ -728,7 +728,7 @@ function ScheduleForm({ initial, channels, onSave, onCancel }) {
   )
 }
 
-function ScheduleItem({ s, onEdit, onDelete, onToggle, onRun }) {
+function ScheduleItem({ s, onEdit, onClone, onDelete, onToggle, onRun }) {
   const [expanded, setExpanded] = useState(false)
   const [running, setRunning] = useState(false)
   const msgs = parseMessages(s.message)
@@ -752,25 +752,39 @@ function ScheduleItem({ s, onEdit, onDelete, onToggle, onRun }) {
         <span className={`schedule-status ${s.enabled ? 'on' : 'off'}`} onClick={e => { e.stopPropagation(); onToggle(s) }} title={s.enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}>
           {s.enabled ? 'ON' : 'OFF'}
         </span>
+        <div className="schedule-item-inline-actions" onClick={e => e.stopPropagation()}>
+          <button className="schedule-inline-btn" onClick={() => onEdit(s)} title="Edit">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+          </button>
+          <button className="schedule-inline-btn" onClick={() => onClone(s)} title="Clone">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+          </button>
+          <button className="schedule-inline-btn run" onClick={handleRun} disabled={running} title="Run now">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+          </button>
+          <button className="schedule-inline-btn delete" onClick={() => onDelete(s.id)} title="Delete">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              <path d="M10 11v6" /><path d="M14 11v6" />
+            </svg>
+          </button>
+        </div>
       </div>
       {expanded && (
-        <>
-          <div className="schedule-item-messages">
-            {msgs.map((m, i) => (
-              <div key={i} className="schedule-item-message"><span className="schedule-item-msg-num">#{i + 1}</span> {m}</div>
-            ))}
-          </div>
-          <div className="schedule-item-footer">
-            {s.last_run_at && <span className="schedule-last-run">Last run: {new Date(s.last_run_at).toLocaleString()}</span>}
-            <div className="schedule-item-actions">
-              <button className="schedule-run-btn" onClick={handleRun} disabled={running}>
-                {running ? 'Sending...' : 'Run Now'}
-              </button>
-              <button className="schedule-edit-btn" onClick={() => onEdit(s)}>Edit</button>
-              <button className="schedule-delete-btn" onClick={() => onDelete(s.id)}>Delete</button>
-            </div>
-          </div>
-        </>
+        <div className="schedule-item-messages">
+          {msgs.map((m, i) => (
+            <div key={i} className="schedule-item-message"><span className="schedule-item-msg-num">#{i + 1}</span> {m}</div>
+          ))}
+          {s.last_run_at && <div className="schedule-last-run">Last run: {new Date(s.last_run_at).toLocaleString()}</div>}
+        </div>
       )}
     </div>
   )
@@ -2015,7 +2029,13 @@ function App() {
                   <div className="schedule-empty">No scheduled messages{scheduleFilterChannel ? ` for ${scheduleFilterChannel}` : ''}</div>
                 )}
                 {schedules.filter(s => !scheduleFilterChannel || s.channel === scheduleFilterChannel).map(s => (
-                  <ScheduleItem key={s.id} s={s} onEdit={setScheduleEditing} onDelete={deleteSchedule} onToggle={toggleScheduleEnabled} onRun={runScheduleNow} />
+                  <ScheduleItem key={s.id} s={s}
+                    onEdit={setScheduleEditing}
+                    onClone={(sched) => setScheduleEditing({ ...sched, id: undefined, title: `${sched.title || ''} (copy)`.trim() })}
+                    onDelete={deleteSchedule}
+                    onToggle={toggleScheduleEnabled}
+                    onRun={runScheduleNow}
+                  />
                 ))}
               </div>
             )}
