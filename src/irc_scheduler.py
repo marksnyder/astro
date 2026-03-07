@@ -125,7 +125,7 @@ class IRCScheduler:
             time.sleep(0.3)
 
             for msg in messages:
-                text = msg.rstrip()
+                text = msg.replace("\r\n", " ").replace("\n", " ").replace("\r", " ").strip()
                 if not text:
                     continue
                 while len(text) > 400:
