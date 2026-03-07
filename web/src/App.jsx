@@ -82,8 +82,8 @@ function QuickView({ item, onClose }) {
   if (!item) return null
   const isNote = item.type === 'note'
   return (
-    <div className="quickview-overlay" onClick={onClose}>
-      <div className="quickview-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="quickview-overlay">
+      <div className="quickview-modal">
         <div className="quickview-header">
           <span className="quickview-type">{isNote ? 'Note' : 'Document'}</span>
           <h3 className="quickview-title">{isNote ? (item.title || 'Untitled') : item.name}</h3>
@@ -149,8 +149,8 @@ function SaveChatModal({ categories, messages, onClose, onSaved, universeId }) {
   }
 
   return (
-    <div className="quickview-overlay" onClick={onClose}>
-      <div className="save-chat-modal" onClick={e => e.stopPropagation()}>
+    <div className="quickview-overlay">
+      <div className="save-chat-modal">
         <div className="quickview-header">
           <span className="quickview-type">Save as Note</span>
           <h3 className="quickview-title">Save Chat</h3>
@@ -235,8 +235,8 @@ function UniverseManager({ universes, currentId, onSwitch, onClose, onRefresh })
   }
 
   return (
-    <div className="quickview-overlay" onClick={onClose}>
-      <div className="save-chat-modal" onClick={e => e.stopPropagation()}>
+    <div className="quickview-overlay">
+      <div className="save-chat-modal">
         <div className="quickview-header">
           <span className="quickview-type">Manage</span>
           <h3 className="quickview-title">Universes</h3>
@@ -548,8 +548,8 @@ function FeedPostModal({ mode, onInsert, onClose }) {
   }
 
   return (
-    <div className="feed-key-modal-overlay" onClick={onClose}>
-      <div className="feed-key-modal" onClick={e => e.stopPropagation()}>
+    <div className="feed-key-modal-overlay">
+      <div className="feed-key-modal">
         <div className="feed-key-modal-header">
           <h3>{isMarkup ? 'Post Feed Markup' : 'Post Feed Document'}</h3>
           <button type="button" className="feed-key-modal-close" onClick={onClose}>&times;</button>
@@ -1992,8 +1992,8 @@ function App() {
         />
       )}
       {showSchedulePanel && (
-        <div className="schedule-modal-overlay" onClick={() => { setShowSchedulePanel(false); setScheduleEditing(null); setScheduleFilterChannel('') }}>
-          <div className="schedule-modal" onClick={e => e.stopPropagation()}>
+        <div className="schedule-modal-overlay">
+          <div className="schedule-modal">
             <div className="schedule-panel-header">
               <h3>Scheduled Messages</h3>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -2043,8 +2043,8 @@ function App() {
         </div>
       )}
       {showHiddenChannels && (
-        <div className="quickview-overlay" onClick={() => setShowHiddenChannels(false)}>
-          <div className="quickview-panel hidden-channels-modal" onClick={e => e.stopPropagation()}>
+        <div className="quickview-overlay">
+          <div className="quickview-panel hidden-channels-modal">
             <div className="quickview-header">
               <h3>Hidden Channels</h3>
               <button className="quickview-close" onClick={() => setShowHiddenChannels(false)}>&times;</button>

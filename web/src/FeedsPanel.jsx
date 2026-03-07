@@ -221,8 +221,8 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
 
       {/* Edit / Create feed modal — portaled to body to escape sidebar stacking context */}
       {editing !== null && createPortal(
-        <div className="note-modal-overlay" onClick={cancel}>
-          <div className="note-modal link-modal" onClick={e => e.stopPropagation()}>
+        <div className="note-modal-overlay">
+          <div className="note-modal link-modal">
             <div className="note-modal-header">
               <span className="note-modal-title">{editing === 'new' ? 'New Feed' : 'Edit Feed'}</span>
               <button className="quickview-close" onClick={cancel}>

@@ -317,8 +317,8 @@ function ArchivePanel({ categories, onPinChange, universeId }) {
         })()}
       </div>
       {editingCat && (
-        <div className="doc-cat-modal-overlay" onClick={() => setEditingCat(null)}>
-          <div className="doc-cat-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="doc-cat-modal-overlay">
+          <div className="doc-cat-modal">
             <div className="doc-cat-modal-header">
               <h3>Set Category</h3>
               <button className="doc-cat-modal-close" onClick={() => setEditingCat(null)}>

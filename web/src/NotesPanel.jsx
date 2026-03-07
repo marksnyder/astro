@@ -728,8 +728,8 @@ function NotesPanel({ categories, onPinChange, editNoteRequest, onEditNoteReques
         })()}
       </div>
       {editing !== null && (
-        <div className="note-modal-overlay" onClick={cancel}>
-          <div className="note-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="note-modal-overlay">
+          <div className="note-modal">
             <div className="note-modal-header">
               <span className="note-modal-title">
                 {editing === 'new' ? 'New Note' : 'Edit Note'}

@@ -527,8 +527,8 @@ function ActionItemsPanel({ categories, onOpenNote, universeId }) {
       </div>
 
       {editing !== null && (
-        <div className="note-modal-overlay" onClick={cancelModal}>
-          <div className="note-modal ai-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="note-modal-overlay">
+          <div className="note-modal ai-modal">
             <div className="note-modal-header">
               <span className="note-modal-title">
                 {editing === 'new' ? 'New Action Item' : 'Edit Action Item'}
