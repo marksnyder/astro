@@ -125,15 +125,16 @@ class IRCScheduler:
             time.sleep(0.3)
 
             for msg in messages:
-                for line in msg.split("\n"):
-                    line = line.rstrip()
-                    if not line:
-                        continue
-                    while len(line) > 400:
-                        chunk = line[:400]
-                        line = line[400:]
-                        self._raw(sock, f"PRIVMSG {channel} :{chunk}")
-                    self._raw(sock, f"PRIVMSG {channel} :{line}")
+                text = msg.rstrip()
+                if not text:
+                    continue
+                while len(text) > 400:
+                    chunk = text[:400]
+                    text = text[400:]
+                    self._raw(sock, f"PRIVMSG {channel} :{chunk}")
+                    time.sleep(0.1)
+                if text:
+                    self._raw(sock, f"PRIVMSG {channel} :{text}")
                 time.sleep(0.2)
 
             time.sleep(0.1)
