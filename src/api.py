@@ -34,6 +34,7 @@ from src.notes import (
     create_feed_artifact_file,
     create_feed_artifact_markup,
     list_pinned_feeds,
+    list_pinned_categories,
     create_link,
     create_note,
     create_universe,
@@ -58,6 +59,7 @@ from src.notes import (
     get_feed,
     get_feed_artifact,
     set_feed_pinned,
+    set_category_pinned,
     get_link,
     get_note,
     get_linked_targets,
@@ -68,6 +70,9 @@ from src.notes import (
     list_action_item_links,
     list_action_items,
     list_feed_artifacts,
+    list_feed_artifacts_by_category,
+    mark_feed_artifacts_read,
+    get_unread_counts_by_category,
     list_feeds,
     list_links,
     list_links_for_note,
@@ -95,6 +100,13 @@ from src.notes import (
     update_action_item,
     update_link,
     update_note,
+    create_scheduled_message,
+    delete_scheduled_message,
+    get_scheduled_message,
+    list_scheduled_messages,
+    mark_scheduled_message_run,
+    scheduled_message_to_dict,
+    update_scheduled_message,
 )
 from src.query import ask, ask_direct
 from src.store import (
@@ -347,6 +359,13 @@ def api_delete_category(cat_id: int):
     return {"ok": True}
 
 
+@app.put("/api/categories/{cat_id}/pin")
+def api_pin_category(cat_id: int, pinned: bool = True):
+    if not set_category_pinned(cat_id, pinned):
+        raise HTTPException(status_code=404, detail="Category not found")
+    return {"ok": True}
+
+
 # ── Notes ─────────────────────────────────────────────────────────────────
 
 
@@ -430,7 +449,8 @@ def api_list_pinned(universe_id: Optional[int] = None):
             })
     links = [link_to_dict(l) for l in list_pinned_links(universe_id=universe_id)]
     feeds = [feed_to_dict(f) for f in list_pinned_feeds(universe_id=universe_id)]
-    return {"notes": notes, "documents": docs, "links": links, "feeds": feeds}
+    pinned_cats = [category_to_dict(c) for c in list_pinned_categories(universe_id=universe_id)]
+    return {"notes": notes, "documents": docs, "links": links, "feeds": feeds, "feed_categories": pinned_cats}
 
 
 # ── Links (bookmarks) ───────────────────────────────────────────────────
@@ -1059,6 +1079,34 @@ def api_list_feed_artifacts(feed_id: int, q: str = "", page: int = 1, page_size:
     }
 
 
+@app.get("/api/feed-artifacts/by-category")
+def api_list_feed_artifacts_by_category(category_id: int = None, q: str = "", page: int = 1, page_size: int = 5):
+    page_size = min(page_size, 50)
+    artifacts, total = list_feed_artifacts_by_category(category_id, q, page=page, page_size=page_size)
+    return {
+        "artifacts": artifacts,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "has_more": (page * page_size) < total,
+    }
+
+
+@app.post("/api/feed-artifacts/mark-read")
+def api_mark_artifacts_read(body: dict):
+    ids = body.get("ids", [])
+    if not isinstance(ids, list):
+        raise HTTPException(status_code=400, detail="ids must be a list")
+    updated = mark_feed_artifacts_read(ids)
+    return {"ok": True, "updated": updated}
+
+
+@app.get("/api/feed-artifacts/unread-counts")
+def api_unread_counts(universe_id: Optional[int] = None):
+    counts = get_unread_counts_by_category(universe_id)
+    return {"counts": {str(k) if k is not None else "null": v for k, v in counts.items()}}
+
+
 @app.delete("/api/feed-artifacts/{artifact_id}")
 def api_delete_feed_artifact(artifact_id: int):
     if not delete_feed_artifact(artifact_id):
@@ -1068,7 +1116,9 @@ def api_delete_feed_artifact(artifact_id: int):
 
 @app.post("/api/feed-artifacts/{artifact_id}/to-note")
 def api_artifact_to_note(artifact_id: int):
-    """Convert a markup artifact into a note."""
+    """Convert a markup artifact into a note, preserving links and images as Markdown."""
+    from markdownify import markdownify as md
+
     art = get_feed_artifact(artifact_id)
     if not art:
         raise HTTPException(status_code=404, detail="Artifact not found")
@@ -1077,12 +1127,12 @@ def api_artifact_to_note(artifact_id: int):
     feed = get_feed(art.feed_id)
     uid = feed.universe_id if feed else 1
     cat_id = feed.category_id if feed else None
-    note = create_note(art.title, art.markup or "", category_id=cat_id, universe_id=uid)
+    markdown_body = md(art.markup or "", heading_style="ATX", bullets="-").strip()
+    note = create_note(art.title, markdown_body, category_id=cat_id, universe_id=uid)
     try:
         upsert_note(note.id, f"{note.title}\n\n{note.body}", note.title, universe_id=uid)
     except Exception as e:
         print(f"[Astro] WARNING: Failed to upsert note {note.id} into vector store: {e}")
-    delete_feed_artifact(artifact_id)
     return {"ok": True, "note_id": note.id}
 
 
@@ -1405,6 +1455,92 @@ async def ws_irc(ws: WebSocket):
             pass
 
 
+# ── Scheduled Messages ─────────────────────────────────────────────────────
+
+
+class ScheduledMessageRequest(BaseModel):
+    channel: str
+    message: str
+    cron_expr: str
+    title: str = ""
+    enabled: bool = True
+
+
+@app.get("/api/scheduled-messages")
+def api_list_scheduled_messages():
+    return [scheduled_message_to_dict(m) for m in list_scheduled_messages()]
+
+
+@app.post("/api/scheduled-messages", status_code=201)
+def api_create_scheduled_message(req: ScheduledMessageRequest):
+    channel = req.channel.strip()
+    if not channel.startswith("#"):
+        channel = "#" + channel
+    msg = create_scheduled_message(channel, req.message, req.cron_expr.strip(), title=req.title.strip(), enabled=req.enabled)
+    return scheduled_message_to_dict(msg)
+
+
+@app.put("/api/scheduled-messages/{msg_id}")
+def api_update_scheduled_message(msg_id: int, req: ScheduledMessageRequest):
+    channel = req.channel.strip()
+    if not channel.startswith("#"):
+        channel = "#" + channel
+    msg = update_scheduled_message(msg_id, channel, req.message, req.cron_expr.strip(), req.enabled, title=req.title.strip())
+    if not msg:
+        raise HTTPException(status_code=404, detail="Scheduled message not found")
+    return scheduled_message_to_dict(msg)
+
+
+@app.delete("/api/scheduled-messages/{msg_id}")
+def api_delete_scheduled_message(msg_id: int):
+    if not delete_scheduled_message(msg_id):
+        raise HTTPException(status_code=404, detail="Scheduled message not found")
+    return {"ok": True}
+
+
+@app.post("/api/scheduled-messages/{msg_id}/run")
+def api_run_scheduled_message(msg_id: int):
+    msg = get_scheduled_message(msg_id)
+    if not msg:
+        raise HTTPException(status_code=404, detail="Scheduled message not found")
+    from src.irc_scheduler import IRCScheduler
+    sched = IRCScheduler.get()
+    try:
+        sched._send_message(msg.channel, msg.message)
+        mark_scheduled_message_run(msg_id)
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send: {e}")
+
+
+class SummarizeTitleRequest(BaseModel):
+    message: str
+    cron_expr: str = ""
+    channel: str = ""
+
+
+@app.post("/api/scheduled-messages/generate-title")
+def api_generate_schedule_title(req: SummarizeTitleRequest):
+    from langchain_openai import ChatOpenAI
+    api_key = get_setting("openai_api_key")
+    if not api_key:
+        return {"title": ""}
+    model = get_setting("selected_model") or "gpt-5-mini"
+    llm = ChatOpenAI(model=model, api_key=api_key, max_tokens=60)
+    prompt = (
+        "Generate a short title (max 8 words) that summarizes this scheduled IRC message. "
+        "Return ONLY the title text, no quotes or punctuation around it.\n\n"
+        f"Channel: {req.channel}\n"
+        f"Schedule: {req.cron_expr}\n"
+        f"Message:\n{req.message}"
+    )
+    try:
+        resp = llm.invoke(prompt)
+        return {"title": resp.content.strip().strip('"').strip("'")}
+    except Exception:
+        return {"title": ""}
+
+
 _ngircd_proc = None
 
 
@@ -1415,6 +1551,8 @@ def on_startup():
     IRCClient.get()
     from src.irc_monitor import IRCMonitor
     IRCMonitor.get()
+    from src.irc_scheduler import IRCScheduler
+    IRCScheduler.get()
 
 
 @app.on_event("shutdown")
@@ -1425,6 +1563,9 @@ def on_shutdown():
     from src.irc_monitor import IRCMonitor
     if IRCMonitor._instance:
         IRCMonitor._instance.stop()
+    from src.irc_scheduler import IRCScheduler
+    if IRCScheduler._instance:
+        IRCScheduler._instance.stop()
     if _ngircd_proc:
         _ngircd_proc.terminate()
         try:

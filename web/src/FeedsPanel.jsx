@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, memo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
 
-function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOpenFeedRequestHandled }) {
+function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOpenFeedRequestHandled, onViewArtifacts, unreadCounts }) {
   const [feeds, setFeeds] = useState([])
   const [search, setSearch] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
@@ -11,7 +11,7 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
   const [categoryId, setCategoryId] = useState(null)
   const [saving, setSaving] = useState(false)
   const titleRef = useRef(null)
-  const [artifactFeed, setArtifactFeed] = useState(null)
+  const [artifactCategory, setArtifactCategory] = useState(null) // { id, name } or { id: null, name: 'Uncategorized' }
 
   const catMap = Object.fromEntries(categories.map(c => [c.id, c.name]))
   const catEmojiMap = Object.fromEntries(categories.map(c => [c.id, c.emoji || null]))
@@ -35,10 +35,19 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
 
   useEffect(() => {
     if (openFeedRequest) {
-      setArtifactFeed(openFeedRequest)
+      const cat = openFeedRequest.category_id
+      const catObj = { id: cat ?? null, name: cat ? (catMap[cat] || 'Unknown') : 'Uncategorized' }
+      onViewArtifacts?.(catObj)
       onOpenFeedRequestHandled?.()
     }
   }, [openFeedRequest])
+
+  useEffect(() => {
+    if (artifactCategory) {
+      onViewArtifacts?.(artifactCategory)
+      setArtifactCategory(null)
+    }
+  }, [artifactCategory])
 
   const startNew = () => {
     setEditing('new')
@@ -88,10 +97,26 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
     onPinChange?.()
   }
 
-  const togglePin = async (e, feed) => {
+  const [pinnedCategoryIds, setPinnedCategoryIds] = useState(new Set())
+
+  useEffect(() => {
+    const params = universeId ? `?universe_id=${universeId}` : ''
+    fetch(`/api/pinned${params}`)
+      .then(r => r.json())
+      .then(data => setPinnedCategoryIds(new Set((data.feed_categories || []).map(c => c.id))))
+      .catch(() => {})
+  }, [universeId])
+
+  const toggleCategoryPin = async (e, categoryId) => {
     e.stopPropagation()
-    await fetch(`/api/feeds/${feed.id}/pin?pinned=${!feed.pinned}`, { method: 'PUT' })
-    fetchFeeds()
+    const isPinned = pinnedCategoryIds.has(categoryId)
+    await fetch(`/api/categories/${categoryId}/pin?pinned=${!isPinned}`, { method: 'PUT' })
+    setPinnedCategoryIds(prev => {
+      const next = new Set(prev)
+      if (isPinned) next.delete(categoryId)
+      else next.add(categoryId)
+      return next
+    })
     onPinChange?.()
   }
 
@@ -119,7 +144,6 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
       <div className="notes-header">
         <span className="notes-header-title">Feeds</span>
         <div className="archive-header-actions">
-          <span className="archive-count">{feeds.length}</span>
           <button className="notes-add-btn" onClick={startNew} title="New feed">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
@@ -142,19 +166,39 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
               <span className="ai-group-emoji">{group.categoryId ? (catEmojiMap[group.categoryId] || '🏷️') : '🏷️'}</span>
               <span className="ai-group-name">{group.name || 'Uncategorized'}</span>
               <span className="ai-group-count">{group.items.length}</span>
-            </div>
-            {group.items.map(feed => (
-              <div key={feed.id} className="link-card" onClick={() => setArtifactFeed(feed)} title="View artifacts">
-                <div className="link-card-info">
-                  <div className="link-card-title">{feed.title || 'Untitled'}</div>
-                  <div className="link-card-url">{feed.artifact_count} artifact{feed.artifact_count !== 1 ? 's' : ''}</div>
-                </div>
-                <button className={`archive-action-btn pin-btn ${feed.pinned ? 'pinned' : ''}`} onClick={e => togglePin(e, feed)} title={feed.pinned ? 'Unpin' : 'Pin to header'}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill={feed.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {(unreadCounts?.[group.categoryId ?? null] || 0) > 0 && (
+                <span className="feed-unread-badge">{unreadCounts[group.categoryId ?? null]}</span>
+              )}
+              {group.categoryId != null && (
+                <button
+                  className={`ai-group-artifacts-btn ${pinnedCategoryIds.has(group.categoryId) ? 'pinned' : ''}`}
+                  onClick={e => toggleCategoryPin(e, group.categoryId)}
+                  title={pinnedCategoryIds.has(group.categoryId) ? 'Unpin category' : 'Pin category to header'}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill={pinnedCategoryIds.has(group.categoryId) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 17v5" />
                     <path d="M9 2h6l-1 7h4l-5 7H7l2-7H5l1-7z" />
                   </svg>
                 </button>
+              )}
+              <button
+                className="ai-group-artifacts-btn"
+                onClick={() => setArtifactCategory({ id: group.categoryId ?? null, name: group.name || 'Uncategorized' })}
+                title="View artifacts for this category"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                  <line x1="8" y1="21" x2="16" y2="21" />
+                  <line x1="12" y1="17" x2="12" y2="21" />
+                </svg>
+              </button>
+            </div>
+            {group.items.map(feed => (
+              <div key={feed.id} className="link-card">
+                <div className="link-card-info">
+                  <div className="link-card-title">{feed.title || 'Untitled'}</div>
+                  <div className="link-card-url">{feed.artifact_count} artifact{feed.artifact_count !== 1 ? 's' : ''}</div>
+                </div>
                 <button className="archive-action-btn" onClick={e => { e.stopPropagation(); startEdit(feed) }} title="Edit feed">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -242,54 +286,74 @@ title=Report&file=@report.pdf`}</pre>
         document.body
       )}
 
-      {/* Artifact browser dialog — portaled to body to escape sidebar stacking context */}
-      {artifactFeed && createPortal(
-        <ArtifactDialog
-          feed={artifactFeed}
-          onClose={() => { setArtifactFeed(null); fetchFeeds() }}
-        />,
-        document.body
-      )}
     </aside>
   )
 }
 
 
-function ArtifactDialog({ feed, onClose }) {
+export const ArtifactTimeline = memo(function ArtifactTimeline({ category, onClose, onUnreadChange }) {
   const [artifacts, setArtifacts] = useState([])
   const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [busy, setBusy] = useState({})
-  const [viewingArt, setViewingArt] = useState(null)
+  const [saved, setSaved] = useState({})
+  const scrollRef = useRef(null)
+  const pageRef = useRef(1)
 
-  const fetchArtifacts = () => {
-    const params = new URLSearchParams({ page: String(page), page_size: '100' })
-    if (search) params.set('q', search)
-    fetch(`/api/feeds/${feed.id}/artifacts?${params}`)
-      .then(r => r.json())
-      .then(data => {
-        setArtifacts(data.artifacts)
-        setTotal(data.total)
-        setHasMore(data.has_more)
-      })
-      .catch(() => {})
+  const markRead = (arts) => {
+    const unreadIds = arts.filter(a => !a.read).map(a => a.id)
+    if (unreadIds.length === 0) return
+    fetch('/api/feed-artifacts/mark-read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: unreadIds }),
+    }).then(() => onUnreadChange?.()).catch(() => {})
   }
 
-  useEffect(() => { fetchArtifacts() }, [feed.id, page])
+  const fetchPage = (page, append = false) => {
+    setLoading(true)
+    const params = new URLSearchParams({ page: String(page), page_size: '5' })
+    if (category.id !== null) params.set('category_id', category.id)
+    if (search) params.set('q', search)
+    fetch(`/api/feed-artifacts/by-category?${params}`)
+      .then(r => r.json())
+      .then(data => {
+        markRead(data.artifacts)
+        setArtifacts(prev => append ? [...prev, ...data.artifacts] : data.artifacts)
+        setTotal(data.total)
+        setHasMore(data.has_more)
+        pageRef.current = page
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { pageRef.current = 1; fetchPage(1) }, [category.id])
   useEffect(() => {
-    setPage(1)
-    const t = setTimeout(fetchArtifacts, 300)
+    pageRef.current = 1
+    const t = setTimeout(() => fetchPage(1), 300)
     return () => clearTimeout(t)
   }, [search])
+
+  const handleScroll = () => {
+    const el = scrollRef.current
+    if (!el || loading || !hasMore) return
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 100) {
+      fetchPage(pageRef.current + 1, true)
+    }
+  }
+
+  const removeFromList = (id) => setArtifacts(prev => prev.filter(a => a.id !== id))
 
   const deleteArtifact = async (id) => {
     if (!confirm('Delete this artifact?')) return
     setBusy(prev => ({ ...prev, [id]: 'deleting' }))
     await fetch(`/api/feed-artifacts/${id}`, { method: 'DELETE' })
     setBusy(prev => { const n = { ...prev }; delete n[id]; return n })
-    fetchArtifacts()
+    removeFromList(id)
+    setTotal(prev => prev - 1)
   }
 
   const addAsNote = async (id) => {
@@ -297,12 +361,12 @@ function ArtifactDialog({ feed, onClose }) {
     try {
       const res = await fetch(`/api/feed-artifacts/${id}/to-note`, { method: 'POST' })
       if (res.ok) {
-        if (viewingArt?.id === id) setViewingArt(null)
-        fetchArtifacts()
+        setBusy(prev => { const n = { ...prev }; delete n[id]; return n })
+        setSaved(prev => ({ ...prev, [id]: true }))
+        setTimeout(() => setSaved(prev => { const n = { ...prev }; delete n[id]; return n }), 3000)
         return
       }
-      const err = await res.json()
-      alert(err.detail || 'Failed')
+      const err = await res.json(); alert(err.detail || 'Failed')
     } catch { alert('Failed') }
     setBusy(prev => { const n = { ...prev }; delete n[id]; return n })
   }
@@ -311,167 +375,89 @@ function ArtifactDialog({ feed, onClose }) {
     setBusy(prev => ({ ...prev, [id]: 'doc' }))
     try {
       const res = await fetch(`/api/feed-artifacts/${id}/to-document`, { method: 'POST' })
-      if (res.ok) {
-        if (viewingArt?.id === id) setViewingArt(null)
-        fetchArtifacts()
-        return
-      }
-      const err = await res.json()
-      alert(err.detail || 'Failed')
+      if (res.ok) { removeFromList(id); setTotal(prev => prev - 1); return }
+      const err = await res.json(); alert(err.detail || 'Failed')
     } catch { alert('Failed') }
     setBusy(prev => { const n = { ...prev }; delete n[id]; return n })
   }
 
-  const totalPages = Math.max(1, Math.ceil(total / 100))
-
   const formatDate = (iso) => {
     try {
       const d = new Date(iso)
+      const now = new Date()
+      const diff = (now - d) / 1000
+      if (diff < 60) return 'Just now'
+      if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+      if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+      if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`
       return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
     } catch { return iso }
   }
 
   return (
-    <div className="quickview-overlay" onClick={onClose}>
-      <div className="feed-artifact-dialog" onClick={e => e.stopPropagation()}>
-        <div className="quickview-header">
-          <span className="quickview-type">Feed</span>
-          <h3 className="quickview-title">{feed.title}</h3>
-          <button className="quickview-close" onClick={onClose}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-        <div className="feed-artifact-search">
-          <input
-            className="notes-search-input"
-            placeholder="Search artifact titles..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          <span className="archive-count">{total} total</span>
-        </div>
-        <div className="feed-artifact-body">
-          <div className="feed-artifact-list">
-            {artifacts.length === 0 ? (
-              <div className="notes-empty">{search ? 'No matching artifacts.' : 'No artifacts yet.'}</div>
-            ) : artifacts.map(art => (
-              <div
-                key={art.id}
-                className={`feed-artifact-row ${viewingArt?.id === art.id ? 'active' : ''}`}
-                onClick={() => setViewingArt(viewingArt?.id === art.id ? null : art)}
-              >
-                <div className="feed-artifact-info">
-                  <div className="feed-artifact-title">{art.title || 'Untitled'}</div>
-                  <div className="feed-artifact-meta">
-                    <span className={`feed-artifact-type ${art.content_type}`}>{art.content_type}</span>
-                    {art.original_filename && <span className="feed-artifact-file">{art.original_filename}</span>}
-                    <span className="feed-artifact-date">{formatDate(art.created_at)}</span>
-                  </div>
-                </div>
-                <div className="feed-artifact-actions">
-                  {art.content_type === 'markup' && (
-                    <button
-                      className="feed-artifact-btn note-btn"
-                      onClick={e => { e.stopPropagation(); addAsNote(art.id) }}
-                      disabled={!!busy[art.id]}
-                      title="Add as note"
-                    >
-                      {busy[art.id] === 'note' ? '...' : (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                          <polyline points="14 2 14 8 20 8" />
-                        </svg>
-                      )}
-                    </button>
-                  )}
-                  {art.content_type === 'file' && (
-                    <button
-                      className="feed-artifact-btn doc-btn"
-                      onClick={e => { e.stopPropagation(); addAsDocument(art.id) }}
-                      disabled={!!busy[art.id]}
-                      title="Add as document"
-                    >
-                      {busy[art.id] === 'doc' ? '...' : (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="21 8 21 21 3 21 3 8" />
-                          <rect x="1" y="3" width="22" height="5" />
-                        </svg>
-                      )}
-                    </button>
-                  )}
-                  <button
-                    className="feed-artifact-btn delete-btn"
-                    onClick={e => { e.stopPropagation(); deleteArtifact(art.id) }}
-                    disabled={!!busy[art.id]}
-                    title="Delete artifact"
-                  >
-                    {busy[art.id] === 'deleting' ? '...' : (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="3 6 5 6 21 6" />
-                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                        <path d="M10 11v6" /><path d="M14 11v6" />
-                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-          {viewingArt && (
-            <div className="feed-artifact-preview">
-              <div className="feed-artifact-preview-header">
-                <h4 className="feed-artifact-preview-title">{viewingArt.title || 'Untitled'}</h4>
-                <span className="feed-artifact-date">{formatDate(viewingArt.created_at)}</span>
-                <button className="quickview-close" onClick={() => setViewingArt(null)}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
-              </div>
-              <div className="feed-artifact-preview-content">
-                {viewingArt.content_type === 'markup' ? (
-                  <div className="feed-artifact-markup" dangerouslySetInnerHTML={{ __html: viewingArt.markup || '<em>Empty</em>' }} onClick={e => {
-                    const a = e.target.closest('a[href]')
-                    if (a) { e.preventDefault(); window.open(a.href, '_blank', 'noopener') }
-                  }} />
-                ) : (
-                  <div className="feed-artifact-file-preview">
-                    <div className="feed-artifact-file-icon">
-                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                        <polyline points="14 2 14 8 20 8" />
-                      </svg>
-                    </div>
-                    <div className="feed-artifact-file-name">{viewingArt.original_filename}</div>
-                    {viewingArt.file_path && (
-                      <a
-                        className="feed-artifact-download-btn"
-                        href={`/api/feed-files/${viewingArt.file_path}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Download
-                      </a>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-        {totalPages > 1 && (
-          <div className="feed-artifact-pagination">
-            <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Prev</button>
-            <span>Page {page} of {totalPages}</span>
-            <button disabled={!hasMore} onClick={() => setPage(p => p + 1)}>Next</button>
-          </div>
+    <div className="timeline-inline" ref={scrollRef} onScroll={handleScroll}>
+      <div className="timeline-header">
+        <button className="timeline-back-btn" onClick={onClose} title="Close feed">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+          Close Feed
+        </button>
+        <h3 className="timeline-title">Artifacts for {category.name}</h3>
+      </div>
+      <div className="timeline-search">
+        <input className="notes-search-input" placeholder="Search artifacts..." value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+      <div className="timeline-feed">
+        {artifacts.length === 0 && !loading && (
+          <div className="timeline-empty">{search ? 'No matching artifacts.' : 'No artifacts yet.'}</div>
         )}
+        {artifacts.map(art => (
+          <article key={art.id} className="timeline-card">
+            <div className="timeline-card-header">
+              <span className="timeline-card-feed">{art.feed_name || 'Feed'}</span>
+              <span className="timeline-card-date">{formatDate(art.created_at)}</span>
+            </div>
+            <h4 className="timeline-card-title">{art.title || 'Untitled'}</h4>
+            <div className="timeline-card-body">
+              {art.content_type === 'markup' ? (
+                <div className="timeline-card-markup" dangerouslySetInnerHTML={{ __html: art.markup || '' }} onClick={e => {
+                  const a = e.target.closest('a[href]')
+                  if (a) { e.preventDefault(); window.open(a.href, '_blank', 'noopener') }
+                }} />
+              ) : (
+                <div className="timeline-card-file">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  <span className="timeline-card-filename">{art.original_filename}</span>
+                  {art.file_path && <a className="timeline-card-download" href={`/api/feed-files/${art.file_path}`} target="_blank" rel="noopener noreferrer">Download</a>}
+                </div>
+              )}
+            </div>
+            <div className="timeline-card-actions">
+              {art.content_type === 'markup' && (
+                <button className={`timeline-action-btn ${saved[art.id] ? 'saved' : ''}`} onClick={() => addAsNote(art.id)} disabled={!!busy[art.id] || !!saved[art.id]} title="Save as note">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  {busy[art.id] === 'note' ? 'Saving...' : saved[art.id] ? 'Saved as Note!' : 'Save as Note'}
+                </button>
+              )}
+              {art.content_type === 'file' && (
+                <button className="timeline-action-btn" onClick={() => addAsDocument(art.id)} disabled={!!busy[art.id]} title="Save as document">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/></svg>
+                  {busy[art.id] === 'doc' ? 'Saving...' : 'Save as Document'}
+                </button>
+              )}
+              <button className="timeline-action-btn delete" onClick={() => deleteArtifact(art.id)} disabled={!!busy[art.id]} title="Delete">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                {busy[art.id] === 'deleting' ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </article>
+        ))}
+        {loading && <div className="timeline-loading">Loading...</div>}
+        {!loading && !hasMore && artifacts.length > 0 && <div className="timeline-end">No more artifacts</div>}
       </div>
     </div>
   )
-}
+})
 
 export default FeedsPanel

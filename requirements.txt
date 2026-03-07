@@ -17,4 +17,6 @@ feedparser
 ddgs
 requests
 websockets
+croniter
+markdownify
 ruff

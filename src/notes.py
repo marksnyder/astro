@@ -108,6 +108,7 @@ class FeedArtifact:
     file_path: str | None
     original_filename: str | None
     created_at: str
+    read: bool = False
 
 
 IMAGES_DIR = Path(__file__).resolve().parent.parent / "data" / "images"
@@ -295,6 +296,24 @@ def delete_category(cat_id: int) -> bool:
     conn.commit()
     conn.close()
     return cur.rowcount > 0
+
+
+def set_category_pinned(cat_id: int, pinned: bool) -> bool:
+    conn = _get_conn()
+    cur = conn.execute("UPDATE categories SET pinned = ? WHERE id = ?", (int(pinned), cat_id))
+    conn.commit()
+    conn.close()
+    return cur.rowcount > 0
+
+
+def list_pinned_categories(universe_id: int | None = None) -> list[Category]:
+    conn = _get_conn()
+    if universe_id is not None:
+        rows = conn.execute("SELECT id, name, parent_id, universe_id, emoji FROM categories WHERE pinned = 1 AND universe_id = ? ORDER BY name", (universe_id,)).fetchall()
+    else:
+        rows = conn.execute("SELECT id, name, parent_id, universe_id, emoji FROM categories WHERE pinned = 1 ORDER BY name").fetchall()
+    conn.close()
+    return [Category(id=r["id"], name=r["name"], parent_id=r["parent_id"], universe_id=r["universe_id"], emoji=r["emoji"]) for r in rows]
 
 
 def get_descendant_ids(category_id: int) -> set[int]:
@@ -1059,6 +1078,7 @@ def _row_to_artifact(row: sqlite3.Row) -> FeedArtifact:
         file_path=row["file_path"],
         original_filename=row["original_filename"],
         created_at=row["created_at"],
+        read=bool(row["read"]) if "read" in row.keys() else False,
     )
 
 
@@ -1084,6 +1104,86 @@ def list_feed_artifacts(
     ).fetchall()
     conn.close()
     return [_row_to_artifact(r) for r in rows], total
+
+
+def list_feed_artifacts_by_category(
+    category_id: int | None,
+    query: str = "",
+    page: int = 1,
+    page_size: int = 100,
+) -> tuple[list[dict], int]:
+    """Return (artifacts_with_feed_name, total_count) for all feeds in a category, paginated."""
+    conn = _get_conn()
+    if category_id is not None:
+        feed_cond = "a.feed_id IN (SELECT id FROM feeds WHERE category_id = ?)"
+        params: list = [category_id]
+    else:
+        feed_cond = "a.feed_id IN (SELECT id FROM feeds WHERE category_id IS NULL)"
+        params = []
+    conditions = [feed_cond]
+    if query:
+        conditions.append("a.title LIKE ?")
+        params.append(f"%{query}%")
+    where = f" WHERE {' AND '.join(conditions)}"
+    total = conn.execute(
+        f"SELECT COUNT(*) AS cnt FROM feed_artifacts a{where}", params
+    ).fetchone()["cnt"]
+    offset = (page - 1) * page_size
+    rows = conn.execute(
+        f"SELECT a.*, f.title AS feed_name FROM feed_artifacts a "
+        f"LEFT JOIN feeds f ON a.feed_id = f.id{where} "
+        f"ORDER BY a.created_at DESC LIMIT ? OFFSET ?",
+        params + [page_size, offset],
+    ).fetchall()
+    conn.close()
+    results = []
+    for r in rows:
+        d = dict(r)
+        feed_name = d.pop("feed_name", None)
+        art = _row_to_artifact(r)
+        art_dict = asdict(art)
+        art_dict["feed_name"] = feed_name or "Unknown"
+        results.append(art_dict)
+    return results, total
+
+
+def mark_feed_artifacts_read(artifact_ids: list[int]) -> int:
+    """Mark a batch of feed artifacts as read. Returns the number of rows updated."""
+    if not artifact_ids:
+        return 0
+    conn = _get_conn()
+    placeholders = ",".join("?" for _ in artifact_ids)
+    cur = conn.execute(
+        f"UPDATE feed_artifacts SET read = 1 WHERE id IN ({placeholders}) AND read = 0",
+        artifact_ids,
+    )
+    conn.commit()
+    count = cur.rowcount
+    conn.close()
+    return count
+
+
+def get_unread_counts_by_category(universe_id: int | None = None) -> dict[int | None, int]:
+    """Return {category_id: unread_count} for all feed categories with unread artifacts.
+    category_id=None represents uncategorized feeds."""
+    conn = _get_conn()
+    if universe_id is not None:
+        rows = conn.execute(
+            "SELECT f.category_id, COUNT(*) AS cnt "
+            "FROM feed_artifacts a JOIN feeds f ON a.feed_id = f.id "
+            "WHERE a.read = 0 AND f.universe_id = ? "
+            "GROUP BY f.category_id",
+            (universe_id,),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT f.category_id, COUNT(*) AS cnt "
+            "FROM feed_artifacts a JOIN feeds f ON a.feed_id = f.id "
+            "WHERE a.read = 0 "
+            "GROUP BY f.category_id",
+        ).fetchall()
+    conn.close()
+    return {r["category_id"]: r["cnt"] for r in rows}
 
 
 def get_feed_artifact(artifact_id: int) -> FeedArtifact | None:
@@ -1141,3 +1241,94 @@ def delete_feed_artifact(artifact_id: int) -> bool:
 
 def feed_artifact_to_dict(art: FeedArtifact) -> dict:
     return asdict(art)
+
+
+# ── Scheduled messages CRUD ───────────────────────────────────────────────
+
+
+@dataclass
+class ScheduledMessage:
+    id: int | None
+    title: str
+    channel: str
+    message: str
+    cron_expr: str
+    enabled: bool
+    created_at: str
+    updated_at: str
+    last_run_at: str | None
+
+
+def _row_to_scheduled_message(row: sqlite3.Row) -> ScheduledMessage:
+    return ScheduledMessage(
+        id=row["id"],
+        title=row["title"],
+        channel=row["channel"],
+        message=row["message"],
+        cron_expr=row["cron_expr"],
+        enabled=bool(row["enabled"]),
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+        last_run_at=row["last_run_at"],
+    )
+
+
+def list_scheduled_messages() -> list[ScheduledMessage]:
+    conn = _get_conn()
+    rows = conn.execute("SELECT * FROM scheduled_messages ORDER BY created_at DESC").fetchall()
+    conn.close()
+    return [_row_to_scheduled_message(r) for r in rows]
+
+
+def get_scheduled_message(msg_id: int) -> ScheduledMessage | None:
+    conn = _get_conn()
+    row = conn.execute("SELECT * FROM scheduled_messages WHERE id = ?", (msg_id,)).fetchone()
+    conn.close()
+    return _row_to_scheduled_message(row) if row else None
+
+
+def create_scheduled_message(channel: str, message: str, cron_expr: str, title: str = "", enabled: bool = True) -> ScheduledMessage:
+    now = _now()
+    conn = _get_conn()
+    cur = conn.execute(
+        "INSERT INTO scheduled_messages (title, channel, message, cron_expr, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (title, channel, message, cron_expr, int(enabled), now, now),
+    )
+    conn.commit()
+    mid = cur.lastrowid
+    conn.close()
+    return get_scheduled_message(mid)  # type: ignore[return-value]
+
+
+def update_scheduled_message(msg_id: int, channel: str, message: str, cron_expr: str, enabled: bool, title: str = "") -> ScheduledMessage | None:
+    now = _now()
+    conn = _get_conn()
+    cur = conn.execute(
+        "UPDATE scheduled_messages SET title = ?, channel = ?, message = ?, cron_expr = ?, enabled = ?, updated_at = ? WHERE id = ?",
+        (title, channel, message, cron_expr, int(enabled), now, msg_id),
+    )
+    conn.commit()
+    conn.close()
+    if cur.rowcount == 0:
+        return None
+    return get_scheduled_message(msg_id)
+
+
+def delete_scheduled_message(msg_id: int) -> bool:
+    conn = _get_conn()
+    cur = conn.execute("DELETE FROM scheduled_messages WHERE id = ?", (msg_id,))
+    conn.commit()
+    conn.close()
+    return cur.rowcount > 0
+
+
+def mark_scheduled_message_run(msg_id: int) -> None:
+    now = _now()
+    conn = _get_conn()
+    conn.execute("UPDATE scheduled_messages SET last_run_at = ? WHERE id = ?", (now, msg_id))
+    conn.commit()
+    conn.close()
+
+
+def scheduled_message_to_dict(msg: ScheduledMessage) -> dict:
+    return asdict(msg)

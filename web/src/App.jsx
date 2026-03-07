@@ -4,7 +4,7 @@ import NotesPanel from './NotesPanel'
 import ArchivePanel from './ArchivePanel'
 import LinksPanel from './LinksPanel'
 import ActionItemsPanel from './ActionItemsPanel'
-import FeedsPanel from './FeedsPanel'
+import FeedsPanel, { ArtifactTimeline } from './FeedsPanel'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import CategoryTree, { CategoryPicker } from './CategoryTree'
@@ -496,6 +496,254 @@ function SettingsDialog({ onClose, onRestored }) {
   )
 }
 
+const MSG_CHAR_LIMIT = 440
+
+function parseMessages(raw) {
+  if (!raw) return ['']
+  try {
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(String)
+  } catch {}
+  return [raw]
+}
+
+function FeedKeyModal({ onInsert, onClose }) {
+  const [feeds, setFeeds] = useState([])
+  const [search, setSearch] = useState('')
+  const [inserted, setInserted] = useState(null)
+
+  useEffect(() => {
+    fetch('/api/feeds').then(r => r.json()).then(setFeeds).catch(() => {})
+  }, [])
+
+  const filtered = feeds.filter(f => !search || f.title.toLowerCase().includes(search.toLowerCase()) || f.api_key.toLowerCase().includes(search.toLowerCase()))
+
+  const handleInsert = (key) => {
+    onInsert(key)
+    setInserted(key)
+    setTimeout(() => setInserted(null), 1200)
+  }
+
+  return (
+    <div className="feed-key-modal-overlay" onClick={onClose}>
+      <div className="feed-key-modal" onClick={e => e.stopPropagation()}>
+        <div className="feed-key-modal-header">
+          <h3>Feed Key Lookup</h3>
+          <button type="button" className="feed-key-modal-close" onClick={onClose}>&times;</button>
+        </div>
+        <input
+          className="schedule-form-input feed-key-modal-search"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search feeds..."
+          autoFocus
+        />
+        <div className="feed-key-modal-list">
+          {filtered.length === 0 && <div className="feed-key-lookup-empty">No feeds found</div>}
+          {filtered.map(f => (
+            <div key={f.id} className="feed-key-lookup-item" onClick={() => handleInsert(f.api_key)} style={{ cursor: 'pointer' }}>
+              <span className="feed-key-lookup-title">{f.title}</span>
+              <code className="feed-key-lookup-key">{f.api_key}</code>
+              {inserted === f.api_key && <span className="feed-key-inserted">Inserted</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ScheduleForm({ initial, channels, onSave, onCancel }) {
+  const [title, setTitle] = useState(initial.title || '')
+  const [channel, setChannel] = useState(initial.channel || '#astro')
+  const [messages, setMessages] = useState(() => parseMessages(initial.message))
+  const [cronExpr, setCronExpr] = useState(initial.cron_expr || '0 9 * * *')
+  const [enabled, setEnabled] = useState(initial.enabled !== false)
+  const [activeMsg, setActiveMsg] = useState(0)
+  const [showFeedKeys, setShowFeedKeys] = useState(false)
+
+  const updateMsg = (idx, val) => {
+    if (val.length > MSG_CHAR_LIMIT) return
+    setMessages(prev => prev.map((m, i) => i === idx ? val : m))
+  }
+
+  const insertIntoActiveMsg = (text) => {
+    setMessages(prev => prev.map((m, i) => {
+      if (i !== activeMsg) return m
+      const newVal = m + text
+      return newVal.length <= MSG_CHAR_LIMIT ? newVal : m
+    }))
+  }
+  const addMsg = () => setMessages(prev => [...prev, ''])
+  const removeMsg = (idx) => setMessages(prev => prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx))
+  const moveMsg = (idx, dir) => {
+    setMessages(prev => {
+      const arr = [...prev]
+      const target = idx + dir
+      if (target < 0 || target >= arr.length) return arr
+      ;[arr[idx], arr[target]] = [arr[target], arr[idx]]
+      return arr
+    })
+  }
+
+  const hasContent = messages.some(m => m.trim())
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (!hasContent || !cronExpr.trim() || !title.trim()) return
+    const cleaned = messages.filter(m => m.trim())
+    const msgPayload = JSON.stringify(cleaned)
+    onSave({ id: initial.id, channel, message: msgPayload, cron_expr: cronExpr.trim(), enabled, title: title.trim() })
+  }
+
+  const cronPresets = [
+    { label: 'Every minute', value: '* * * * *' },
+    { label: 'Every 5 min', value: '*/5 * * * *' },
+    { label: 'Every hour', value: '0 * * * *' },
+    { label: 'Daily 9am', value: '0 9 * * *' },
+    { label: 'Mon-Fri 9am', value: '0 9 * * 1-5' },
+    { label: 'Weekly Mon', value: '0 9 * * 1' },
+  ]
+
+  return (
+    <form className="schedule-form" onSubmit={handleSubmit}>
+      <div className="schedule-form-row">
+        <label>Title</label>
+        <input
+          className="schedule-form-input"
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          placeholder="Give this schedule a name..."
+          maxLength={100}
+        />
+      </div>
+      <div className="schedule-form-row">
+        <label>Channel</label>
+        <select value={channel} onChange={e => setChannel(e.target.value)} className="schedule-form-input">
+          {channels.filter(c => !c.name.startsWith('&')).map(c => (
+            <option key={c.name} value={c.name}>{c.name}</option>
+          ))}
+          {!channels.find(c => c.name === channel) && <option value={channel}>{channel}</option>}
+        </select>
+      </div>
+      <div className="schedule-form-row">
+        <label>Cron Schedule</label>
+        <input
+          className="schedule-form-input"
+          value={cronExpr}
+          onChange={e => setCronExpr(e.target.value)}
+          placeholder="* * * * *"
+          spellCheck={false}
+        />
+        <div className="schedule-cron-presets">
+          {cronPresets.map(p => (
+            <button key={p.value} type="button" className={`schedule-preset-btn ${cronExpr === p.value ? 'active' : ''}`} onClick={() => setCronExpr(p.value)}>{p.label}</button>
+          ))}
+        </div>
+        <div className="schedule-cron-hint">min hour day month weekday</div>
+      </div>
+      <div className="schedule-form-row">
+        <label>Messages <span className="schedule-msg-count">({messages.length})</span></label>
+        {messages.map((msg, idx) => (
+          <div key={idx} className={`schedule-msg-entry ${activeMsg === idx ? 'active' : ''}`}>
+            <div className="schedule-msg-entry-header">
+              <span className="schedule-msg-label">#{idx + 1}</span>
+              <span className={`schedule-msg-chars ${msg.length > MSG_CHAR_LIMIT * 0.9 ? 'warn' : ''} ${msg.length >= MSG_CHAR_LIMIT ? 'over' : ''}`}>
+                {msg.length}/{MSG_CHAR_LIMIT}
+              </span>
+              <div className="schedule-msg-entry-btns">
+                <button type="button" className="schedule-msg-move-btn" onClick={() => moveMsg(idx, -1)} disabled={idx === 0} title="Move up">&uarr;</button>
+                <button type="button" className="schedule-msg-move-btn" onClick={() => moveMsg(idx, 1)} disabled={idx === messages.length - 1} title="Move down">&darr;</button>
+                <button type="button" className="schedule-msg-remove-btn" onClick={() => removeMsg(idx)} disabled={messages.length <= 1} title="Remove">&times;</button>
+              </div>
+            </div>
+            <textarea
+              className="schedule-form-input schedule-form-textarea"
+              value={msg}
+              onChange={e => updateMsg(idx, e.target.value)}
+              onFocus={() => setActiveMsg(idx)}
+              onInput={e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
+              ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' } }}
+              placeholder={`Message ${idx + 1}...`}
+              rows={2}
+              maxLength={MSG_CHAR_LIMIT}
+            />
+            <div className="schedule-msg-tools">
+              <span className="schedule-msg-tools-label">Tools</span>
+              <button type="button" className="schedule-msg-tool-btn" onClick={() => { setActiveMsg(idx); setShowFeedKeys(true) }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
+                Feed Keys
+              </button>
+            </div>
+          </div>
+        ))}
+        <button type="button" className="schedule-add-msg-btn" onClick={addMsg}>+ Add message</button>
+        {showFeedKeys && <FeedKeyModal onInsert={insertIntoActiveMsg} onClose={() => setShowFeedKeys(false)} />}
+      </div>
+      <div className="schedule-form-row schedule-form-toggle-row">
+        <label>Enabled</label>
+        <button type="button" className={`schedule-toggle ${enabled ? 'on' : 'off'}`} onClick={() => setEnabled(!enabled)}>
+          {enabled ? 'ON' : 'OFF'}
+        </button>
+      </div>
+      <div className="schedule-form-actions">
+        <button type="submit" className="schedule-save-btn" disabled={!hasContent || !title.trim()}>
+          {initial.id ? 'Update' : 'Create'}
+        </button>
+        <button type="button" className="schedule-cancel-btn" onClick={onCancel}>Cancel</button>
+      </div>
+    </form>
+  )
+}
+
+function ScheduleItem({ s, onEdit, onDelete, onToggle, onRun }) {
+  const [expanded, setExpanded] = useState(false)
+  const [running, setRunning] = useState(false)
+  const msgs = parseMessages(s.message)
+
+  const handleRun = async (e) => {
+    e.stopPropagation()
+    setRunning(true)
+    try { await onRun(s.id) } finally { setRunning(false) }
+  }
+
+  return (
+    <div className={`schedule-item ${s.enabled ? '' : 'disabled'}`}>
+      <div className="schedule-item-header" onClick={() => setExpanded(!expanded)} style={{ cursor: 'pointer' }}>
+        <svg className={`schedule-expand-chevron ${expanded ? 'open' : ''}`} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+        <span className="schedule-title">{s.title || msgs[0]?.slice(0, 60)}</span>
+        {msgs.length > 1 && <span className="schedule-msg-badge">{msgs.length} msgs</span>}
+        <span className="schedule-channel">{s.channel}</span>
+        <code className="schedule-cron">{s.cron_expr}</code>
+        <span className={`schedule-status ${s.enabled ? 'on' : 'off'}`} onClick={e => { e.stopPropagation(); onToggle(s) }} title={s.enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}>
+          {s.enabled ? 'ON' : 'OFF'}
+        </span>
+      </div>
+      {expanded && (
+        <>
+          <div className="schedule-item-messages">
+            {msgs.map((m, i) => (
+              <div key={i} className="schedule-item-message"><span className="schedule-item-msg-num">#{i + 1}</span> {m}</div>
+            ))}
+          </div>
+          <div className="schedule-item-footer">
+            {s.last_run_at && <span className="schedule-last-run">Last run: {new Date(s.last_run_at).toLocaleString()}</span>}
+            <div className="schedule-item-actions">
+              <button className="schedule-run-btn" onClick={handleRun} disabled={running}>
+                {running ? 'Sending...' : 'Run Now'}
+              </button>
+              <button className="schedule-edit-btn" onClick={() => onEdit(s)}>Edit</button>
+              <button className="schedule-delete-btn" onClick={() => onDelete(s.id)}>Delete</button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function App() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -504,6 +752,8 @@ function App() {
   const [model, setModel] = useState('gpt-5-mini')
   const [useContext, setUseContext] = useState(true)
   const [chatMode, setChatMode] = useState('llm') // 'llm' or 'irc'
+  const [artifactViewCategory, setArtifactViewCategory] = useState(null)
+  const [feedUnreadCounts, setFeedUnreadCounts] = useState({})
   const [ircNick, setIrcNick] = useState('')
   const [ircMessages, setIrcMessages] = useState([])
   const [ircStatus, setIrcStatus] = useState({ connected: false, nick: '', channel: '' })
@@ -519,6 +769,10 @@ function App() {
   const [showHiddenChannels, setShowHiddenChannels] = useState(false)
   const [unreadCounts, setUnreadCounts] = useState({})
   const lastSeenTsRef = useRef({})
+  const [showSchedulePanel, setShowSchedulePanel] = useState(false)
+  const [schedules, setSchedules] = useState([])
+  const [scheduleEditing, setScheduleEditing] = useState(null)
+  const [scheduleFilterChannel, setScheduleFilterChannel] = useState('')
   const [universes, setUniverses] = useState([])
   const [currentUniverseId, setCurrentUniverseId] = useState(null)
   const [sidebarTab, setSidebarTab] = useState('actions')
@@ -530,7 +784,7 @@ function App() {
   })
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const lastWidthRef = useRef(sidebarWidth)
-  const [pinnedItems, setPinnedItems] = useState({ notes: [], documents: [], links: [] })
+  const [pinnedItems, setPinnedItems] = useState({ notes: [], documents: [], links: [], feed_categories: [] })
   const [quickView, setQuickView] = useState(null)
   const [editNoteRequest, setEditNoteRequest] = useState(null)
   const [openFeedRequest, setOpenFeedRequest] = useState(null)
@@ -651,6 +905,47 @@ function App() {
       .then(r => r.json())
       .then(setIrcUsers)
       .catch(() => {})
+  }
+
+  const fetchSchedules = () => {
+    fetch('/api/scheduled-messages')
+      .then(r => r.json())
+      .then(setSchedules)
+      .catch(() => {})
+  }
+
+  const saveSchedule = async (data) => {
+    const method = data.id ? 'PUT' : 'POST'
+    const url = data.id ? `/api/scheduled-messages/${data.id}` : '/api/scheduled-messages'
+    await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    fetchSchedules()
+    setScheduleEditing(null)
+  }
+
+  const deleteSchedule = async (id) => {
+    if (!confirm('Delete this scheduled message?')) return
+    await fetch(`/api/scheduled-messages/${id}`, { method: 'DELETE' })
+    fetchSchedules()
+  }
+
+  const toggleScheduleEnabled = async (sched) => {
+    await fetch(`/api/scheduled-messages/${sched.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...sched, enabled: !sched.enabled }),
+    })
+    fetchSchedules()
+  }
+
+  const runScheduleNow = async (id) => {
+    try {
+      await fetch(`/api/scheduled-messages/${id}/run`, { method: 'POST' })
+      fetchSchedules()
+    } catch {}
   }
 
   const hideChannel = (name) => {
@@ -885,6 +1180,25 @@ function App() {
       .catch(() => {})
   }, [currentUniverseId])
 
+  const fetchUnreadCounts = useCallback(() => {
+    const params = currentUniverseId ? `?universe_id=${currentUniverseId}` : ''
+    fetch(`/api/feed-artifacts/unread-counts${params}`)
+      .then(r => r.json())
+      .then(data => {
+        const counts = {}
+        for (const [k, v] of Object.entries(data.counts || {})) {
+          counts[k === 'null' ? null : Number(k)] = v
+        }
+        setFeedUnreadCounts(counts)
+      })
+      .catch(() => {})
+  }, [currentUniverseId])
+
+  const closeArtifactView = useCallback(() => {
+    setArtifactViewCategory(null)
+    fetchUnreadCounts()
+  }, [fetchUnreadCounts])
+
   const handleCategoryAction = async (action, payload) => {
     if (action === 'add') {
       const name = payload.name || prompt('Category name:')
@@ -927,7 +1241,13 @@ function App() {
     if (currentUniverseId === null) return
     fetchCategories()
     fetchPinned()
-  }, [currentUniverseId, fetchCategories, fetchPinned])
+    fetchUnreadCounts()
+  }, [currentUniverseId, fetchCategories, fetchPinned, fetchUnreadCounts])
+
+  useEffect(() => {
+    const iv = setInterval(fetchUnreadCounts, 30000)
+    return () => clearInterval(iv)
+  }, [fetchUnreadCounts])
 
   const toggleSidebar = () => {
     if (sidebarCollapsed) {
@@ -1111,7 +1431,7 @@ function App() {
             </button>
           )}
         </div>
-        {(pinnedItems.notes.length > 0 || pinnedItems.documents.length > 0 || pinnedItems.links?.length > 0 || pinnedItems.feeds?.length > 0) && (
+        {(pinnedItems.notes.length > 0 || pinnedItems.documents.length > 0 || pinnedItems.links?.length > 0 || pinnedItems.feed_categories?.length > 0) && (
           <div className="pinned-bar">
             {pinnedItems.notes.map((n) => (
               <button key={`n-${n.id}`} className="pinned-chip pinned-note" onClick={() => { setSidebarTab('notes'); setEditNoteRequest(n); }} title={n.title || 'Untitled'}>
@@ -1140,14 +1460,17 @@ function App() {
                 <span className="pinned-chip-label">{l.title || l.url}</span>
               </button>
             ))}
-            {(pinnedItems.feeds || []).map((f) => (
-              <button key={`f-${f.id}`} className="pinned-chip pinned-feed" onClick={() => { setSidebarTab('feeds'); setOpenFeedRequest(f); }} title={f.title}>
+            {(pinnedItems.feed_categories || []).map((c) => (
+              <button key={`fc-${c.id}`} className="pinned-chip pinned-feed" onClick={() => setArtifactViewCategory({ id: c.id, name: c.name })} title={`Artifacts for ${c.name}`}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4 11a9 9 0 0 1 9 9" />
                   <path d="M4 4a16 16 0 0 1 16 16" />
                   <circle cx="5" cy="19" r="1" />
                 </svg>
-                <span className="pinned-chip-label">{f.title}</span>
+                <span className="pinned-chip-label">{c.name}</span>
+                {(feedUnreadCounts[c.id] || 0) > 0 && (
+                  <span className="pinned-chip-unread">{feedUnreadCounts[c.id]}</span>
+                )}
               </button>
             ))}
           </div>
@@ -1327,6 +1650,8 @@ function App() {
               onPinChange={fetchPinned}
               openFeedRequest={openFeedRequest}
               onOpenFeedRequestHandled={() => setOpenFeedRequest(null)}
+              onViewArtifacts={(cat) => setArtifactViewCategory(cat)}
+              unreadCounts={feedUnreadCounts}
             />
           )}
           {sidebarTab === 'actions' && (
@@ -1362,7 +1687,13 @@ function App() {
         </div>
 
         <div className="chat-container">
-          {chatMode === 'irc' ? (
+          {artifactViewCategory ? (
+            <ArtifactTimeline
+              category={artifactViewCategory}
+              onClose={closeArtifactView}
+              onUnreadChange={fetchUnreadCounts}
+            />
+          ) : chatMode === 'irc' ? (
             <div className="irc-layout">
               <div className="irc-channel-tabs">
                 {(ircChannels.length > 0 ? ircChannels : (ircNick ? [{ name: ircNick }] : []))
@@ -1422,6 +1753,16 @@ function App() {
                     {hiddenChannels.length} hidden
                   </button>
                 )}
+                <button
+                  className="irc-channel-tab irc-schedule-tab"
+                  onClick={() => { setShowSchedulePanel(true); fetchSchedules() }}
+                  title="Scheduled messages"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  Schedules
+                </button>
               </div>
               <div className="irc-chat-body">
                 <div className="chat-toolbar">
@@ -1538,7 +1879,7 @@ function App() {
             </>
           )}
 
-          <footer className="input-area">
+          {!artifactViewCategory && <footer className="input-area">
             <form onSubmit={handleSubmit} className="input-form">
               <textarea
                 ref={inputRef}
@@ -1571,7 +1912,7 @@ function App() {
                 </svg>
               </button>
             </form>
-          </footer>
+          </footer>}
         </div>
       </div>
       {quickView && <QuickView item={quickView} onClose={() => setQuickView(null)} />}
@@ -1590,6 +1931,7 @@ function App() {
           onRestored={() => {
             fetchCategories()
             fetchPinned()
+            fetchUnreadCounts()
             fetch('/api/stats').then(r => r.json()).then(d => setStats(d)).catch(() => {})
           }}
         />
@@ -1602,6 +1944,51 @@ function App() {
           onClose={() => setShowUniverseManager(false)}
           onRefresh={fetchUniverses}
         />
+      )}
+      {showSchedulePanel && (
+        <div className="schedule-modal-overlay" onClick={() => { setShowSchedulePanel(false); setScheduleEditing(null); setScheduleFilterChannel('') }}>
+          <div className="schedule-modal" onClick={e => e.stopPropagation()}>
+            <div className="schedule-panel-header">
+              <h3>Scheduled Messages</h3>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <select className="schedule-filter-select" value={scheduleFilterChannel} onChange={e => setScheduleFilterChannel(e.target.value)}>
+                  <option value="">All channels</option>
+                  {[...new Set(schedules.map(s => s.channel))].sort().map(ch => (
+                    <option key={ch} value={ch}>{ch}</option>
+                  ))}
+                </select>
+                <button className="schedule-add-btn" onClick={() => setScheduleEditing({ channel: '#astro', message: '', cron_expr: '0 9 * * *', enabled: true })}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  New
+                </button>
+                <button className="quickview-close" onClick={() => { setShowSchedulePanel(false); setScheduleEditing(null); setScheduleFilterChannel('') }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            {scheduleEditing ? (
+              <ScheduleForm
+                initial={scheduleEditing}
+                channels={ircChannels}
+                onSave={saveSchedule}
+                onCancel={() => setScheduleEditing(null)}
+              />
+            ) : (
+              <div className="schedule-list">
+                {schedules.filter(s => !scheduleFilterChannel || s.channel === scheduleFilterChannel).length === 0 && (
+                  <div className="schedule-empty">No scheduled messages{scheduleFilterChannel ? ` for ${scheduleFilterChannel}` : ''}</div>
+                )}
+                {schedules.filter(s => !scheduleFilterChannel || s.channel === scheduleFilterChannel).map(s => (
+                  <ScheduleItem key={s.id} s={s} onEdit={setScheduleEditing} onDelete={deleteSchedule} onToggle={toggleScheduleEnabled} onRun={runScheduleNow} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
       {showHiddenChannels && (
         <div className="quickview-overlay" onClick={() => setShowHiddenChannels(false)}>
