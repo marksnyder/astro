@@ -507,7 +507,7 @@ function parseMessages(raw) {
   return [raw]
 }
 
-function FeedKeyModal({ onInsert, onClose }) {
+function FeedPostModal({ mode, onInsert, onClose }) {
   const [feeds, setFeeds] = useState([])
   const [search, setSearch] = useState('')
   const [inserted, setInserted] = useState(null)
@@ -516,21 +516,49 @@ function FeedKeyModal({ onInsert, onClose }) {
     fetch('/api/feeds').then(r => r.json()).then(setFeeds).catch(() => {})
   }, [])
 
-  const filtered = feeds.filter(f => !search || f.title.toLowerCase().includes(search.toLowerCase()) || f.api_key.toLowerCase().includes(search.toLowerCase()))
+  const filtered = feeds.filter(f => !search || f.title.toLowerCase().includes(search.toLowerCase()) || f.api_key?.toLowerCase().includes(search.toLowerCase()))
+  const baseUrl = `${window.location.origin}/api/feeds`
+  const isMarkup = mode === 'markup'
 
-  const handleInsert = (key) => {
-    onInsert(key)
-    setInserted(key)
-    setTimeout(() => setInserted(null), 1200)
+  const handleSelect = (f) => {
+    const url = `${baseUrl}/${f.id}/ingest`
+    let text
+    if (isMarkup) {
+      text = [
+        `POST ${url}`,
+        `Content-Type: multipart/form-data`,
+        `X-Feed-Key: ${f.api_key}`,
+        ``,
+        `Payload: title=<title>&markup=<html_content>`,
+        `Response: {"ok":true,"artifact_id":<id>,"content_type":"markup"}`,
+      ].join('\n')
+    } else {
+      text = [
+        `POST ${url}`,
+        `Content-Type: multipart/form-data`,
+        `X-Feed-Key: ${f.api_key}`,
+        ``,
+        `Payload: title=<title>&file=@<filepath>`,
+        `Response: {"ok":true,"artifact_id":<id>,"content_type":"file"}`,
+      ].join('\n')
+    }
+    onInsert(text)
+    setInserted(f.id)
+    setTimeout(() => setInserted(null), 1500)
   }
 
   return (
     <div className="feed-key-modal-overlay" onClick={onClose}>
       <div className="feed-key-modal" onClick={e => e.stopPropagation()}>
         <div className="feed-key-modal-header">
-          <h3>Feed Key Lookup</h3>
+          <h3>{isMarkup ? 'Post Feed Markup' : 'Post Feed Document'}</h3>
           <button type="button" className="feed-key-modal-close" onClick={onClose}>&times;</button>
         </div>
+        <p className="feed-post-modal-desc">
+          {isMarkup
+            ? 'Select a feed to insert a markup POST template into your message.'
+            : 'Select a feed to insert a document POST template into your message.'}
+        </p>
         <input
           className="schedule-form-input feed-key-modal-search"
           value={search}
@@ -541,10 +569,10 @@ function FeedKeyModal({ onInsert, onClose }) {
         <div className="feed-key-modal-list">
           {filtered.length === 0 && <div className="feed-key-lookup-empty">No feeds found</div>}
           {filtered.map(f => (
-            <div key={f.id} className="feed-key-lookup-item" onClick={() => handleInsert(f.api_key)} style={{ cursor: 'pointer' }}>
+            <div key={f.id} className="feed-key-lookup-item" onClick={() => handleSelect(f)} style={{ cursor: 'pointer' }}>
               <span className="feed-key-lookup-title">{f.title}</span>
               <code className="feed-key-lookup-key">{f.api_key}</code>
-              {inserted === f.api_key && <span className="feed-key-inserted">Inserted</span>}
+              {inserted === f.id && <span className="feed-key-inserted">Inserted</span>}
             </div>
           ))}
         </div>
@@ -560,7 +588,7 @@ function ScheduleForm({ initial, channels, onSave, onCancel }) {
   const [cronExpr, setCronExpr] = useState(initial.cron_expr || '0 9 * * *')
   const [enabled, setEnabled] = useState(initial.enabled !== false)
   const [activeMsg, setActiveMsg] = useState(0)
-  const [showFeedKeys, setShowFeedKeys] = useState(false)
+  const [feedPostMode, setFeedPostMode] = useState(null) // null | 'markup' | 'document'
 
   const updateMsg = (idx, val) => {
     if (val.length > MSG_CHAR_LIMIT) return
@@ -670,15 +698,19 @@ function ScheduleForm({ initial, channels, onSave, onCancel }) {
             />
             <div className="schedule-msg-tools">
               <span className="schedule-msg-tools-label">Tools</span>
-              <button type="button" className="schedule-msg-tool-btn" onClick={() => { setActiveMsg(idx); setShowFeedKeys(true) }}>
+              <button type="button" className="schedule-msg-tool-btn" onClick={() => { setActiveMsg(idx); setFeedPostMode('markup') }}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
-                Feed Keys
+                Post Feed Markup
+              </button>
+              <button type="button" className="schedule-msg-tool-btn" onClick={() => { setActiveMsg(idx); setFeedPostMode('document') }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                Post Feed Document
               </button>
             </div>
           </div>
         ))}
         <button type="button" className="schedule-add-msg-btn" onClick={addMsg}>+ Add message</button>
-        {showFeedKeys && <FeedKeyModal onInsert={insertIntoActiveMsg} onClose={() => setShowFeedKeys(false)} />}
+        {feedPostMode && <FeedPostModal mode={feedPostMode} onInsert={insertIntoActiveMsg} onClose={() => setFeedPostMode(null)} />}
       </div>
       <div className="schedule-form-row schedule-form-toggle-row">
         <label>Enabled</label>

@@ -1004,6 +1004,14 @@
   color: var(--text-primary);
 }
 
+.feed-post-modal-desc {
+  margin: 0;
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
 .feed-key-modal-close {
   background: transparent;
   border: none;
