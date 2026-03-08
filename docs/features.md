@@ -158,8 +158,6 @@ Define reusable message templates that send to Agent Network channels.
 - **Message body** — the text delivered to the channel when the prompt fires
 - **Cron scheduling** — set a cron expression for recurring, automatic delivery
 - **On-demand execution** — run any prompt instantly from the desktop or mobile UI
-- **AI-generated titles** — let the LLM summarize the prompt into a short title
-- **Cooldown protection** — prevents duplicate sends to the same channel in quick succession
 
 Prompts turn Astro into an orchestration layer: schedule status checks, kick off agent workflows, or broadcast instructions to your network on a timer.
 

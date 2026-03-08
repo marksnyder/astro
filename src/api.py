@@ -1183,6 +1183,15 @@ def api_artifact_to_document(artifact_id: int):
 # ── Feed external ingest endpoint ─────────────────────────────────────────
 
 
+def _ensure_markdown(text: str) -> str:
+    """If *text* looks like HTML, convert it to Markdown; otherwise return as-is."""
+    import re
+    if re.search(r"<(?:p|div|span|h[1-6]|ul|ol|li|table|br|img|a|strong|em)\b", text, re.I):
+        from markdownify import markdownify as md
+        return md(text, heading_style="ATX", bullets="-").strip()
+    return text
+
+
 @app.post("/api/feeds/{feed_id}/ingest")
 async def api_feed_ingest(
     feed_id: int,
@@ -1195,11 +1204,14 @@ async def api_feed_ingest(
 
     Authenticate with the X-Feed-Key header matching the feed's api_key.
 
-    To send markup:
+    Content in the ``markup`` field can be Markdown or HTML.  If HTML is
+    detected it is automatically converted to Markdown before storage.
+
+    To send markup (Markdown or HTML):
       POST /api/feeds/{id}/ingest
       Content-Type: multipart/form-data
       X-Feed-Key: fk_...
-      title=...&markup=<html>...
+      title=...&markup=...
 
     To send a file:
       POST /api/feeds/{id}/ingest
@@ -1225,7 +1237,7 @@ async def api_feed_ingest(
         art = create_feed_artifact_file(feed_id, title.strip(), file.filename, data)
         return {"ok": True, "artifact_id": art.id, "content_type": "file"}
     elif markup is not None:
-        art = create_feed_artifact_markup(feed_id, title.strip(), markup)
+        art = create_feed_artifact_markup(feed_id, title.strip(), _ensure_markdown(markup))
         return {"ok": True, "artifact_id": art.id, "content_type": "markup"}
     else:
         raise HTTPException(status_code=400, detail="Provide either 'markup' or 'file'")
