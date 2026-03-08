@@ -581,6 +581,75 @@ function FeedPostModal({ mode, onInsert, onClose }) {
   )
 }
 
+function NoteToolModal({ mode, onInsert, onClose }) {
+  const [notes, setNotes] = useState([])
+  const [search, setSearch] = useState('')
+  const [inserted, setInserted] = useState(null)
+
+  useEffect(() => {
+    fetch('/api/notes').then(r => r.json()).then(setNotes).catch(() => {})
+  }, [])
+
+  const filtered = notes.filter(n => !search || n.title?.toLowerCase().includes(search.toLowerCase()) || String(n.id).includes(search))
+  const baseUrl = `${window.location.origin}/api/notes`
+  const isRead = mode === 'read'
+
+  const handleSelect = (n) => {
+    let text
+    if (isRead) {
+      text = [
+        `GET ${baseUrl}/${n.id}`,
+        ``,
+        `Response: {"id":${n.id},"title":"${n.title}","body":"...","category_id":${n.category_id ?? 'null'},"pinned":${n.pinned}}`,
+      ].join('\n')
+    } else {
+      text = [
+        `PUT ${baseUrl}/${n.id}`,
+        `Content-Type: application/json`,
+        ``,
+        `Payload: {"title":"${n.title}","body":"<new_body>","category_id":${n.category_id ?? 'null'}}`,
+        `Response: {"id":${n.id},"title":"...","body":"...","category_id":${n.category_id ?? 'null'},"pinned":${n.pinned}}`,
+      ].join('\n')
+    }
+    onInsert(text)
+    setInserted(n.id)
+    setTimeout(() => setInserted(null), 1500)
+  }
+
+  return (
+    <div className="feed-key-modal-overlay">
+      <div className="feed-key-modal">
+        <div className="feed-key-modal-header">
+          <h3>{isRead ? 'Read Note' : 'Update Note'}</h3>
+          <button type="button" className="feed-key-modal-close" onClick={onClose}>&times;</button>
+        </div>
+        <p className="feed-post-modal-desc">
+          {isRead
+            ? 'Select a note to insert a GET template into your message.'
+            : 'Select a note to insert a PUT update template into your message.'}
+        </p>
+        <input
+          className="schedule-form-input feed-key-modal-search"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search notes..."
+          autoFocus
+        />
+        <div className="feed-key-modal-list">
+          {filtered.length === 0 && <div className="feed-key-lookup-empty">No notes found</div>}
+          {filtered.map(n => (
+            <div key={n.id} className="feed-key-lookup-item" onClick={() => handleSelect(n)} style={{ cursor: 'pointer' }}>
+              <span className="feed-key-lookup-title">{n.title || 'Untitled'}</span>
+              <code className="feed-key-lookup-key">#{n.id}</code>
+              {inserted === n.id && <span className="feed-key-inserted">Inserted</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ScheduleForm({ initial, channels, onSave, onCancel }) {
   const [title, setTitle] = useState(initial.title || '')
   const [channel, setChannel] = useState(initial.channel || '#astro')
@@ -589,6 +658,7 @@ function ScheduleForm({ initial, channels, onSave, onCancel }) {
   const [enabled, setEnabled] = useState(initial.enabled !== false)
   const [activeMsg, setActiveMsg] = useState(0)
   const [feedPostMode, setFeedPostMode] = useState(null) // null | 'markup' | 'document'
+  const [noteToolMode, setNoteToolMode] = useState(null) // null | 'read' | 'update'
 
   const updateMsg = (idx, val) => {
     if (val.length > MSG_CHAR_LIMIT) return
@@ -706,11 +776,20 @@ function ScheduleForm({ initial, channels, onSave, onCancel }) {
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                 Post Feed Document
               </button>
+              <button type="button" className="schedule-msg-tool-btn" onClick={() => { setActiveMsg(idx); setNoteToolMode('read') }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                Read Note
+              </button>
+              <button type="button" className="schedule-msg-tool-btn" onClick={() => { setActiveMsg(idx); setNoteToolMode('update') }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                Update Note
+              </button>
             </div>
           </div>
         ))}
         <button type="button" className="schedule-add-msg-btn" onClick={addMsg}>+ Add message</button>
         {feedPostMode && <FeedPostModal mode={feedPostMode} onInsert={insertIntoActiveMsg} onClose={() => setFeedPostMode(null)} />}
+        {noteToolMode && <NoteToolModal mode={noteToolMode} onInsert={insertIntoActiveMsg} onClose={() => setNoteToolMode(null)} />}
       </div>
       <div className="schedule-form-row schedule-form-toggle-row">
         <label>Enabled</label>
@@ -729,7 +808,6 @@ function ScheduleForm({ initial, channels, onSave, onCancel }) {
 }
 
 function ScheduleItem({ s, onEdit, onClone, onDelete, onToggle, onRun }) {
-  const [expanded, setExpanded] = useState(false)
   const [running, setRunning] = useState(false)
   const msgs = parseMessages(s.message)
 
@@ -741,10 +819,7 @@ function ScheduleItem({ s, onEdit, onClone, onDelete, onToggle, onRun }) {
 
   return (
     <div className={`schedule-item ${s.enabled ? '' : 'disabled'}`}>
-      <div className="schedule-item-header" onClick={() => setExpanded(!expanded)} style={{ cursor: 'pointer' }}>
-        <svg className={`schedule-expand-chevron ${expanded ? 'open' : ''}`} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="9 18 15 12 9 6" />
-        </svg>
+      <div className="schedule-item-header">
         <span className="schedule-title">{s.title || msgs[0]?.slice(0, 60)}</span>
         {msgs.length > 1 && <span className="schedule-msg-badge">{msgs.length} msgs</span>}
         <span className="schedule-channel">{s.channel}</span>
@@ -778,14 +853,6 @@ function ScheduleItem({ s, onEdit, onClone, onDelete, onToggle, onRun }) {
           </button>
         </div>
       </div>
-      {expanded && (
-        <div className="schedule-item-messages">
-          {msgs.map((m, i) => (
-            <div key={i} className="schedule-item-message"><span className="schedule-item-msg-num">#{i + 1}</span> {m}</div>
-          ))}
-          {s.last_run_at && <div className="schedule-last-run">Last run: {new Date(s.last_run_at).toLocaleString()}</div>}
-        </div>
-      )}
     </div>
   )
 }

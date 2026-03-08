@@ -704,16 +704,6 @@
   outline: none;
 }
 
-.schedule-expand-chevron {
-  flex-shrink: 0;
-  transition: transform .15s;
-  color: var(--text-secondary);
-}
-
-.schedule-expand-chevron.open {
-  transform: rotate(90deg);
-}
-
 .schedule-title {
   font-weight: 600;
   font-size: 13px;
