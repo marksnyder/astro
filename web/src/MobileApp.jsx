@@ -63,10 +63,10 @@ function MobileCategorySelect({ categories, value, onChange }) {
   )
 }
 
-// ── Notes view ────────────────────────────────────────
+// ── Markups view ──────────────────────────────────────
 
-function MobileNotes({ categories, universeId }) {
-  const [notes, setNotes] = useState([])
+function MobileMarkups({ categories, universeId }) {
+  const [markups, setMarkups] = useState([])
   const [search, setSearch] = useState('')
   const [filterCatId, setFilterCatId] = useState(null)
   const [viewing, setViewing] = useState(null)
@@ -188,23 +188,23 @@ function MobileNotes({ categories, universeId }) {
     return () => { wantListeningRef.current = false; releaseWakeLock(); if (recognitionRef.current) recognitionRef.current.stop() }
   }, [editing])
 
-  const fetchNotes = useCallback(() => {
+  const fetchMarkups = useCallback(() => {
     const params = new URLSearchParams()
     if (search) params.set('q', search)
     if (filterCatId !== null) params.set('category_id', filterCatId)
     if (universeId) params.set('universe_id', universeId)
-    fetch(`/api/notes?${params}`)
+    fetch(`/api/markups?${params}`)
       .then(r => r.json())
       .then(data => {
         data.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
-        setNotes(data)
+        setMarkups(data)
       })
       .catch(() => {})
   }, [search, filterCatId, universeId])
 
-  useEffect(() => { fetchNotes() }, [universeId])
+  useEffect(() => { fetchMarkups() }, [universeId])
   useEffect(() => {
-    const t = setTimeout(fetchNotes, 300)
+    const t = setTimeout(fetchMarkups, 300)
     return () => clearTimeout(t)
   }, [search, filterCatId, universeId])
 
@@ -212,18 +212,18 @@ function MobileNotes({ categories, universeId }) {
     setEditing('new')
     const now = new Date()
     const ts = now.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
-    setTitle(`Mobile Note # ${ts}`)
+    setTitle(`Mobile Markup # ${ts}`)
     setBody('')
     setCategoryId(filterCatId ?? getLastCategoryId())
     setTimeout(() => titleRef.current?.focus(), 80)
   }
 
-  const startEdit = (note) => {
+  const startEdit = (markup) => {
     setViewing(null)
-    setEditing(note)
-    setTitle(note.title)
-    setBody(stripHtml(note.body, true))
-    setCategoryId(note.category_id)
+    setEditing(markup)
+    setTitle(markup.title)
+    setBody(stripHtml(markup.body, true))
+    setCategoryId(markup.category_id)
     setTimeout(() => titleRef.current?.focus(), 80)
   }
 
@@ -235,29 +235,29 @@ function MobileNotes({ categories, universeId }) {
     try {
       const payload = { title, body, category_id: categoryId }
       if (editing === 'new') {
-        await fetch(`/api/notes?universe_id=${universeId || 1}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        await fetch(`/api/markups?universe_id=${universeId || 1}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       } else {
-        await fetch(`/api/notes/${editing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        await fetch(`/api/markups/${editing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       }
       saveLastCategoryId(categoryId)
       setEditing(null)
-      fetchNotes()
+      fetchMarkups()
     } finally { setSaving(false) }
   }
 
-  const remove = async (note) => {
-    if (!confirm(`Delete "${note.title || 'Untitled'}"?`)) return
-    await fetch(`/api/notes/${note.id}`, { method: 'DELETE' })
+  const remove = async (markup) => {
+    if (!confirm(`Delete "${markup.title || 'Untitled'}"?`)) return
+    await fetch(`/api/markups/${markup.id}`, { method: 'DELETE' })
     setViewing(null)
     setEditing(null)
-    fetchNotes()
+    fetchMarkups()
   }
 
-  const togglePin = async (note) => {
-    const newPinned = !note.pinned
-    await fetch(`/api/notes/${note.id}/pin?pinned=${newPinned}`, { method: 'PUT' })
-    if (viewing) setViewing({ ...note, pinned: newPinned })
-    fetchNotes()
+  const togglePin = async (markup) => {
+    const newPinned = !markup.pinned
+    await fetch(`/api/markups/${markup.id}/pin?pinned=${newPinned}`, { method: 'PUT' })
+    if (viewing) setViewing({ ...markup, pinned: newPinned })
+    fetchMarkups()
   }
 
   const stripHtml = (html, preserveBreaks = false) => {
@@ -276,7 +276,7 @@ function MobileNotes({ categories, universeId }) {
   const formatDate = (iso) =>
     new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 
-  // ── View note ──────────────────────────
+  // ── View markup ─────────────────────────
   if (viewing) {
     return (
       <div className="mn-view">
@@ -284,7 +284,7 @@ function MobileNotes({ categories, universeId }) {
           <button className="mn-back-btn" onClick={() => setViewing(null)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
           </button>
-          <span className="mn-view-header-title">Note</span>
+          <span className="mn-view-header-title">Markup</span>
           <span style={{ flex: 1 }} />
           <button className={`mn-action-btn ${viewing.pinned ? 'mn-pin-active' : ''}`} onClick={() => togglePin(viewing)} title={viewing.pinned ? 'Unpin' : 'Pin to top'}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill={viewing.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l3 9h9l-7 5 3 9-8-6-8 6 3-9-7-5h9z" /></svg>
@@ -312,7 +312,7 @@ function MobileNotes({ categories, universeId }) {
     )
   }
 
-  // ── Edit / New note ────────────────────
+  // ── Edit / New markup ───────────────────
   if (editing) {
     return (
       <div className="mn-edit">
@@ -320,7 +320,7 @@ function MobileNotes({ categories, universeId }) {
           <button className="mn-back-btn" onClick={cancelEdit}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
           </button>
-          <span className="mn-view-header-title">{editing === 'new' ? 'New Note' : 'Edit Note'}</span>
+          <span className="mn-view-header-title">{editing === 'new' ? 'New Markup' : 'Edit Markup'}</span>
           <span style={{ flex: 1 }} />
           <button className={`mn-mic-header-btn ${listening ? 'active' : ''}`} onClick={toggleDictation} title={listening ? 'Stop dictation' : 'Start dictation'}>
             {listening ? (
@@ -337,38 +337,38 @@ function MobileNotes({ categories, universeId }) {
         <div className="mn-edit-body">
           <input ref={titleRef} className="mn-edit-title" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
           <MobileCategorySelect categories={categories} value={categoryId} onChange={setCategoryId} />
-          <textarea className="mn-edit-content" placeholder="Write your note..." value={body} onChange={(e) => setBody(e.target.value)} />
+          <textarea className="mn-edit-content" placeholder="Write your markup..." value={body} onChange={(e) => setBody(e.target.value)} />
         </div>
       </div>
     )
   }
 
-  // ── Notes list ─────────────────────────
+  // ── Markups list ────────────────────────
   return (
     <div className="mn-list-view">
       <div className="mn-search-bar">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-        <input className="mn-search-input" placeholder="Search notes..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        <button className="mn-new-btn" onClick={startNew} title="New note">
+        <input className="mn-search-input" placeholder="Search markups..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <button className="mn-new-btn" onClick={startNew} title="New markup">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
         </button>
       </div>
       <div className="mn-filter-bar">
         <MobileCategorySelect categories={categories} value={filterCatId} onChange={setFilterCatId} />
       </div>
-      <div className="mn-notes-list">
-        {notes.length === 0 ? (
-          <div className="mn-empty">{search || filterCatId ? 'No matching notes.' : 'No notes yet. Tap + to create one.'}</div>
-        ) : notes.map(note => (
-          <div key={note.id} className={`mn-note-card ${note.pinned ? 'pinned' : ''}`} onClick={() => setViewing(note)}>
-            <div className="mn-note-title">
-              {note.pinned && <svg className="mn-pin-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1"><path d="M12 2l3 9h9l-7 5 3 9-8-6-8 6 3-9-7-5h9z" /></svg>}
-              {note.title || 'Untitled'}
+      <div className="mn-markups-list">
+        {markups.length === 0 ? (
+          <div className="mn-empty">{search || filterCatId ? 'No matching markups.' : 'No markups yet. Tap + to create one.'}</div>
+        ) : markups.map(markup => (
+          <div key={markup.id} className={`mn-markup-card ${markup.pinned ? 'pinned' : ''}`} onClick={() => setViewing(markup)}>
+            <div className="mn-markup-title">
+              {markup.pinned && <svg className="mn-pin-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1"><path d="M12 2l3 9h9l-7 5 3 9-8-6-8 6 3-9-7-5h9z" /></svg>}
+              {markup.title || 'Untitled'}
             </div>
-            <div className="mn-note-preview">{stripHtml(note.body).slice(0, 100)}</div>
-            <div className="mn-note-card-footer">
-              <span className="mn-note-date">{formatDate(note.updated_at)}</span>
-              {note.category_id && catMap[note.category_id] && <span className="mn-cat-badge small">{catLabel(note.category_id)}</span>}
+            <div className="mn-markup-preview">{stripHtml(markup.body).slice(0, 100)}</div>
+            <div className="mn-markup-card-footer">
+              <span className="mn-markup-date">{formatDate(markup.updated_at)}</span>
+              {markup.category_id && catMap[markup.category_id] && <span className="mn-cat-badge small">{catLabel(markup.category_id)}</span>}
             </div>
           </div>
         ))}
@@ -525,7 +525,7 @@ function MobileActions({ categories, universeId }) {
           {showCompleted ? 'Hide Completed' : 'Show Completed'}
         </button>
       </div>
-      <div className="mn-notes-list">
+      <div className="mn-markups-list">
         {items.length === 0 ? (
           <div className="mn-empty">{search ? 'No matching items.' : 'No action items. Tap + to add one.'}</div>
         ) : (() => {
@@ -734,7 +734,7 @@ title=Report&file=@report.pdf`}</pre>
       <div className="mn-filter-bar">
         <MobileCategorySelect categories={categories} value={filterCatId} onChange={setFilterCatId} />
       </div>
-      <div className="mn-notes-list">
+      <div className="mn-markups-list">
         {feeds.length === 0 ? (
           <div className="mn-empty">{search || filterCatId ? 'No matching feeds.' : 'No feeds yet. Tap + to create one.'}</div>
         ) : (() => {
@@ -763,10 +763,10 @@ title=Report&file=@report.pdf`}</pre>
                   </button>
                 </div>
                 {groups[key].map(feed => (
-                  <div key={feed.id} className="mn-note-card">
-                    <div className="mn-note-title">{feed.title || 'Untitled'}</div>
-                    <div className="mn-note-card-footer">
-                      <span className="mn-note-date">{feed.artifact_count} artifact{feed.artifact_count !== 1 ? 's' : ''}</span>
+                  <div key={feed.id} className="mn-markup-card">
+                    <div className="mn-markup-title">{feed.title || 'Untitled'}</div>
+                    <div className="mn-markup-card-footer">
+                      <span className="mn-markup-date">{feed.artifact_count} artifact{feed.artifact_count !== 1 ? 's' : ''}</span>
                       <button className="mf-edit-btn" onClick={e => { e.stopPropagation(); startEdit(feed) }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                       </button>
@@ -835,10 +835,10 @@ function MobileArtifactTimeline({ category, onBack }) {
     removeFromList(id)
   }
 
-  const addAsNote = async (id) => {
-    setBusy(prev => ({ ...prev, [id]: 'note' }))
+  const addAsMarkup = async (id) => {
+    setBusy(prev => ({ ...prev, [id]: 'markup' }))
     try {
-      const res = await fetch(`/api/feed-artifacts/${id}/to-note`, { method: 'POST' })
+      const res = await fetch(`/api/feed-artifacts/${id}/to-markup`, { method: 'POST' })
       if (res.ok) {
         setBusy(prev => { const n = { ...prev }; delete n[id]; return n })
         setSaved(prev => ({ ...prev, [id]: true }))
@@ -908,9 +908,9 @@ function MobileArtifactTimeline({ category, onBack }) {
             </div>
             <div className="timeline-card-actions">
               {art.content_type === 'markup' && (
-                <button className={`timeline-action-btn ${saved[art.id] ? 'saved' : ''}`} onClick={() => addAsNote(art.id)} disabled={!!busy[art.id] || !!saved[art.id]}>
+                <button className={`timeline-action-btn ${saved[art.id] ? 'saved' : ''}`} onClick={() => addAsMarkup(art.id)} disabled={!!busy[art.id] || !!saved[art.id]}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                  {busy[art.id] === 'note' ? 'Saving...' : saved[art.id] ? 'Saved!' : 'Note'}
+                  {busy[art.id] === 'markup' ? 'Saving...' : saved[art.id] ? 'Saved!' : 'Markup'}
                 </button>
               )}
               {art.content_type === 'file' && (
@@ -1575,7 +1575,7 @@ function MobileApp() {
             </footer>
           </div>
         )}
-        {view === 'notes' && <MobileNotes categories={categories} universeId={currentUniverseId} />}
+        {view === 'markups' && <MobileMarkups categories={categories} universeId={currentUniverseId} />}
         {view === 'actions' && <MobileActions categories={categories} universeId={currentUniverseId} />}
         {view === 'feeds' && <MobileFeeds categories={categories} universeId={currentUniverseId} />}
       </div>
@@ -1586,9 +1586,9 @@ function MobileApp() {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
           <span>Chat</span>
         </button>
-        <button className={`m-tab ${view === 'notes' ? 'active' : ''}`} onClick={() => setView('notes')}>
+        <button className={`m-tab ${view === 'markups' ? 'active' : ''}`} onClick={() => setView('markups')}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
-          <span>Notes</span>
+          <span>Markups</span>
         </button>
         <button className={`m-tab ${view === 'actions' ? 'active' : ''}`} onClick={() => setView('actions')}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z" /></svg>

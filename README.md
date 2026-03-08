@@ -2,7 +2,7 @@
 
 **Your Universe, Organized.**
 
-Astro is a self-hosted, AI-powered workspace that brings chat, notes, documents, action items, bookmarks, and autonomous agents into one platform. Everything lives inside **Universes** — cleanly separated workspaces that keep your knowledge organized and contained.
+Astro is a self-hosted, AI-powered workspace that brings chat, markups, documents, action items, bookmarks, and autonomous agents into one platform. Everything lives inside **Universes** — cleanly separated workspaces that keep your knowledge organized and contained.
 
 [Documentation](https://runastro.sh) · [Chrome/Edge Extension](https://chromewebstore.google.com/detail/astro-browse/djbiamicfibnldnmhfnmndpdmghilmmi)
 
@@ -11,10 +11,10 @@ Astro is a self-hosted, AI-powered workspace that brings chat, notes, documents,
 ## Features
 
 ### AI Chat with Retrieval (RAG)
-Conversational AI with retrieval you can toggle per message. When enabled, answers are grounded in your notes, documents, and action items — building a persistent knowledgebase that grows with use.
+Conversational AI with retrieval you can toggle per message. When enabled, answers are grounded in your markups, documents, and action items — building a persistent knowledgebase that grows with use.
 
-### Notes
-Create and organize structured notes with rich formatting, embedded images, category assignment, and full-text search. Every note is automatically included in AI retrieval context.
+### Markups
+Create and organize structured markups with rich formatting, embedded images, category assignment, and full-text search. Every markup is automatically included in AI retrieval context.
 
 ### Document Archive
 Upload PDF, DOCX, XLSX, PPTX, TXT, MD, and CSV files. Documents are automatically ingested and embedded so they become queryable memory — not just storage. Includes inline PDF viewing and Excel rendering as styled tables.
@@ -26,13 +26,13 @@ Track tasks with priority flags, due dates, and categories. Tasks integrate dire
 Save and organize links with titles, URLs, and categories. Links become part of your searchable knowledge base.
 
 ### Universes
-Isolate all content — notes, documents, tasks, links, and categories — into independent workspaces. Use separate Universes for work, personal projects, research, clients, or agent environments.
+Isolate all content — markups, documents, tasks, links, and categories — into independent workspaces. Use separate Universes for work, personal projects, research, clients, or agent environments.
 
 ### Hierarchical Categories
-A parent/child category tree organizes content across notes, documents, tasks, and links with consistent structure. Assign emojis to categories for quick visual identification.
+A parent/child category tree organizes content across markups, documents, tasks, and links with consistent structure. Assign emojis to categories for quick visual identification.
 
 ### Pinned Items Bar
-Pin important notes, documents, links, and feeds to a unified header bar for quick access.
+Pin important markups, documents, links, and feeds to a unified header bar for quick access.
 
 ### AI Agent Network
 A built-in IRC server enables communication with AI agents across platforms. Coordinate agents, communicate across systems, and integrate with external AI platforms from one central hub.
@@ -127,7 +127,7 @@ Create an auth key at [login.tailscale.com/admin/settings/keys](https://login.ta
 1. Open **http://localhost:8000**
 2. Click the gear icon to open Settings
 3. Enter your **OpenAI API key** (required for chat and embeddings)
-4. Start uploading documents, creating notes, or chatting
+4. Start uploading documents, creating markups, or chatting
 
 ---
 

@@ -65,7 +65,7 @@ function launchFireworks() {
 /* ── Small link-picker component ─────────────────────────────────── */
 
 function LinkPicker({ actionItemId, links, onLinksChange }) {
-  const [mode, setMode] = useState(null) // null | 'note' | 'document'
+  const [mode, setMode] = useState(null) // null | 'markup' | 'document'
   const [searchQ, setSearchQ] = useState('')
   const [results, setResults] = useState([])
   const inputRef = useRef(null)
@@ -73,8 +73,8 @@ function LinkPicker({ actionItemId, links, onLinksChange }) {
   useEffect(() => {
     if (!mode) { setResults([]); return }
     const timer = setTimeout(() => {
-      const url = mode === 'note'
-        ? `/api/notes?q=${encodeURIComponent(searchQ)}`
+      const url = mode === 'markup'
+        ? `/api/markups?q=${encodeURIComponent(searchQ)}`
         : `/api/documents?q=${encodeURIComponent(searchQ)}`
       fetch(url).then(r => r.json()).then(data => setResults(data)).catch(() => {})
     }, 200)
@@ -88,8 +88,8 @@ function LinkPicker({ actionItemId, links, onLinksChange }) {
   }
 
   const addLink = async (item) => {
-    const body = mode === 'note'
-      ? { link_type: 'note', note_id: item.id }
+    const body = mode === 'markup'
+      ? { link_type: 'markup', markup_id: item.id }
       : { link_type: 'document', document_path: item.path }
     await fetch(`/api/action-items/${actionItemId}/links`, {
       method: 'POST',
@@ -106,11 +106,11 @@ function LinkPicker({ actionItemId, links, onLinksChange }) {
   }
 
   // Existing linked IDs to avoid duplicates in results
-  const linkedNoteIds = new Set(links.filter(l => l.link_type === 'note').map(l => l.note_id))
+  const linkedMarkupIds = new Set(links.filter(l => l.link_type === 'markup').map(l => l.markup_id))
   const linkedDocPaths = new Set(links.filter(l => l.link_type === 'document').map(l => l.document_path))
 
-  const filtered = mode === 'note'
-    ? results.filter(r => !linkedNoteIds.has(r.id))
+  const filtered = mode === 'markup'
+    ? results.filter(r => !linkedMarkupIds.has(r.id))
     : results.filter(r => !linkedDocPaths.has(r.path))
 
   return (
@@ -118,12 +118,12 @@ function LinkPicker({ actionItemId, links, onLinksChange }) {
       <div className="ai-links-header">
         <span className="ai-links-label">Linked Items</span>
         <div className="ai-links-add-btns">
-          <button className="ai-link-add-btn" onClick={() => openPicker('note')} title="Link a note">
+          <button className="ai-link-add-btn" onClick={() => openPicker('markup')} title="Link a markup">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
             </svg>
-            Note
+            Markup
           </button>
           <button className="ai-link-add-btn" onClick={() => openPicker('document')} title="Link a document">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -139,7 +139,7 @@ function LinkPicker({ actionItemId, links, onLinksChange }) {
         <div className="ai-links-list">
           {links.map((lk) => (
             <div key={lk.id} className={`ai-link-chip ${lk.link_type}`}>
-              {lk.link_type === 'note' ? (
+              {lk.link_type === 'markup' ? (
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                   <polyline points="14 2 14 8 20 8" />
@@ -166,22 +166,22 @@ function LinkPicker({ actionItemId, links, onLinksChange }) {
           <input
             ref={inputRef}
             className="ai-link-search"
-            placeholder={mode === 'note' ? 'Search notes...' : 'Search documents...'}
+            placeholder={mode === 'markup' ? 'Search markups...' : 'Search documents...'}
             value={searchQ}
             onChange={(e) => setSearchQ(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Escape') setMode(null) }}
           />
           <div className="ai-link-results">
             {filtered.length === 0 && (
-              <div className="ai-link-empty">No {mode === 'note' ? 'notes' : 'documents'} found</div>
+              <div className="ai-link-empty">No {mode === 'markup' ? 'markups' : 'documents'} found</div>
             )}
             {filtered.slice(0, 20).map((item) => (
               <button
-                key={mode === 'note' ? item.id : item.path}
+                key={mode === 'markup' ? item.id : item.path}
                 className="ai-link-result"
                 onClick={() => addLink(item)}
               >
-                {mode === 'note' ? (item.title || 'Untitled') : item.name}
+                {mode === 'markup' ? (item.title || 'Untitled') : item.name}
               </button>
             ))}
           </div>
@@ -195,7 +195,7 @@ function LinkPicker({ actionItemId, links, onLinksChange }) {
 
 /* ── Main panel ──────────────────────────────────────────────────── */
 
-function ActionItemsPanel({ categories, onOpenNote, universeId }) {
+function ActionItemsPanel({ categories, onOpenMarkup, universeId }) {
   const [items, setItems] = useState([])
   const [search, setSearch] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
@@ -384,19 +384,19 @@ function ActionItemsPanel({ categories, onOpenNote, universeId }) {
   const groups = buildGroups(filteredItems)
 
   return (
-    <div className="notes-panel">
-      <div className="notes-header">
-        <span className="notes-header-title">Action Items</span>
-        <button className="notes-add-btn" onClick={startAdd} title="New action item">
+    <div className="markups-panel">
+      <div className="markups-header">
+        <span className="markups-header-title">Action Items</span>
+        <button className="markups-add-btn" onClick={startAdd} title="New action item">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
           </svg>
         </button>
       </div>
-      <div className="notes-search">
+      <div className="markups-search">
         <div className="ai-search-row">
           <input
-            className="notes-search-input"
+            className="markups-search-input"
             placeholder="Search action items..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -414,9 +414,9 @@ function ActionItemsPanel({ categories, onOpenNote, universeId }) {
         <CategoryFilterPicker categories={categories} value={selectedCategoryId} onChange={setSelectedCategoryId} />
       </div>
 
-      <div className="notes-list">
+      <div className="markups-list">
         {filteredItems.length === 0 ? (
-          <div className="notes-empty">
+          <div className="markups-empty">
             {search || selectedCategoryId ? 'No matching action items.' : showCompleted ? 'No action items.' : 'No open action items.'}
           </div>
         ) : (
@@ -467,17 +467,17 @@ function ActionItemsPanel({ categories, onOpenNote, universeId }) {
                         {!item.completed && isOverdue(item.due_date) && <span className="ai-overdue-label">overdue</span>}
                       </div>
                     )}
-                    {item.links && item.links.filter(l => l.link_type === 'note').length > 0 && (
-                      <div className="ai-card-note-links">
-                        {item.links.filter(l => l.link_type === 'note').map(lk => (
+                    {item.links && item.links.filter(l => l.link_type === 'markup').length > 0 && (
+                      <div className="ai-card-markup-links">
+                        {item.links.filter(l => l.link_type === 'markup').map(lk => (
                           <button
                             key={lk.id}
-                            className="ai-note-link-btn"
+                            className="ai-markup-link-btn"
                             onClick={(e) => {
                               e.stopPropagation()
-                              if (onOpenNote && lk.note_id) onOpenNote(lk.note_id)
+                              if (onOpenMarkup && lk.markup_id) onOpenMarkup(lk.markup_id)
                             }}
-                            title={`Open note: ${lk.display_name}`}
+                            title={`Open markup: ${lk.display_name}`}
                           >
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -527,10 +527,10 @@ function ActionItemsPanel({ categories, onOpenNote, universeId }) {
       </div>
 
       {editing !== null && (
-        <div className="note-modal-overlay">
-          <div className="note-modal ai-modal">
-            <div className="note-modal-header">
-              <span className="note-modal-title">
+        <div className="markup-modal-overlay">
+          <div className="markup-modal ai-modal">
+            <div className="markup-modal-header">
+              <span className="markup-modal-title">
                 {editing === 'new' ? 'New Action Item' : 'Edit Action Item'}
               </span>
               <button className="quickview-close" onClick={cancelModal}>
@@ -539,10 +539,10 @@ function ActionItemsPanel({ categories, onOpenNote, universeId }) {
                 </svg>
               </button>
             </div>
-            <div className="note-modal-body">
+            <div className="markup-modal-body">
               <input
                 ref={titleRef}
-                className="note-title-input"
+                className="markup-title-input"
                 placeholder="Action item title..."
                 value={formTitle}
                 onChange={(e) => setFormTitle(e.target.value)}
@@ -611,14 +611,14 @@ function ActionItemsPanel({ categories, onOpenNote, universeId }) {
                   onLinksChange={() => { fetchLinks(editingId); fetchItems() }}
                 />
               ) : (
-                <div className="ai-links-hint">Save the item first to link notes or documents.</div>
+                <div className="ai-links-hint">Save the item first to link markups or documents.</div>
               )}
 
-              <div className="note-editor-actions">
-                <button className="note-save-btn" onClick={() => saveItem(true)} disabled={!formTitle.trim() || saving}>
+              <div className="markup-editor-actions">
+                <button className="markup-save-btn" onClick={() => saveItem(true)} disabled={!formTitle.trim() || saving}>
                   {saving ? 'Saving...' : 'Save & Close'}
                 </button>
-                <button className="note-save-continue-btn" onClick={() => saveItem(false)} disabled={!formTitle.trim() || saving}>
+                <button className="markup-save-continue-btn" onClick={() => saveItem(false)} disabled={!formTitle.trim() || saving}>
                   {saving ? 'Saving...' : 'Save'}
                 </button>
               </div>

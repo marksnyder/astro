@@ -212,11 +212,11 @@ function ArchivePanel({ categories, onPinChange, universeId }) {
   }
 
   return (
-    <div className="notes-panel">
-      <div className="notes-header">
-        <span className="notes-header-title">Documents</span>
+    <div className="markups-panel">
+      <div className="markups-header">
+        <span className="markups-header-title">Documents</span>
         <div className="archive-header-actions">
-          <button className="notes-add-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Upload document">
+          <button className="markups-add-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Upload document">
             {uploading ? (
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="spin">
                 <path d="M21 12a9 9 0 1 1-6.219-8.56" />
@@ -238,9 +238,9 @@ function ArchivePanel({ categories, onPinChange, universeId }) {
       {uploadError && (
         <div className="archive-upload-error" onClick={() => setUploadError('')}>{uploadError}</div>
       )}
-      <div className="notes-search">
+      <div className="markups-search">
         <div className="ai-search-row">
-          <input className="notes-search-input" placeholder="Search documents..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input className="markups-search-input" placeholder="Search documents..." value={search} onChange={(e) => setSearch(e.target.value)} />
           <button
             className={`linked-filter-btn ${onlyLinked ? 'active' : ''}`}
             onClick={() => setOnlyLinked(!onlyLinked)}
@@ -254,13 +254,13 @@ function ArchivePanel({ categories, onPinChange, universeId }) {
         </div>
         <CategoryFilterPicker categories={categories} value={selectedCategoryId} onChange={setSelectedCategoryId} />
       </div>
-      <div className="notes-list">
+      <div className="markups-list">
         {(() => {
           const filtered = onlyLinked && linkedDocPaths
             ? docs.filter(d => linkedDocPaths.has(d.path))
             : docs
           if (filtered.length === 0) return (
-            <div className="notes-empty">
+            <div className="markups-empty">
               {onlyLinked ? 'No documents with linked action items.' : search || selectedCategoryId ? 'No matching documents.' : 'No documents in archive.'}
             </div>
           )

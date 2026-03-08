@@ -2,7 +2,7 @@
 
 Creates a ZIP archive containing:
 - astro.db   (SQLite database)
-- images/    (note image files)
+- images/    (markup image files)
 - documents/ (uploaded documents)
 - chroma/    (ChromaDB vector store — embeddings cost money to regenerate)
 """
@@ -35,7 +35,7 @@ def create_backup(dest: Path | None = None) -> Path:
         if DB_PATH.is_file():
             zf.write(DB_PATH, "astro.db")
 
-        # 2. Note images
+        # 2. Markup images
         if IMAGES_DIR.is_dir():
             for f in IMAGES_DIR.iterdir():
                 if f.is_file():

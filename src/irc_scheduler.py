@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 from croniter import croniter
 
-from src.notes import list_scheduled_messages, mark_scheduled_message_run
+from src.markups import list_scheduled_messages, mark_scheduled_message_run
 
 
 def _parse_messages(raw: str) -> list[str]:
@@ -146,7 +146,7 @@ class IRCScheduler:
         self._record_channel_send(channel)
 
     def _send_messages(self, channel: str, messages: list[str]):
-        from src.notes import get_setting
+        from src.markups import get_setting
         try:
             port = int(get_setting("irc_port") or IRC_PORT)
         except (TypeError, ValueError):

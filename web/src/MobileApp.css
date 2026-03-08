@@ -695,7 +695,7 @@
   border-color: var(--accent);
 }
 
-/* ── Mobile notes ──────────────────────────────────── */
+/* ── Mobile markups ──────────────────────────────────── */
 
 /* List view */
 
@@ -749,13 +749,13 @@
   height: 26px;
 }
 
-.mn-notes-list {
+.mn-markups-list {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-.mn-notes-list::-webkit-scrollbar { width: 0; }
+.mn-markups-list::-webkit-scrollbar { width: 0; }
 
 .mn-empty {
   padding: 40px 24px;
@@ -764,22 +764,22 @@
   font-size: 14px;
 }
 
-.mn-note-card {
+.mn-markup-card {
   padding: 14px 16px;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   transition: background 0.1s;
 }
 
-.mn-note-card:active {
+.mn-markup-card:active {
   background: var(--bg-tertiary);
 }
 
-.mn-note-card.pinned {
+.mn-markup-card.pinned {
   background: rgba(124, 131, 247, 0.04);
 }
 
-.mn-note-title {
+.mn-markup-title {
   font-size: 15px;
   font-weight: 600;
   white-space: nowrap;
@@ -799,7 +799,7 @@
   color: var(--accent) !important;
 }
 
-.mn-note-preview {
+.mn-markup-preview {
   font-size: 13px;
   color: var(--text-secondary);
   margin-top: 3px;
@@ -809,14 +809,14 @@
   line-height: 1.4;
 }
 
-.mn-note-date {
+.mn-markup-date {
   font-size: 11px;
   color: var(--text-secondary);
   margin-top: 4px;
   opacity: 0.7;
 }
 
-/* View note */
+/* View markup */
 
 .mn-view {
   flex: 1;
@@ -905,7 +905,7 @@
   color: var(--accent);
 }
 
-/* Edit / New note */
+/* Edit / New markup */
 
 .mn-edit {
   flex: 1;
@@ -930,7 +930,7 @@
   cursor: not-allowed;
 }
 
-/* ── Header mic + save buttons (note editor) ──────── */
+/* ── Header mic + save buttons (markup editor) ──────── */
 
 .mn-mic-header-btn {
   width: 44px;
@@ -1093,14 +1093,14 @@
   margin-bottom: 20px;
 }
 
-.mn-note-card-footer {
+.mn-markup-card-footer {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-top: 4px;
 }
 
-.mn-note-card-footer .mn-note-date {
+.mn-markup-card-footer .mn-markup-date {
   margin-top: 0;
 }
 

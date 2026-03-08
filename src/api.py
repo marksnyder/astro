@@ -20,13 +20,13 @@ load_dotenv()
 
 from src.backup import create_backup, restore_backup
 from src.ingest import SUPPORTED_EXTENSIONS, chunk_documents, load_document
-from src.notes import (
+from src.markups import (
     FEED_FILES_DIR,
     IMAGES_DIR,
     action_item_link_to_dict,
     action_item_to_dict,
     add_action_item_link,
-    add_note_image,
+    add_markup_image,
     category_to_dict,
     create_action_item,
     create_category,
@@ -36,18 +36,18 @@ from src.notes import (
     list_pinned_feeds,
     list_pinned_categories,
     create_link,
-    create_note,
+    create_markup,
     create_universe,
     delete_action_item,
     delete_action_item_link,
-    delete_all_note_images,
+    delete_all_markup_images,
     delete_category,
     delete_document_meta,
     delete_feed,
     delete_feed_artifact,
     delete_link,
-    delete_note,
-    delete_note_image,
+    delete_markup,
+    delete_markup_image,
     delete_universe,
     feed_artifact_to_dict,
     feed_to_dict,
@@ -61,12 +61,12 @@ from src.notes import (
     set_feed_pinned,
     set_category_pinned,
     get_link,
-    get_note,
+    get_markup,
     get_linked_targets,
     get_universe,
     get_universe_action_item_ids,
     get_universe_document_paths,
-    get_universe_note_ids,
+    get_universe_markup_ids,
     list_action_item_links,
     list_action_items,
     list_feed_artifacts,
@@ -75,17 +75,17 @@ from src.notes import (
     get_unread_counts_by_category,
     list_feeds,
     list_links,
-    list_links_for_note,
+    list_links_for_markup,
     list_categories,
-    list_note_images,
-    list_notes,
+    list_markup_images,
+    list_markups,
     list_pinned_documents,
     list_pinned_links,
-    list_pinned_notes,
+    list_pinned_markups,
     list_universes,
     link_to_dict,
-    note_image_to_dict,
-    note_to_dict,
+    markup_image_to_dict,
+    markup_to_dict,
     update_category,
     update_feed,
     rename_universe,
@@ -93,13 +93,13 @@ from src.notes import (
     set_document_pinned,
     set_document_universe,
     set_link_pinned,
-    set_note_pinned,
+    set_markup_pinned,
     get_setting,
     set_setting,
     universe_to_dict,
     update_action_item,
     update_link,
-    update_note,
+    update_markup,
     create_scheduled_message,
     delete_scheduled_message,
     get_scheduled_message,
@@ -113,10 +113,10 @@ from src.store import (
     add_documents,
     delete_action_item_from_store,
     delete_document_chunks,
-    delete_note_from_store,
+    delete_markup_from_store,
     doc_count,
     upsert_action_item,
-    upsert_note,
+    upsert_markup,
 )
 
 DOCUMENTS_DIR = Path(__file__).resolve().parent.parent / "documents"
@@ -161,13 +161,13 @@ class StatsResponse(BaseModel):
     schema_version: int = 0
 
 
-class NoteRequest(BaseModel):
+class MarkupRequest(BaseModel):
     title: str
     body: str
     category_id: Optional[int] = None
 
 
-class NoteResponse(BaseModel):
+class MarkupResponse(BaseModel):
     id: int
     title: str
     body: str
@@ -228,8 +228,8 @@ class ActionItemUpdateRequest(BaseModel):
 
 
 class ActionItemLinkRequest(BaseModel):
-    link_type: str  # 'note' or 'document'
-    note_id: Optional[int] = None
+    link_type: str  # 'markup' or 'document'
+    markup_id: Optional[int] = None
     document_path: Optional[str] = None
 
 
@@ -237,7 +237,7 @@ class ActionItemLinkResponse(BaseModel):
     id: int
     action_item_id: int
     link_type: str
-    note_id: Optional[int]
+    markup_id: Optional[int]
     document_path: Optional[str]
     created_at: str
     # Resolved display fields
@@ -314,8 +314,8 @@ def api_delete_universe(uid: int):
         raise HTTPException(status_code=404, detail="Universe not found")
 
     # Clean up vector store entries before deleting DB rows
-    for nid in get_universe_note_ids(uid):
-        delete_note_from_store(nid)
+    for nid in get_universe_markup_ids(uid):
+        delete_markup_from_store(nid)
     for aid in get_universe_action_item_ids(uid):
         delete_action_item_from_store(aid)
     for path in get_universe_document_paths(uid):
@@ -366,60 +366,60 @@ def api_pin_category(cat_id: int, pinned: bool = True):
     return {"ok": True}
 
 
-# ── Notes ─────────────────────────────────────────────────────────────────
+# ── Markups ───────────────────────────────────────────────────────────────
 
 
-@app.get("/api/notes", response_model=list[NoteResponse])
-def api_list_notes(q: str = "", category_id: Optional[int] = None, universe_id: Optional[int] = None):
-    return [note_to_dict(n) for n in list_notes(q, category_id, universe_id=universe_id)]
+@app.get("/api/markups", response_model=list[MarkupResponse])
+def api_list_markups(q: str = "", category_id: Optional[int] = None, universe_id: Optional[int] = None):
+    return [markup_to_dict(n) for n in list_markups(q, category_id, universe_id=universe_id)]
 
 
-@app.get("/api/notes/{note_id}", response_model=NoteResponse)
-def api_get_note(note_id: int):
-    note = get_note(note_id)
-    if not note:
-        raise HTTPException(status_code=404, detail="Note not found")
-    return note_to_dict(note)
+@app.get("/api/markups/{markup_id}", response_model=MarkupResponse)
+def api_get_markup(markup_id: int):
+    markup = get_markup(markup_id)
+    if not markup:
+        raise HTTPException(status_code=404, detail="Markup not found")
+    return markup_to_dict(markup)
 
 
-@app.post("/api/notes", response_model=NoteResponse, status_code=201)
-def api_create_note(req: NoteRequest, universe_id: int = 1):
-    note = create_note(req.title, req.body, req.category_id, universe_id=universe_id)
+@app.post("/api/markups", response_model=MarkupResponse, status_code=201)
+def api_create_markup(req: MarkupRequest, universe_id: int = 1):
+    markup = create_markup(req.title, req.body, req.category_id, universe_id=universe_id)
     try:
-        upsert_note(note.id, f"{note.title}\n\n{note.body}", note.title, universe_id=universe_id)
+        upsert_markup(markup.id, f"{markup.title}\n\n{markup.body}", markup.title, universe_id=universe_id)
     except Exception as e:
-        print(f"[Astro] WARNING: Failed to upsert note {note.id} into vector store: {e}")
-    return note_to_dict(note)
+        print(f"[Astro] WARNING: Failed to upsert markup {markup.id} into vector store: {e}")
+    return markup_to_dict(markup)
 
 
-@app.put("/api/notes/{note_id}", response_model=NoteResponse)
-def api_update_note(note_id: int, req: NoteRequest):
-    note = update_note(note_id, req.title, req.body, req.category_id)
-    if not note:
-        raise HTTPException(status_code=404, detail="Note not found")
+@app.put("/api/markups/{markup_id}", response_model=MarkupResponse)
+def api_update_markup(markup_id: int, req: MarkupRequest):
+    markup = update_markup(markup_id, req.title, req.body, req.category_id)
+    if not markup:
+        raise HTTPException(status_code=404, detail="Markup not found")
     try:
-        upsert_note(note.id, f"{note.title}\n\n{note.body}", note.title, universe_id=note.universe_id)
+        upsert_markup(markup.id, f"{markup.title}\n\n{markup.body}", markup.title, universe_id=markup.universe_id)
     except Exception as e:
-        print(f"[Astro] WARNING: Failed to upsert note {note.id} into vector store: {e}")
-    return note_to_dict(note)
+        print(f"[Astro] WARNING: Failed to upsert markup {markup.id} into vector store: {e}")
+    return markup_to_dict(markup)
 
 
-@app.delete("/api/notes/{note_id}")
-def api_delete_note(note_id: int):
-    delete_all_note_images(note_id)
-    if not delete_note(note_id):
-        raise HTTPException(status_code=404, detail="Note not found")
-    delete_note_from_store(note_id)
+@app.delete("/api/markups/{markup_id}")
+def api_delete_markup(markup_id: int):
+    delete_all_markup_images(markup_id)
+    if not delete_markup(markup_id):
+        raise HTTPException(status_code=404, detail="Markup not found")
+    delete_markup_from_store(markup_id)
     return {"ok": True}
 
 
 # ── Pinned items ──────────────────────────────────────────────────────────
 
 
-@app.put("/api/notes/{note_id}/pin")
-def api_toggle_note_pin(note_id: int, pinned: bool = True):
-    if not set_note_pinned(note_id, pinned):
-        raise HTTPException(status_code=404, detail="Note not found")
+@app.put("/api/markups/{markup_id}/pin")
+def api_toggle_markup_pin(markup_id: int, pinned: bool = True):
+    if not set_markup_pinned(markup_id, pinned):
+        raise HTTPException(status_code=404, detail="Markup not found")
     return {"ok": True}
 
 
@@ -434,8 +434,8 @@ def api_toggle_document_pin(path: str, pinned: bool = True):
 
 @app.get("/api/pinned")
 def api_list_pinned(universe_id: Optional[int] = None):
-    """Return all pinned notes, documents, and links in one call."""
-    notes = [note_to_dict(n) for n in list_pinned_notes(universe_id=universe_id)]
+    """Return all pinned markups, documents, and links in one call."""
+    markups = [markup_to_dict(m) for m in list_pinned_markups(universe_id=universe_id)]
     doc_paths = list_pinned_documents(universe_id=universe_id)
     docs = []
     for rel_str in doc_paths:
@@ -450,7 +450,7 @@ def api_list_pinned(universe_id: Optional[int] = None):
     links = [link_to_dict(l) for l in list_pinned_links(universe_id=universe_id)]
     feeds = [feed_to_dict(f) for f in list_pinned_feeds(universe_id=universe_id)]
     pinned_cats = [category_to_dict(c) for c in list_pinned_categories(universe_id=universe_id)]
-    return {"notes": notes, "documents": docs, "links": links, "feeds": feeds, "feed_categories": pinned_cats}
+    return {"markups": markups, "documents": docs, "links": links, "feeds": feeds, "feed_categories": pinned_cats}
 
 
 # ── Links (bookmarks) ───────────────────────────────────────────────────
@@ -497,21 +497,21 @@ def api_toggle_link_pin(link_id: int, pinned: bool = True):
     return {"ok": True}
 
 
-# ── Note images ──────────────────────────────────────────────────────────
+# ── Markup images ────────────────────────────────────────────────────────
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"}
 
 
-@app.get("/api/notes/{note_id}/images")
-def api_list_note_images(note_id: int):
-    return [note_image_to_dict(img) for img in list_note_images(note_id)]
+@app.get("/api/markups/{markup_id}/images")
+def api_list_markup_images(markup_id: int):
+    return [markup_image_to_dict(img) for img in list_markup_images(markup_id)]
 
 
-@app.post("/api/notes/{note_id}/images", status_code=201)
-async def api_upload_note_image(note_id: int, file: UploadFile):
-    note = get_note(note_id)
-    if not note:
-        raise HTTPException(status_code=404, detail="Note not found")
+@app.post("/api/markups/{markup_id}/images", status_code=201)
+async def api_upload_markup_image(markup_id: int, file: UploadFile):
+    markup = get_markup(markup_id)
+    if not markup:
+        raise HTTPException(status_code=404, detail="Markup not found")
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
     ext = Path(file.filename).suffix.lower()
@@ -521,32 +521,32 @@ async def api_upload_note_image(note_id: int, file: UploadFile):
             detail=f"Unsupported image type: {ext}. Supported: {', '.join(sorted(IMAGE_EXTENSIONS))}",
         )
     data = await file.read()
-    img = add_note_image(note_id, file.filename, data)
-    return note_image_to_dict(img)
+    img = add_markup_image(markup_id, file.filename, data)
+    return markup_image_to_dict(img)
 
 
-@app.delete("/api/note-images/{image_id}")
-def api_delete_note_image(image_id: int):
-    if not delete_note_image(image_id):
+@app.delete("/api/markup-images/{image_id}")
+def api_delete_markup_image(image_id: int):
+    if not delete_markup_image(image_id):
         raise HTTPException(status_code=404, detail="Image not found")
     return {"ok": True}
 
 
-@app.get("/api/note-images/file/{filename}")
-def api_serve_note_image(filename: str):
+@app.get("/api/markup-images/file/{filename}")
+def api_serve_markup_image(filename: str):
     safe = (IMAGES_DIR / filename).resolve()
     if not str(safe).startswith(str(IMAGES_DIR.resolve())) or not safe.is_file():
         raise HTTPException(status_code=404, detail="Image not found")
     return FileResponse(safe)
 
 
-# ── Action items linked to a note ─────────────────────────────────────────
+# ── Action items linked to a markup ───────────────────────────────────────
 
 
-@app.get("/api/notes/{note_id}/action-items")
-def api_note_action_items(note_id: int):
-    """Return action items linked to this note (with link_id for unlinking)."""
-    return list_links_for_note(note_id)
+@app.get("/api/markups/{markup_id}/action-items")
+def api_markup_action_items(markup_id: int):
+    """Return action items linked to this markup (with link_id for unlinking)."""
+    return list_links_for_markup(markup_id)
 
 
 # ── Documents (archive) ──────────────────────────────────────────────────
@@ -746,9 +746,9 @@ def api_upload_document(file: UploadFile, universe_id: int = 1):
 
 def _resolve_link(link_dict: dict) -> dict:
     """Add display_name to a link dict."""
-    if link_dict["link_type"] == "note" and link_dict["note_id"]:
-        note = get_note(link_dict["note_id"])
-        link_dict["display_name"] = (note.title or "Untitled note") if note else "Deleted note"
+    if link_dict["link_type"] == "markup" and link_dict["markup_id"]:
+        markup = get_markup(link_dict["markup_id"])
+        link_dict["display_name"] = (markup.title or "Untitled markup") if markup else "Deleted markup"
     elif link_dict["link_type"] == "document" and link_dict["document_path"]:
         link_dict["display_name"] = Path(link_dict["document_path"]).name
     return link_dict
@@ -833,13 +833,13 @@ def api_list_action_item_links(item_id: int):
 def api_add_action_item_link(item_id: int, req: ActionItemLinkRequest):
     if not get_action_item(item_id):
         raise HTTPException(status_code=404, detail="Action item not found")
-    if req.link_type not in ("note", "document"):
-        raise HTTPException(status_code=400, detail="link_type must be 'note' or 'document'")
-    if req.link_type == "note" and not req.note_id:
-        raise HTTPException(status_code=400, detail="note_id required for note links")
+    if req.link_type not in ("markup", "document"):
+        raise HTTPException(status_code=400, detail="link_type must be 'markup' or 'document'")
+    if req.link_type == "markup" and not req.markup_id:
+        raise HTTPException(status_code=400, detail="markup_id required for markup links")
     if req.link_type == "document" and not req.document_path:
         raise HTTPException(status_code=400, detail="document_path required for document links")
-    link = add_action_item_link(item_id, req.link_type, req.note_id, req.document_path)
+    link = add_action_item_link(item_id, req.link_type, req.markup_id, req.document_path)
     return _resolve_link(action_item_link_to_dict(link))
 
 
@@ -852,7 +852,7 @@ def api_delete_action_item_link(link_id: int):
 
 @app.get("/api/action-item-links/linked-targets")
 def api_linked_targets():
-    """Return note IDs and document paths that have action-item links."""
+    """Return markup IDs and document paths that have action-item links."""
     return get_linked_targets()
 
 
@@ -924,20 +924,20 @@ def api_reindex():
     Call this after a restore to re-create all embeddings.
     """
     import traceback
-    from src.store import clear, add_documents as add_docs, upsert_note, upsert_action_item
+    from src.store import clear, add_documents as add_docs, upsert_markup, upsert_action_item
 
-    counts = {"notes": 0, "action_items": 0, "document_chunks": 0}
+    counts = {"markups": 0, "action_items": 0, "document_chunks": 0}
 
     try:
         # 1. Clear existing vector store
         print("[reindex] Clearing vector store...")
         clear()
 
-        # 2. Re-index notes
-        print("[reindex] Indexing notes...")
-        for note in list_notes():
-            upsert_note(note.id, f"{note.title}\n\n{note.body}", note.title, universe_id=note.universe_id)
-            counts["notes"] += 1
+        # 2. Re-index markups
+        print("[reindex] Indexing markups...")
+        for markup in list_markups():
+            upsert_markup(markup.id, f"{markup.title}\n\n{markup.body}", markup.title, universe_id=markup.universe_id)
+            counts["markups"] += 1
 
         # 3. Re-index action items
         print("[reindex] Indexing action items...")
@@ -1114,26 +1114,26 @@ def api_delete_feed_artifact(artifact_id: int):
     return {"ok": True}
 
 
-@app.post("/api/feed-artifacts/{artifact_id}/to-note")
-def api_artifact_to_note(artifact_id: int):
-    """Convert a markup artifact into a note, preserving links and images as Markdown."""
+@app.post("/api/feed-artifacts/{artifact_id}/to-markup")
+def api_artifact_to_markup(artifact_id: int):
+    """Convert a markup artifact into a markup, preserving links and images as Markdown."""
     from markdownify import markdownify as md
 
     art = get_feed_artifact(artifact_id)
     if not art:
         raise HTTPException(status_code=404, detail="Artifact not found")
     if art.content_type != "markup":
-        raise HTTPException(status_code=400, detail="Only markup artifacts can be converted to notes")
+        raise HTTPException(status_code=400, detail="Only markup artifacts can be converted to markups")
     feed = get_feed(art.feed_id)
     uid = feed.universe_id if feed else 1
     cat_id = feed.category_id if feed else None
     markdown_body = md(art.markup or "", heading_style="ATX", bullets="-").strip()
-    note = create_note(art.title, markdown_body, category_id=cat_id, universe_id=uid)
+    markup = create_markup(art.title, markdown_body, category_id=cat_id, universe_id=uid)
     try:
-        upsert_note(note.id, f"{note.title}\n\n{note.body}", note.title, universe_id=uid)
+        upsert_markup(markup.id, f"{markup.title}\n\n{markup.body}", markup.title, universe_id=uid)
     except Exception as e:
-        print(f"[Astro] WARNING: Failed to upsert note {note.id} into vector store: {e}")
-    return {"ok": True, "note_id": note.id}
+        print(f"[Astro] WARNING: Failed to upsert markup {markup.id} into vector store: {e}")
+    return {"ok": True, "markup_id": markup.id}
 
 
 @app.post("/api/feed-artifacts/{artifact_id}/to-document")
@@ -1625,7 +1625,7 @@ def api_query(req: QueryRequest):
 @app.get("/api/stats", response_model=StatsResponse)
 def api_stats():
     from src.migrate import get_current_version
-    from src.notes import _get_conn
+    from src.markups import _get_conn
     conn = _get_conn()
     version = get_current_version(conn)
     conn.close()

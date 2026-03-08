@@ -122,25 +122,25 @@ function LinksPanel({ categories, onPinChange, universeId }) {
   }
 
   return (
-    <aside className="notes-panel">
-      <div className="notes-header">
-        <span className="notes-header-title">Links</span>
+    <aside className="markups-panel">
+      <div className="markups-header">
+        <span className="markups-header-title">Links</span>
         <div className="archive-header-actions">
-          <button className="notes-add-btn" onClick={startNew} title="New link">
+          <button className="markups-add-btn" onClick={startNew} title="New link">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
             </svg>
           </button>
         </div>
       </div>
-      <div className="notes-search">
-        <input className="notes-search-input" placeholder="Search links..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div className="markups-search">
+        <input className="markups-search-input" placeholder="Search links..." value={search} onChange={(e) => setSearch(e.target.value)} />
         <CategoryFilterPicker categories={categories} value={selectedCategoryId} onChange={setSelectedCategoryId} />
       </div>
-      <div className="notes-list">
+      <div className="markups-list">
         {(() => {
           if (links.length === 0) return (
-            <div className="notes-empty">
+            <div className="markups-empty">
               {search || selectedCategoryId ? 'No matching links.' : 'No links yet. Click + to add one.'}
             </div>
           )
@@ -185,10 +185,10 @@ function LinksPanel({ categories, onPinChange, universeId }) {
         })()}
       </div>
       {editing !== null && (
-        <div className="note-modal-overlay">
-          <div className="note-modal link-modal">
-            <div className="note-modal-header">
-              <span className="note-modal-title">
+        <div className="markup-modal-overlay">
+          <div className="markup-modal link-modal">
+            <div className="markup-modal-header">
+              <span className="markup-modal-title">
                 {editing === 'new' ? 'New Link' : 'Edit Link'}
               </span>
               <button className="quickview-close" onClick={cancel}>
@@ -197,15 +197,15 @@ function LinksPanel({ categories, onPinChange, universeId }) {
                 </svg>
               </button>
             </div>
-            <div className="note-modal-body">
-              <input ref={titleRef} className="note-title-input" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-              <input className="note-title-input link-url-input" placeholder="https://..." value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') save() }} />
+            <div className="markup-modal-body">
+              <input ref={titleRef} className="markup-title-input" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
+              <input className="markup-title-input link-url-input" placeholder="https://..." value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') save() }} />
               <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId} />
-              <div className="note-editor-actions">
-                <button className="note-save-btn" onClick={save} disabled={saving || (!title.trim() && !url.trim())}>
+              <div className="markup-editor-actions">
+                <button className="markup-save-btn" onClick={save} disabled={saving || (!title.trim() && !url.trim())}>
                   {saving ? 'Saving...' : 'Save'}
                 </button>
-                <button className="note-delete-btn" onClick={cancel}>Cancel</button>
+                <button className="markup-delete-btn" onClick={cancel}>Cancel</button>
               </div>
             </div>
           </div>

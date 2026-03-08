@@ -11,7 +11,7 @@ from langchain_core.documents import Document
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 
-from src.notes import create_action_item, get_openai_api_key, list_categories
+from src.markups import create_action_item, get_openai_api_key, list_categories
 from src.store import get_retriever, upsert_action_item
 
 SYSTEM_PROMPT = """\
@@ -21,7 +21,7 @@ answer the question, say so clearly.
 
 The context may include different types of items:
 - Documents: uploaded files and their content
-- Notes: user-created notes
+- Markups: user-created markups
 - Action items: tasks/to-dos that may be OPEN or COMPLETED, optionally marked
   as HOT (urgent), with due dates and categories. When the user asks about
   "action items", "tasks", or "to-dos", refer to these.

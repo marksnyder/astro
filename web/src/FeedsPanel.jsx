@@ -195,24 +195,24 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
   const baseUrl = `${window.location.origin}/api/feeds`
 
   return (
-    <aside className="notes-panel">
-      <div className="notes-header">
-        <span className="notes-header-title">Feeds</span>
+    <aside className="markups-panel">
+      <div className="markups-header">
+        <span className="markups-header-title">Feeds</span>
         <div className="archive-header-actions">
-          <button className="notes-add-btn" onClick={startNew} title="New feed">
+          <button className="markups-add-btn" onClick={startNew} title="New feed">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
             </svg>
           </button>
         </div>
       </div>
-      <div className="notes-search">
-        <input className="notes-search-input" placeholder="Search feeds..." value={search} onChange={e => setSearch(e.target.value)} />
+      <div className="markups-search">
+        <input className="markups-search-input" placeholder="Search feeds..." value={search} onChange={e => setSearch(e.target.value)} />
         <CategoryFilterPicker categories={categories} value={selectedCategoryId} onChange={setSelectedCategoryId} />
       </div>
-      <div className="notes-list">
+      <div className="markups-list">
         {feeds.length === 0 ? (
-          <div className="notes-empty">
+          <div className="markups-empty">
             {search || selectedCategoryId ? 'No matching feeds.' : 'No feeds yet. Click + to create one.'}
           </div>
         ) : buildGroups(feeds).map(group => (
@@ -276,18 +276,18 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
 
       {/* Edit / Create feed modal — portaled to body to escape sidebar stacking context */}
       {editing !== null && createPortal(
-        <div className="note-modal-overlay">
-          <div className="note-modal link-modal">
-            <div className="note-modal-header">
-              <span className="note-modal-title">{editing === 'new' ? 'New Feed' : 'Edit Feed'}</span>
+        <div className="markup-modal-overlay">
+          <div className="markup-modal link-modal">
+            <div className="markup-modal-header">
+              <span className="markup-modal-title">{editing === 'new' ? 'New Feed' : 'Edit Feed'}</span>
               <button className="quickview-close" onClick={cancel}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </button>
             </div>
-            <div className="note-modal-body">
-              <input ref={titleRef} className="note-title-input" placeholder="Feed title" value={title} onChange={e => setTitle(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') save() }} />
+            <div className="markup-modal-body">
+              <input ref={titleRef} className="markup-title-input" placeholder="Feed title" value={title} onChange={e => setTitle(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') save() }} />
               <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId} />
 
               {editing !== 'new' && editing.api_key && (
@@ -329,11 +329,11 @@ title=Report&file=@report.pdf`}</pre>
                 </div>
               )}
 
-              <div className="note-editor-actions">
-                <button className="note-save-btn" onClick={save} disabled={saving || !title.trim()}>
+              <div className="markup-editor-actions">
+                <button className="markup-save-btn" onClick={save} disabled={saving || !title.trim()}>
                   {saving ? 'Saving...' : 'Save'}
                 </button>
-                <button className="note-delete-btn" onClick={cancel}>Cancel</button>
+                <button className="markup-delete-btn" onClick={cancel}>Cancel</button>
               </div>
             </div>
           </div>
@@ -411,10 +411,10 @@ export const ArtifactTimeline = memo(function ArtifactTimeline({ category, onClo
     setTotal(prev => prev - 1)
   }
 
-  const addAsNote = async (id) => {
-    setBusy(prev => ({ ...prev, [id]: 'note' }))
+  const addAsMarkup = async (id) => {
+    setBusy(prev => ({ ...prev, [id]: 'markup' }))
     try {
-      const res = await fetch(`/api/feed-artifacts/${id}/to-note`, { method: 'POST' })
+      const res = await fetch(`/api/feed-artifacts/${id}/to-markup`, { method: 'POST' })
       if (res.ok) {
         setBusy(prev => { const n = { ...prev }; delete n[id]; return n })
         setSaved(prev => ({ ...prev, [id]: true }))
@@ -461,7 +461,7 @@ export const ArtifactTimeline = memo(function ArtifactTimeline({ category, onClo
         <h3 className="timeline-title">Artifacts for {category.name}</h3>
       </div>
       <div className="timeline-search">
-        <input className="notes-search-input" placeholder="Search artifacts..." value={search} onChange={e => setSearch(e.target.value)} />
+        <input className="markups-search-input" placeholder="Search artifacts..." value={search} onChange={e => setSearch(e.target.value)} />
       </div>
       <div className="timeline-feed">
         {artifacts.length === 0 && !loading && (
@@ -487,9 +487,9 @@ export const ArtifactTimeline = memo(function ArtifactTimeline({ category, onClo
             </div>
             <div className="timeline-card-actions">
               {art.content_type === 'markup' && (
-                <button className={`timeline-action-btn ${saved[art.id] ? 'saved' : ''}`} onClick={() => addAsNote(art.id)} disabled={!!busy[art.id] || !!saved[art.id]} title="Save as note">
+                <button className={`timeline-action-btn ${saved[art.id] ? 'saved' : ''}`} onClick={() => addAsMarkup(art.id)} disabled={!!busy[art.id] || !!saved[art.id]} title="Save as markup">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                  {busy[art.id] === 'note' ? 'Saving...' : saved[art.id] ? 'Saved as Note!' : 'Save as Note'}
+                  {busy[art.id] === 'markup' ? 'Saving...' : saved[art.id] ? 'Saved as Markup!' : 'Save as Markup'}
                 </button>
               )}
               {art.content_type === 'file' && (

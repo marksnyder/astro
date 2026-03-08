@@ -10,16 +10,16 @@ Astro includes a conversational AI interface powered by OpenAI (with additional 
 
 - Chat-based interaction
 - Toggle Retrieval on/off per message
-- Answers grounded in your notes, documents, and action items
+- Answers grounded in your markups, documents, and action items
 - Persistent knowledgebase that grows with use
 
 When Retrieval is enabled, Astro pulls relevant context from your stored knowledge before generating a response — making conversations contextual and meaningful.
 
 ---
 
-## Notes
+## Markups
 
-Create and organize structured notes.
+Create and organize structured markups.
 
 - Title + body
 - Category assignment
@@ -28,7 +28,7 @@ Create and organize structured notes.
 - Fully searchable
 - Included in AI retrieval context
 
-Notes are first-class citizens in your Universe.
+Markups are first-class citizens in your Universe.
 
 ---
 
@@ -89,7 +89,7 @@ Links become part of your searchable knowledge base.
 
 ## Universes
 
-Universes isolate all content: notes, documents, tasks, links, and categories.
+Universes isolate all content: markups, documents, tasks, links, and categories.
 
 Use separate Universes for:
 
@@ -109,7 +109,7 @@ Organize everything using a parent/child category tree.
 
 Categories apply across:
 
-- Notes
+- Markups
 - Documents
 - Tasks
 - Links
@@ -120,13 +120,13 @@ This creates consistent structure across your entire workspace.
 
 ## Pinned Items Bar
 
-Pin important notes, documents, and links. They appear in a unified header bar for quick access.
+Pin important markups, documents, and links. They appear in a unified header bar for quick access.
 
 ---
 
 ## Unified Search
 
-Quickly search across notes, documents, and links. Find what you need instantly.
+Quickly search across markups, documents, and links. Find what you need instantly.
 
 ---
 
