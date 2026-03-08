@@ -1649,6 +1649,21 @@ if _static.is_dir():
     # SPA catch-all: serve index.html for client-side routes like /mobile
     _index_html = _static / "index.html"
 
+    @app.get("/sw.js")
+    def service_worker():
+        return FileResponse(
+            str(_static / "sw.js"),
+            media_type="application/javascript",
+            headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"},
+        )
+
+    @app.get("/manifest.json")
+    def pwa_manifest():
+        return FileResponse(
+            str(_static / "manifest.json"),
+            media_type="application/manifest+json",
+        )
+
     @app.get("/mobile")
     @app.get("/mobile/{rest:path}")
     def spa_mobile(rest: str = ""):
