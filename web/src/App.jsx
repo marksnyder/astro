@@ -552,7 +552,7 @@ function FeedPostModal({ mode, onInsert, onClose }) {
         `Content-Type: multipart/form-data`,
         `X-Feed-Key: ${f.api_key}`,
         ``,
-        `Payload: title=<title>&markup=<html_content>`,
+        `Payload: title=<title>&markup=<markup_content>`,
         `Response: {"ok":true,"artifact_id":<id>,"content_type":"markup"}`,
       ].join('\n')
     } else {
