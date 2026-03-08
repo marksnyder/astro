@@ -6098,6 +6098,41 @@
   overflow-y: auto;
 }
 
+.markup-inline-editor {
+  height: 100%;
+  width: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.markup-inline-editor .timeline-header {
+  flex-shrink: 0;
+  width: 85%;
+}
+
+.markup-inline-editor .timeline-header .markup-mode-toggle {
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.markup-inline-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  gap: 12px;
+  overflow-y: auto;
+  min-height: 0;
+  width: 85%;
+  margin: 0 auto;
+}
+
+.markup-inline-body .md-editor-wrapper {
+  flex: 1;
+  min-height: 200px;
+}
+
 .timeline-header {
   display: flex;
   align-items: center;

@@ -503,19 +503,121 @@ function MarkupActionItems({ markupId, categories }) {
 
 // ── Markups panel ───────────────────────────────────────
 
-function MarkupsPanel({ categories, onPinChange, editMarkupRequest, onEditMarkupRequestHandled, universeId }) {
-  const [markups, setMarkups] = useState([])
-  const [search, setSearch] = useState('')
-  const [selectedCategoryId, setSelectedCategoryId] = useState(null)
-  const [onlyLinked, setOnlyLinked] = useState(false)
-  const [linkedMarkupIds, setLinkedMarkupIds] = useState(null) // Set or null
-  const [editing, setEditing] = useState(null)
+export function MarkupEditorView({ markup, categories, onClose, onSaved }) {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [categoryId, setCategoryId] = useState(null)
   const [saving, setSaving] = useState(false)
   const [previewMode, setPreviewMode] = useState(false)
   const titleRef = useRef(null)
+  const isNew = !!markup?._new
+
+  const htmlToMarkdownText = (html) => {
+    if (!html) return ''
+    let text = html
+    text = text.replace(/<br\s*\/?>/gi, '\n')
+    text = text.replace(/<\/p>\s*<p[^>]*>/gi, '\n\n')
+    text = text.replace(/<\/div>\s*<div[^>]*>/gi, '\n')
+    const tmp = document.createElement('div')
+    tmp.innerHTML = text
+    return tmp.textContent || tmp.innerText || ''
+  }
+
+  useEffect(() => {
+    if (isNew) {
+      setTitle('')
+      setBody('')
+      setCategoryId(null)
+    } else {
+      setTitle(markup.title || '')
+      setBody(htmlToMarkdownText(markup.body))
+      setCategoryId(markup.category_id)
+    }
+    setPreviewMode(!isNew)
+    if (isNew) setTimeout(() => titleRef.current?.focus(), 50)
+  }, [markup])
+
+  const save = async (close = true) => {
+    if (!title.trim() && !body.trim()) return
+    setSaving(true)
+    try {
+      const payload = { title, body, category_id: categoryId }
+      if (isNew) {
+        const res = await fetch(`/api/markups?universe_id=${markup.universeId || 1}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        if (!close) {
+          const created = await res.json()
+          onSaved?.(created, false)
+          return
+        }
+      } else {
+        await fetch(`/api/markups/${markup.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+      }
+      onSaved?.(null, close)
+      if (close) onClose?.()
+    } finally { setSaving(false) }
+  }
+
+  const currentId = isNew ? null : markup.id
+
+  return (
+    <div className="markup-inline-editor">
+      <div className="timeline-header">
+        <button className="timeline-back-btn" onClick={onClose} title="Close editor">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+          Close
+        </button>
+        <h3 className="timeline-title">{isNew ? 'New Markup' : 'Edit Markup'}</h3>
+        <div className="markup-mode-toggle">
+          <button className={`markup-mode-btn ${!previewMode ? 'active' : ''}`} onClick={() => setPreviewMode(false)}>Edit</button>
+          <button className={`markup-mode-btn ${previewMode ? 'active' : ''}`} onClick={() => setPreviewMode(true)}>Preview</button>
+        </div>
+      </div>
+      <div className="markup-inline-body">
+        <input ref={titleRef} className="markup-title-input" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId} />
+        {previewMode ? (
+          <div className="markup-preview markdown-body">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}>{body}</ReactMarkdown>
+          </div>
+        ) : (
+          <MarkdownEditor
+            key={isNew ? 'new' : markup.id}
+            value={body}
+            onChange={setBody}
+            placeholder="Write your markup using markdown..."
+          />
+        )}
+        {currentId && <MarkupImageGallery markupId={currentId} />}
+        {currentId && <MarkupActionItems markupId={currentId} categories={categories} />}
+        <div className="markup-editor-actions">
+          <button className="markup-save-btn" onClick={() => save(true)} disabled={saving || (!title.trim() && !body.trim())}>
+            {saving ? 'Saving...' : 'Save & Close'}
+          </button>
+          <button className="markup-save-continue-btn" onClick={() => save(false)} disabled={saving || (!title.trim() && !body.trim())}>
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MarkupsPanel({ categories, onPinChange, editMarkupRequest, onEditMarkupRequestHandled, universeId, onEditMarkup, refreshKey }) {
+  const [markups, setMarkups] = useState([])
+  const [search, setSearch] = useState('')
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null)
+  const [onlyLinked, setOnlyLinked] = useState(false)
+  const [linkedMarkupIds, setLinkedMarkupIds] = useState(null)
 
   const catMap = Object.fromEntries(categories.map((c) => [c.id, c.name]))
   const catEmojiMap = Object.fromEntries(categories.map((c) => [c.id, c.emoji || null]))
@@ -538,7 +640,7 @@ function MarkupsPanel({ categories, onPinChange, editMarkupRequest, onEditMarkup
       .catch(() => {})
   }
 
-  useEffect(() => { fetchMarkups(); fetchLinkedIds() }, [universeId])
+  useEffect(() => { fetchMarkups(); fetchLinkedIds() }, [universeId, refreshKey])
   useEffect(() => {
     const timer = setTimeout(fetchMarkups, 300)
     return () => clearTimeout(timer)
@@ -546,63 +648,22 @@ function MarkupsPanel({ categories, onPinChange, editMarkupRequest, onEditMarkup
 
   useEffect(() => {
     if (editMarkupRequest) {
-      startEdit(editMarkupRequest)
+      onEditMarkup?.(editMarkupRequest)
       onEditMarkupRequestHandled?.()
     }
   }, [editMarkupRequest])
 
   const startNew = () => {
-    setEditing('new')
-    setTitle('')
-    setBody('')
-    setCategoryId(selectedCategoryId)
-    setPreviewMode(false)
-    setTimeout(() => titleRef.current?.focus(), 50)
+    onEditMarkup?.({ _new: true, universeId })
   }
 
   const startEdit = (markup) => {
-    setEditing(markup)
-    setTitle(markup.title)
-    setBody(htmlToMarkdownText(markup.body))
-    setCategoryId(markup.category_id)
-    setPreviewMode(false)
-    setTimeout(() => titleRef.current?.focus(), 50)
-  }
-
-  const cancel = () => setEditing(null)
-
-  const save = async (close = true) => {
-    if (!title.trim() && !body.trim()) return
-    setSaving(true)
-    try {
-      const payload = { title, body, category_id: categoryId }
-      if (editing === 'new') {
-        const res = await fetch(`/api/markups?universe_id=${universeId || 1}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
-        if (!close) {
-          const created = await res.json()
-          setEditing(created)
-        }
-      } else {
-        await fetch(`/api/markups/${editing.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
-      }
-      if (close) setEditing(null)
-      fetchMarkups()
-      onPinChange?.()
-    } finally { setSaving(false) }
+    onEditMarkup?.(markup)
   }
 
   const remove = async (markupId) => {
     if (!confirm('Are you sure you want to delete this markup?')) return
     await fetch(`/api/markups/${markupId}`, { method: 'DELETE' })
-    setEditing(null)
     fetchMarkups()
     onPinChange?.()
   }
@@ -613,20 +674,6 @@ function MarkupsPanel({ categories, onPinChange, editMarkupRequest, onEditMarkup
     await fetch(`/api/markups/${markup.id}/pin?pinned=${newPinned}`, { method: 'PUT' })
     fetchMarkups()
     onPinChange?.()
-  }
-
-  const formatDate = (iso) =>
-    new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-
-  const htmlToMarkdownText = (html) => {
-    if (!html) return ''
-    let text = html
-    text = text.replace(/<br\s*\/?>/gi, '\n')
-    text = text.replace(/<\/p>\s*<p[^>]*>/gi, '\n\n')
-    text = text.replace(/<\/div>\s*<div[^>]*>/gi, '\n')
-    const tmp = document.createElement('div')
-    tmp.innerHTML = text
-    return tmp.textContent || tmp.innerText || ''
   }
 
   // ── List view ────────────────────────────────────────
@@ -724,60 +771,6 @@ function MarkupsPanel({ categories, onPinChange, editMarkupRequest, onEditMarkup
           ))
         })()}
       </div>
-      {editing !== null && (
-        <div className="markup-modal-overlay">
-          <div className="markup-modal">
-            <div className="markup-modal-header">
-              <span className="markup-modal-title">
-                {editing === 'new' ? 'New Markup' : 'Edit Markup'}
-              </span>
-              <div className="markup-mode-toggle">
-                <button
-                  className={`markup-mode-btn ${!previewMode ? 'active' : ''}`}
-                  onClick={() => setPreviewMode(false)}
-                >Edit</button>
-                <button
-                  className={`markup-mode-btn ${previewMode ? 'active' : ''}`}
-                  onClick={() => setPreviewMode(true)}
-                >Preview</button>
-              </div>
-              <button className="quickview-close" onClick={cancel}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </div>
-            <div className="markup-modal-body">
-              <input ref={titleRef} className="markup-title-input" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-              <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId} />
-              {previewMode ? (
-                <div className="markup-preview markdown-body">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {body}
-                  </ReactMarkdown>
-                </div>
-              ) : (
-                <MarkdownEditor
-                  key={editing === 'new' ? 'new' : editing.id}
-                  value={body}
-                  onChange={setBody}
-                  placeholder="Write your markup using markdown..."
-                />
-              )}
-              {editing !== 'new' && <MarkupImageGallery markupId={editing.id} />}
-              {editing !== 'new' && <MarkupActionItems markupId={editing.id} categories={categories} />}
-              <div className="markup-editor-actions">
-                <button className="markup-save-btn" onClick={() => save(true)} disabled={saving || (!title.trim() && !body.trim())}>
-                  {saving ? 'Saving...' : 'Save & Close'}
-                </button>
-                <button className="markup-save-continue-btn" onClick={() => save(false)} disabled={saving || (!title.trim() && !body.trim())}>
-                  {saving ? 'Saving...' : 'Save'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </aside>
   )
 }

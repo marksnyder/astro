@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import './App.css'
-import MarkupsPanel from './MarkupsPanel'
+import MarkupsPanel, { MarkupEditorView } from './MarkupsPanel'
 import ArchivePanel from './ArchivePanel'
 import LinksPanel from './LinksPanel'
 import ActionItemsPanel from './ActionItemsPanel'
@@ -929,6 +929,8 @@ function App() {
   const [pinnedItems, setPinnedItems] = useState({ markups: [], documents: [], links: [], feed_categories: [] })
   const [quickView, setQuickView] = useState(null)
   const [editMarkupRequest, setEditMarkupRequest] = useState(null)
+  const [activeMarkup, setActiveMarkup] = useState(null)
+  const [markupRefreshKey, setMarkupRefreshKey] = useState(0)
   const [openFeedRequest, setOpenFeedRequest] = useState(null)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -1760,6 +1762,8 @@ function App() {
               editMarkupRequest={editMarkupRequest}
               onEditMarkupRequestHandled={() => setEditMarkupRequest(null)}
               universeId={currentUniverseId}
+              onEditMarkup={(m) => setActiveMarkup(m._new ? { ...m, _key: 'new' } : m)}
+              refreshKey={markupRefreshKey}
             />
           )}
           {sidebarTab === 'archive' && (
@@ -1820,7 +1824,19 @@ function App() {
         </div>
 
         <div className="chat-container">
-          {artifactViewCategory ? (
+          {activeMarkup ? (
+            <MarkupEditorView
+              markup={activeMarkup}
+              categories={categories}
+              onClose={() => setActiveMarkup(null)}
+              onSaved={(created, closed) => {
+                setMarkupRefreshKey(k => k + 1)
+                fetchPinned()
+                if (created && !closed) setActiveMarkup(created)
+                if (closed) setActiveMarkup(null)
+              }}
+            />
+          ) : artifactViewCategory ? (
             <ArtifactTimeline
               category={artifactViewCategory}
               onClose={closeArtifactView}
@@ -2012,7 +2028,7 @@ function App() {
             </>
           )}
 
-          {!artifactViewCategory && <footer className="input-area">
+          {!artifactViewCategory && !activeMarkup && <footer className="input-area">
             <form onSubmit={handleSubmit} className="input-form">
               <textarea
                 ref={inputRef}
