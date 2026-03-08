@@ -31,6 +31,17 @@ SCHEDULER_NICK = "astro-schedule"
 CHECK_INTERVAL = 30
 
 
+CHANNEL_COOLDOWN = 60
+
+
+class ChannelCooldownError(Exception):
+    """Raised when a channel is still within its send cooldown window."""
+    def __init__(self, channel: str, wait_seconds: float):
+        self.channel = channel
+        self.wait_seconds = wait_seconds
+        super().__init__(f"Channel {channel} on cooldown, {wait_seconds:.0f}s remaining")
+
+
 class IRCScheduler:
     _instance = None
     _lock = threading.Lock()
@@ -38,6 +49,8 @@ class IRCScheduler:
     def __init__(self):
         self._stopping = False
         self._thread: threading.Thread | None = None
+        self._channel_last_send: dict[str, float] = {}
+        self._channel_send_lock = threading.Lock()
 
     @classmethod
     def get(cls) -> "IRCScheduler":
@@ -69,6 +82,26 @@ class IRCScheduler:
                     return
                 time.sleep(1)
 
+    def _channel_cooldown_remaining(self, channel: str) -> float:
+        with self._channel_send_lock:
+            last = self._channel_last_send.get(channel)
+        if last is None:
+            return 0.0
+        elapsed = time.monotonic() - last
+        return max(0.0, CHANNEL_COOLDOWN - elapsed)
+
+    def _record_channel_send(self, channel: str):
+        with self._channel_send_lock:
+            self._channel_last_send[channel] = time.monotonic()
+
+    def _wait_for_channel(self, channel: str):
+        remaining = self._channel_cooldown_remaining(channel)
+        if remaining > 0:
+            print(f"[IRC Scheduler] Waiting {remaining:.0f}s for {channel} cooldown")
+            while remaining > 0 and not self._stopping:
+                time.sleep(min(remaining, 1.0))
+                remaining = self._channel_cooldown_remaining(channel)
+
     def _tick(self):
         messages = list_scheduled_messages()
         now = datetime.now(timezone.utc)
@@ -91,8 +124,13 @@ class IRCScheduler:
                     if (now - last_run).total_seconds() < 50:
                         continue
 
+                self._wait_for_channel(msg.channel)
+                if self._stopping:
+                    return
+
                 parts = _parse_messages(msg.message)
                 self._send_messages(msg.channel, parts)
+                self._record_channel_send(msg.channel)
                 mark_scheduled_message_run(msg.id)
                 print(f"[IRC Scheduler] Sent {len(parts)} message(s) to {msg.channel}")
             except Exception as e:
@@ -100,8 +138,12 @@ class IRCScheduler:
 
     def _send_message(self, channel: str, message: str):
         """Public interface used by the run-now API endpoint."""
+        remaining = self._channel_cooldown_remaining(channel)
+        if remaining > 0:
+            raise ChannelCooldownError(channel, remaining)
         parts = _parse_messages(message)
         self._send_messages(channel, parts)
+        self._record_channel_send(channel)
 
     def _send_messages(self, channel: str, messages: list[str]):
         from src.notes import get_setting

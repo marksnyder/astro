@@ -2,6 +2,61 @@ import { useState, useEffect, useRef, memo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
 
+const SANDBOXED_STYLE = `
+  html, body { margin: 0; padding: 0; background: #1a1b26 !important; color: #e1e2e8 !important; overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px; line-height: 1.6; word-break: break-word; overflow-wrap: break-word; }
+  *, *::before, *::after { color: inherit; }
+  div, section, article, main, header, footer, aside, nav, table, tr, td, th,
+  p, span, h1, h2, h3, h4, h5, h6, ul, ol, li, blockquote, pre, figure, figcaption {
+    background-color: transparent !important; color: #e1e2e8 !important; }
+  img { max-width: 100%; height: auto; border-radius: 8px; margin: 8px 0; display: block; }
+  a { color: #7c83f7 !important; }
+  p { margin: 6px 0; }
+  ul, ol { padding-left: 20px; margin: 6px 0; }
+  pre { background: rgba(0,0,0,0.2) !important; padding: 8px 12px; border-radius: 6px; overflow-x: auto; font-size: 12px; color: #e1e2e8 !important; }
+  code { background: rgba(0,0,0,0.15) !important; color: #e1e2e8 !important; }
+  blockquote { border-left: 3px solid #7c83f7; margin: 6px 0; padding: 4px 12px; color: #9ca0b0 !important; }
+  table { border-collapse: collapse; max-width: 100%; }
+  td, th { border: 1px solid #2e3044; padding: 4px 8px; }
+  hr { border-color: #2e3044; }
+`
+
+export function SandboxedMarkup({ html }) {
+  const iframeRef = useRef(null)
+  const srcdoc = `<!DOCTYPE html><html><head><base target="_blank"><style>${SANDBOXED_STYLE}</style></head><body>${html || ''}</body></html>`
+
+  useEffect(() => {
+    const iframe = iframeRef.current
+    if (!iframe) return
+
+    const resize = () => {
+      try {
+        const h = iframe.contentDocument?.documentElement?.scrollHeight
+        if (h) iframe.style.height = h + 'px'
+      } catch {}
+    }
+
+    const onLoad = () => {
+      resize()
+      setTimeout(resize, 300)
+      setTimeout(resize, 1500)
+    }
+
+    iframe.addEventListener('load', onLoad)
+    return () => iframe.removeEventListener('load', onLoad)
+  }, [html])
+
+  return (
+    <iframe
+      ref={iframeRef}
+      srcDoc={srcdoc}
+      sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+      className="sandboxed-markup-frame"
+    />
+  )
+}
+
 function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOpenFeedRequestHandled, onViewArtifacts, unreadCounts }) {
   const [feeds, setFeeds] = useState([])
   const [search, setSearch] = useState('')
@@ -421,10 +476,7 @@ export const ArtifactTimeline = memo(function ArtifactTimeline({ category, onClo
             <h4 className="timeline-card-title">{art.title || 'Untitled'}</h4>
             <div className="timeline-card-body">
               {art.content_type === 'markup' ? (
-                <div className="timeline-card-markup" dangerouslySetInnerHTML={{ __html: art.markup || '' }} onClick={e => {
-                  const a = e.target.closest('a[href]')
-                  if (a) { e.preventDefault(); window.open(a.href, '_blank', 'noopener') }
-                }} />
+                <SandboxedMarkup html={art.markup} />
               ) : (
                 <div className="timeline-card-file">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>

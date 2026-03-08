@@ -6175,6 +6175,14 @@
   padding: 8px 16px 12px;
 }
 
+.sandboxed-markup-frame {
+  width: 100%;
+  border: none;
+  min-height: 40px;
+  display: block;
+  color-scheme: dark;
+}
+
 .timeline-card-markup {
   font-size: 13px;
   line-height: 1.6;

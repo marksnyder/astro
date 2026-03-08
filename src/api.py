@@ -1503,12 +1503,17 @@ def api_run_scheduled_message(msg_id: int):
     msg = get_scheduled_message(msg_id)
     if not msg:
         raise HTTPException(status_code=404, detail="Scheduled message not found")
-    from src.irc_scheduler import IRCScheduler
+    from src.irc_scheduler import IRCScheduler, ChannelCooldownError
     sched = IRCScheduler.get()
     try:
         sched._send_message(msg.channel, msg.message)
         mark_scheduled_message_run(msg_id)
         return {"ok": True}
+    except ChannelCooldownError as e:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Channel {msg.channel} was sent to recently, wait {e.wait_seconds:.0f}s",
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to send: {e}")
 
