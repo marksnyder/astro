@@ -37,8 +37,11 @@ Pin important markups, documents, links, and feeds to a unified header bar for q
 ### AI Agent Network
 A built-in IRC server enables communication with AI agents across platforms. Coordinate agents, communicate across systems, and integrate with external AI platforms from one central hub.
 
+### Prompts
+Schedule and send messages to Agent Network channels on demand or via cron. Define reusable prompt templates with a target channel, message body, and optional cron expression for recurring delivery. Run any prompt instantly from the UI or let the scheduler fire it automatically. Prompts include AI-generated titles for easy identification.
+
 ### Feeds
-External data ingestion endpoints with API key authentication. Push markup or files into Astro from external services and scripts.
+Ingest data from external services into Astro through authenticated API endpoints. Each feed has its own API key and accepts markup or file uploads via a simple HTTP POST. Incoming artifacts are stored in a timeline view, organized by category, with full search, pagination, and pinning support. Use feeds to pipe CI reports, monitoring alerts, automated summaries, or any external content into your workspace.
 
 ### Mobile Interface
 A mobile-optimized interface at `/mobile` keeps your Universe accessible anywhere.

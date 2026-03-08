@@ -351,7 +351,6 @@ export const ArtifactTimeline = memo(function ArtifactTimeline({ category, onClo
   const [total, setTotal] = useState(0)
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [search, setSearch] = useState('')
   const [busy, setBusy] = useState({})
   const [saved, setSaved] = useState({})
   const scrollRef = useRef(null)
@@ -371,7 +370,6 @@ export const ArtifactTimeline = memo(function ArtifactTimeline({ category, onClo
     setLoading(true)
     const params = new URLSearchParams({ page: String(page), page_size: '5' })
     if (category.id !== null) params.set('category_id', category.id)
-    if (search) params.set('q', search)
     fetch(`/api/feed-artifacts/by-category?${params}`)
       .then(r => r.json())
       .then(data => {
@@ -386,11 +384,6 @@ export const ArtifactTimeline = memo(function ArtifactTimeline({ category, onClo
   }
 
   useEffect(() => { pageRef.current = 1; fetchPage(1) }, [category.id])
-  useEffect(() => {
-    pageRef.current = 1
-    const t = setTimeout(() => fetchPage(1), 300)
-    return () => clearTimeout(t)
-  }, [search])
 
   const handleScroll = () => {
     const el = scrollRef.current
@@ -460,12 +453,9 @@ export const ArtifactTimeline = memo(function ArtifactTimeline({ category, onClo
         </button>
         <h3 className="timeline-title">Artifacts for {category.name}</h3>
       </div>
-      <div className="timeline-search">
-        <input className="markups-search-input" placeholder="Search artifacts..." value={search} onChange={e => setSearch(e.target.value)} />
-      </div>
       <div className="timeline-feed">
         {artifacts.length === 0 && !loading && (
-          <div className="timeline-empty">{search ? 'No matching artifacts.' : 'No artifacts yet.'}</div>
+          <div className="timeline-empty">No artifacts yet.</div>
         )}
         {artifacts.map(art => (
           <article key={art.id} className="timeline-card">

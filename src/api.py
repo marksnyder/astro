@@ -100,13 +100,13 @@ from src.markups import (
     update_action_item,
     update_link,
     update_markup,
-    create_scheduled_message,
-    delete_scheduled_message,
-    get_scheduled_message,
-    list_scheduled_messages,
-    mark_scheduled_message_run,
-    scheduled_message_to_dict,
-    update_scheduled_message,
+    create_prompt,
+    delete_prompt,
+    get_prompt,
+    list_prompts,
+    mark_prompt_run,
+    prompt_to_dict,
+    update_prompt,
 )
 from src.query import ask, ask_direct
 from src.store import (
@@ -1455,64 +1455,63 @@ async def ws_irc(ws: WebSocket):
             pass
 
 
-# ── Scheduled Messages ─────────────────────────────────────────────────────
+# ── Prompts ────────────────────────────────────────────────────────────────
 
 
-class ScheduledMessageRequest(BaseModel):
+class PromptRequest(BaseModel):
     channel: str
     message: str
-    cron_expr: str
+    cron_expr: str = ""
     title: str = ""
-    enabled: bool = True
 
 
-@app.get("/api/scheduled-messages")
-def api_list_scheduled_messages():
-    return [scheduled_message_to_dict(m) for m in list_scheduled_messages()]
+@app.get("/api/prompts")
+def api_list_prompts():
+    return [prompt_to_dict(p) for p in list_prompts()]
 
 
-@app.post("/api/scheduled-messages", status_code=201)
-def api_create_scheduled_message(req: ScheduledMessageRequest):
+@app.post("/api/prompts", status_code=201)
+def api_create_prompt(req: PromptRequest):
     channel = req.channel.strip()
     if not channel.startswith("#"):
         channel = "#" + channel
-    msg = create_scheduled_message(channel, req.message, req.cron_expr.strip(), title=req.title.strip(), enabled=req.enabled)
-    return scheduled_message_to_dict(msg)
+    p = create_prompt(channel, req.message, req.cron_expr.strip(), title=req.title.strip())
+    return prompt_to_dict(p)
 
 
-@app.put("/api/scheduled-messages/{msg_id}")
-def api_update_scheduled_message(msg_id: int, req: ScheduledMessageRequest):
+@app.put("/api/prompts/{prompt_id}")
+def api_update_prompt(prompt_id: int, req: PromptRequest):
     channel = req.channel.strip()
     if not channel.startswith("#"):
         channel = "#" + channel
-    msg = update_scheduled_message(msg_id, channel, req.message, req.cron_expr.strip(), req.enabled, title=req.title.strip())
-    if not msg:
-        raise HTTPException(status_code=404, detail="Scheduled message not found")
-    return scheduled_message_to_dict(msg)
+    p = update_prompt(prompt_id, channel, req.message, req.cron_expr.strip(), title=req.title.strip())
+    if not p:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    return prompt_to_dict(p)
 
 
-@app.delete("/api/scheduled-messages/{msg_id}")
-def api_delete_scheduled_message(msg_id: int):
-    if not delete_scheduled_message(msg_id):
-        raise HTTPException(status_code=404, detail="Scheduled message not found")
+@app.delete("/api/prompts/{prompt_id}")
+def api_delete_prompt(prompt_id: int):
+    if not delete_prompt(prompt_id):
+        raise HTTPException(status_code=404, detail="Prompt not found")
     return {"ok": True}
 
 
-@app.post("/api/scheduled-messages/{msg_id}/run")
-def api_run_scheduled_message(msg_id: int):
-    msg = get_scheduled_message(msg_id)
-    if not msg:
-        raise HTTPException(status_code=404, detail="Scheduled message not found")
+@app.post("/api/prompts/{prompt_id}/run")
+def api_run_prompt(prompt_id: int):
+    p = get_prompt(prompt_id)
+    if not p:
+        raise HTTPException(status_code=404, detail="Prompt not found")
     from src.irc_scheduler import IRCScheduler, ChannelCooldownError
     sched = IRCScheduler.get()
     try:
-        sched._send_message(msg.channel, msg.message)
-        mark_scheduled_message_run(msg_id)
+        sched._send_message(p.channel, p.message)
+        mark_prompt_run(prompt_id)
         return {"ok": True}
     except ChannelCooldownError as e:
         raise HTTPException(
             status_code=429,
-            detail=f"Channel {msg.channel} was sent to recently, wait {e.wait_seconds:.0f}s",
+            detail=f"Channel {p.channel} was sent to recently, wait {e.wait_seconds:.0f}s",
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to send: {e}")
@@ -1524,23 +1523,23 @@ class SummarizeTitleRequest(BaseModel):
     channel: str = ""
 
 
-@app.post("/api/scheduled-messages/generate-title")
-def api_generate_schedule_title(req: SummarizeTitleRequest):
+@app.post("/api/prompts/generate-title")
+def api_generate_prompt_title(req: SummarizeTitleRequest):
     from langchain_openai import ChatOpenAI
     api_key = get_setting("openai_api_key")
     if not api_key:
         return {"title": ""}
     model = get_setting("selected_model") or "gpt-5-mini"
     llm = ChatOpenAI(model=model, api_key=api_key, max_tokens=60)
-    prompt = (
-        "Generate a short title (max 8 words) that summarizes this scheduled IRC message. "
+    prompt_text = (
+        "Generate a short title (max 8 words) that summarizes this IRC prompt message. "
         "Return ONLY the title text, no quotes or punctuation around it.\n\n"
         f"Channel: {req.channel}\n"
         f"Schedule: {req.cron_expr}\n"
         f"Message:\n{req.message}"
     )
     try:
-        resp = llm.invoke(prompt)
+        resp = llm.invoke(prompt_text)
         return {"title": resp.content.strip().strip('"').strip("'")}
     except Exception:
         return {"title": ""}

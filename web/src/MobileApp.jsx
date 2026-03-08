@@ -18,6 +18,29 @@ function ircTimestamp(ts) {
   return `${mon} ${day} ${h % 12 || 12}:${m}${ampm}`
 }
 
+const GUID_RE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi
+
+function renderTextWithGuids(text) {
+  if (!text) return text
+  const parts = []
+  let last = 0
+  for (const m of text.matchAll(GUID_RE)) {
+    if (m.index > last) parts.push(text.slice(last, m.index))
+    parts.push(
+      <span key={m.index} className="guid-chip" title={m[0]}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="3" />
+          <path d="M7 7h.01M12 7h.01M17 7h.01M7 12h.01M12 12h.01M17 12h.01M7 17h.01M12 17h.01M17 17h.01" />
+        </svg>
+      </span>
+    )
+    last = m.index + m[0].length
+  }
+  if (parts.length === 0) return text
+  if (last < text.length) parts.push(text.slice(last))
+  return parts
+}
+
 const MODELS = [
   { id: 'gpt-5.2', label: 'GPT-5.2' },
   { id: 'gpt-5.1', label: 'GPT-5.1' },
@@ -787,7 +810,6 @@ function MobileArtifactTimeline({ category, onBack }) {
   const [total, setTotal] = useState(0)
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [search, setSearch] = useState('')
   const [busy, setBusy] = useState({})
   const [saved, setSaved] = useState({})
   const scrollRef = useRef(null)
@@ -797,7 +819,6 @@ function MobileArtifactTimeline({ category, onBack }) {
     setLoading(true)
     const params = new URLSearchParams({ page: String(page), page_size: '5' })
     if (category.id !== null) params.set('category_id', category.id)
-    if (search) params.set('q', search)
     fetch(`/api/feed-artifacts/by-category?${params}`)
       .then(r => r.json())
       .then(data => {
@@ -811,11 +832,6 @@ function MobileArtifactTimeline({ category, onBack }) {
   }
 
   useEffect(() => { pageRef.current = 1; fetchPage(1) }, [category.id])
-  useEffect(() => {
-    pageRef.current = 1
-    const t = setTimeout(() => fetchPage(1), 300)
-    return () => clearTimeout(t)
-  }, [search])
 
   const handleScroll = () => {
     const el = scrollRef.current
@@ -880,13 +896,9 @@ function MobileArtifactTimeline({ category, onBack }) {
         <span className="mn-view-header-title">{category.name}</span>
         <span className="mf-total-badge">{total}</span>
       </div>
-      <div className="mn-search-bar" style={{ borderTop: '1px solid var(--border, #333)' }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-        <input className="mn-search-input" placeholder="Search artifacts..." value={search} onChange={e => setSearch(e.target.value)} />
-      </div>
       <div className="timeline-feed mobile" ref={scrollRef} onScroll={handleScroll}>
         {artifacts.length === 0 && !loading && (
-          <div className="timeline-empty">{search ? 'No matching artifacts.' : 'No artifacts yet.'}</div>
+          <div className="timeline-empty">No artifacts yet.</div>
         )}
         {artifacts.map(art => (
           <article key={art.id} className="timeline-card">
@@ -970,6 +982,29 @@ function MobileApp() {
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const [stats, setStats] = useState(null)
+  const [showPromptPicker, setShowPromptPicker] = useState(false)
+  const [mobilePrompts, setMobilePrompts] = useState([])
+  const [promptSearchQ, setPromptSearchQ] = useState('')
+  const [runningPromptId, setRunningPromptId] = useState(null)
+
+  const fetchMobilePrompts = () => {
+    fetch('/api/prompts').then(r => r.json()).then(setMobilePrompts).catch(() => {})
+  }
+
+  const openPromptPicker = () => {
+    fetchMobilePrompts()
+    setPromptSearchQ('')
+    setShowPromptPicker(true)
+  }
+
+  const runMobilePrompt = async (id) => {
+    setRunningPromptId(id)
+    try {
+      await fetch(`/api/prompts/${id}/run`, { method: 'POST' })
+    } catch {}
+    setRunningPromptId(null)
+    setShowPromptPicker(false)
+  }
 
   useEffect(() => {
     fetch('/api/stats').then(r => r.json()).then(setStats).catch(() => {})
@@ -1505,7 +1540,7 @@ function MobileApp() {
                       <div key={msg.id} className={`m-irc-msg ${msg.self ? 'm-irc-self' : ''}`}>
                         <span className="m-irc-ts">{ircTimestamp(msg.timestamp)}</span>
                         <span className="m-irc-nick">{msg.sender}</span>
-                        <span className="m-irc-text">{msg.text}</span>
+                        <span className="m-irc-text">{renderTextWithGuids(msg.text)}</span>
                       </div>
                     ))}
                     <div ref={messagesEndRef} />
@@ -1555,6 +1590,13 @@ function MobileApp() {
             {chatListening && <div className="mn-listening-bar">Listening...</div>}
             <footer className="m-input-area">
               <form className="m-input-form" onSubmit={handleSubmit}>
+                {chatMode === 'irc' && (
+                  <button type="button" className="m-prompt-picker-btn" onClick={openPromptPicker} title="Run a prompt">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" /><polygon points="10 8 16 12 10 16 10 8" />
+                    </svg>
+                  </button>
+                )}
                 <button type="button" className={`m-chat-mic-btn ${chatListening ? 'active' : ''}`} onClick={toggleChatDictation} disabled={chatMode !== 'irc' && loading}>
                   {chatListening ? (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>
@@ -1573,6 +1615,54 @@ function MobileApp() {
                 </button>
               </form>
             </footer>
+            {showPromptPicker && (
+              <div className="m-prompt-overlay" onClick={() => setShowPromptPicker(false)}>
+                <div className="m-prompt-sheet" onClick={e => e.stopPropagation()}>
+                  <div className="m-prompt-sheet-header">
+                    <span className="m-prompt-sheet-title">Run Prompt</span>
+                    <button className="m-prompt-sheet-close" onClick={() => setShowPromptPicker(false)}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                    </button>
+                  </div>
+                  <input
+                    className="m-prompt-sheet-search"
+                    placeholder="Search prompts..."
+                    value={promptSearchQ}
+                    onChange={e => setPromptSearchQ(e.target.value)}
+                    autoFocus
+                  />
+                  <div className="m-prompt-sheet-list">
+                    {mobilePrompts
+                      .filter(p => !promptSearchQ || (p.title || '').toLowerCase().includes(promptSearchQ.toLowerCase()))
+                      .map(p => (
+                        <button
+                          key={p.id}
+                          className="m-prompt-sheet-item"
+                          onClick={() => runMobilePrompt(p.id)}
+                          disabled={runningPromptId === p.id}
+                        >
+                          <div className="m-prompt-sheet-item-info">
+                            <span className="m-prompt-sheet-item-title">{p.title || 'Untitled'}</span>
+                            <span className="m-prompt-sheet-item-meta">
+                              {p.channel}
+                              {p.cron_expr ? ` \u00b7 ${p.cron_expr}` : ' \u00b7 On-demand'}
+                            </span>
+                          </div>
+                          <span className="m-prompt-sheet-run">
+                            {runningPromptId === p.id ? '...' : (
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+                            )}
+                          </span>
+                        </button>
+                      ))
+                    }
+                    {mobilePrompts.filter(p => !promptSearchQ || (p.title || '').toLowerCase().includes(promptSearchQ.toLowerCase())).length === 0 && (
+                      <div className="m-prompt-sheet-empty">{promptSearchQ ? 'No matching prompts' : 'No prompts yet'}</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
         {view === 'markups' && <MobileMarkups categories={categories} universeId={currentUniverseId} />}

@@ -1243,11 +1243,11 @@ def feed_artifact_to_dict(art: FeedArtifact) -> dict:
     return asdict(art)
 
 
-# ── Scheduled messages CRUD ───────────────────────────────────────────────
+# ── Prompts CRUD ──────────────────────────────────────────────────────────
 
 
 @dataclass
-class ScheduledMessage:
+class Prompt:
     id: int | None
     title: str
     channel: str
@@ -1259,8 +1259,8 @@ class ScheduledMessage:
     last_run_at: str | None
 
 
-def _row_to_scheduled_message(row: sqlite3.Row) -> ScheduledMessage:
-    return ScheduledMessage(
+def _row_to_prompt(row: sqlite3.Row) -> Prompt:
+    return Prompt(
         id=row["id"],
         title=row["title"],
         channel=row["channel"],
@@ -1273,62 +1273,62 @@ def _row_to_scheduled_message(row: sqlite3.Row) -> ScheduledMessage:
     )
 
 
-def list_scheduled_messages() -> list[ScheduledMessage]:
+def list_prompts() -> list[Prompt]:
     conn = _get_conn()
-    rows = conn.execute("SELECT * FROM scheduled_messages ORDER BY created_at DESC").fetchall()
+    rows = conn.execute("SELECT * FROM prompts ORDER BY created_at DESC").fetchall()
     conn.close()
-    return [_row_to_scheduled_message(r) for r in rows]
+    return [_row_to_prompt(r) for r in rows]
 
 
-def get_scheduled_message(msg_id: int) -> ScheduledMessage | None:
+def get_prompt(prompt_id: int) -> Prompt | None:
     conn = _get_conn()
-    row = conn.execute("SELECT * FROM scheduled_messages WHERE id = ?", (msg_id,)).fetchone()
+    row = conn.execute("SELECT * FROM prompts WHERE id = ?", (prompt_id,)).fetchone()
     conn.close()
-    return _row_to_scheduled_message(row) if row else None
+    return _row_to_prompt(row) if row else None
 
 
-def create_scheduled_message(channel: str, message: str, cron_expr: str, title: str = "", enabled: bool = True) -> ScheduledMessage:
+def create_prompt(channel: str, message: str, cron_expr: str = "", title: str = "") -> Prompt:
     now = _now()
     conn = _get_conn()
     cur = conn.execute(
-        "INSERT INTO scheduled_messages (title, channel, message, cron_expr, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (title, channel, message, cron_expr, int(enabled), now, now),
+        "INSERT INTO prompts (title, channel, message, cron_expr, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?)",
+        (title, channel, message, cron_expr, now, now),
     )
     conn.commit()
     mid = cur.lastrowid
     conn.close()
-    return get_scheduled_message(mid)  # type: ignore[return-value]
+    return get_prompt(mid)  # type: ignore[return-value]
 
 
-def update_scheduled_message(msg_id: int, channel: str, message: str, cron_expr: str, enabled: bool, title: str = "") -> ScheduledMessage | None:
+def update_prompt(prompt_id: int, channel: str, message: str, cron_expr: str = "", title: str = "") -> Prompt | None:
     now = _now()
     conn = _get_conn()
     cur = conn.execute(
-        "UPDATE scheduled_messages SET title = ?, channel = ?, message = ?, cron_expr = ?, enabled = ?, updated_at = ? WHERE id = ?",
-        (title, channel, message, cron_expr, int(enabled), now, msg_id),
+        "UPDATE prompts SET title = ?, channel = ?, message = ?, cron_expr = ?, enabled = 1, updated_at = ? WHERE id = ?",
+        (title, channel, message, cron_expr, now, prompt_id),
     )
     conn.commit()
     conn.close()
     if cur.rowcount == 0:
         return None
-    return get_scheduled_message(msg_id)
+    return get_prompt(prompt_id)
 
 
-def delete_scheduled_message(msg_id: int) -> bool:
+def delete_prompt(prompt_id: int) -> bool:
     conn = _get_conn()
-    cur = conn.execute("DELETE FROM scheduled_messages WHERE id = ?", (msg_id,))
+    cur = conn.execute("DELETE FROM prompts WHERE id = ?", (prompt_id,))
     conn.commit()
     conn.close()
     return cur.rowcount > 0
 
 
-def mark_scheduled_message_run(msg_id: int) -> None:
+def mark_prompt_run(prompt_id: int) -> None:
     now = _now()
     conn = _get_conn()
-    conn.execute("UPDATE scheduled_messages SET last_run_at = ? WHERE id = ?", (now, msg_id))
+    conn.execute("UPDATE prompts SET last_run_at = ? WHERE id = ?", (now, prompt_id))
     conn.commit()
     conn.close()
 
 
-def scheduled_message_to_dict(msg: ScheduledMessage) -> dict:
-    return asdict(msg)
+def prompt_to_dict(p: Prompt) -> dict:
+    return asdict(p)

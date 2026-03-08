@@ -46,6 +46,29 @@ function ircTimestamp(ts) {
   return `${mon} ${day} ${h % 12 || 12}:${m}${ampm}`
 }
 
+const GUID_RE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi
+
+function renderTextWithGuids(text) {
+  if (!text) return text
+  const parts = []
+  let last = 0
+  for (const m of text.matchAll(GUID_RE)) {
+    if (m.index > last) parts.push(text.slice(last, m.index))
+    parts.push(
+      <span key={m.index} className="guid-chip" title={m[0]}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="3" />
+          <path d="M7 7h.01M12 7h.01M17 7h.01M7 12h.01M12 12h.01M17 12h.01M7 17h.01M12 17h.01M17 17h.01" />
+        </svg>
+      </span>
+    )
+    last = m.index + m[0].length
+  }
+  if (parts.length === 0) return text
+  if (last < text.length) parts.push(text.slice(last))
+  return parts
+}
+
 function IrcMessage({ msg }) {
   if (msg.kind === 'join' || msg.kind === 'part' || msg.kind === 'quit') {
     return (
@@ -59,7 +82,7 @@ function IrcMessage({ msg }) {
     <div className={`irc-msg ${isSelf ? 'irc-self' : ''}`}>
       <span className="irc-ts">{ircTimestamp(msg.timestamp)}</span>
       <span className="irc-nick">{msg.sender}</span>
-      <span className="irc-text">{msg.text}</span>
+      <span className="irc-text">{renderTextWithGuids(msg.text)}</span>
     </div>
   )
 }
@@ -496,7 +519,7 @@ function SettingsDialog({ onClose, onRestored }) {
   )
 }
 
-const MSG_CHAR_LIMIT = 440
+const MSG_CHAR_LIMIT = 350
 
 function parseMessages(raw) {
   if (!raw) return ['']
@@ -560,7 +583,7 @@ function FeedPostModal({ mode, onInsert, onClose }) {
             : 'Select a feed to insert a document POST template into your message.'}
         </p>
         <input
-          className="schedule-form-input feed-key-modal-search"
+          className="prompt-form-input feed-key-modal-search"
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search feeds..."
@@ -629,7 +652,7 @@ function MarkupToolModal({ mode, onInsert, onClose }) {
             : 'Select a markup to insert a PUT update template into your message.'}
         </p>
         <input
-          className="schedule-form-input feed-key-modal-search"
+          className="prompt-form-input feed-key-modal-search"
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search markups..."
@@ -650,15 +673,15 @@ function MarkupToolModal({ mode, onInsert, onClose }) {
   )
 }
 
-function ScheduleForm({ initial, channels, onSave, onCancel }) {
+function PromptForm({ initial, channels, onSave, onCancel }) {
   const [title, setTitle] = useState(initial.title || '')
   const [channel, setChannel] = useState(initial.channel || '#astro')
   const [messages, setMessages] = useState(() => parseMessages(initial.message))
-  const [cronExpr, setCronExpr] = useState(initial.cron_expr || '0 9 * * *')
-  const [enabled, setEnabled] = useState(initial.enabled !== false)
+  const [cronExpr, setCronExpr] = useState(initial.cron_expr || '')
+  const [showSchedule, setShowSchedule] = useState(Boolean(initial.cron_expr))
   const [activeMsg, setActiveMsg] = useState(0)
-  const [feedPostMode, setFeedPostMode] = useState(null) // null | 'markup' | 'document'
-  const [markupToolMode, setMarkupToolMode] = useState(null) // null | 'read' | 'update'
+  const [feedPostMode, setFeedPostMode] = useState(null)
+  const [markupToolMode, setMarkupToolMode] = useState(null)
 
   const updateMsg = (idx, val) => {
     if (val.length > MSG_CHAR_LIMIT) return
@@ -688,10 +711,10 @@ function ScheduleForm({ initial, channels, onSave, onCancel }) {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (!hasContent || !cronExpr.trim() || !title.trim()) return
+    if (!hasContent || !title.trim()) return
     const cleaned = messages.filter(m => m.trim())
     const msgPayload = JSON.stringify(cleaned)
-    onSave({ id: initial.id, channel, message: msgPayload, cron_expr: cronExpr.trim(), enabled, title: title.trim() })
+    onSave({ id: initial.id, channel, message: msgPayload, cron_expr: showSchedule ? cronExpr.trim() : '', title: title.trim() })
   }
 
   const cronPresets = [
@@ -704,59 +727,67 @@ function ScheduleForm({ initial, channels, onSave, onCancel }) {
   ]
 
   return (
-    <form className="schedule-form" onSubmit={handleSubmit}>
-      <div className="schedule-form-row">
+    <form className="prompt-form" onSubmit={handleSubmit}>
+      <div className="prompt-form-row">
         <label>Title</label>
         <input
-          className="schedule-form-input"
+          className="prompt-form-input"
           value={title}
           onChange={e => setTitle(e.target.value)}
-          placeholder="Give this schedule a name..."
+          placeholder="Give this prompt a name..."
           maxLength={100}
         />
       </div>
-      <div className="schedule-form-row">
+      <div className="prompt-form-row">
         <label>Channel</label>
-        <select value={channel} onChange={e => setChannel(e.target.value)} className="schedule-form-input">
+        <select value={channel} onChange={e => setChannel(e.target.value)} className="prompt-form-input">
           {channels.filter(c => !c.name.startsWith('&')).map(c => (
             <option key={c.name} value={c.name}>{c.name}</option>
           ))}
           {!channels.find(c => c.name === channel) && <option value={channel}>{channel}</option>}
         </select>
       </div>
-      <div className="schedule-form-row">
-        <label>Cron Schedule</label>
-        <input
-          className="schedule-form-input"
-          value={cronExpr}
-          onChange={e => setCronExpr(e.target.value)}
-          placeholder="* * * * *"
-          spellCheck={false}
-        />
-        <div className="schedule-cron-presets">
-          {cronPresets.map(p => (
-            <button key={p.value} type="button" className={`schedule-preset-btn ${cronExpr === p.value ? 'active' : ''}`} onClick={() => setCronExpr(p.value)}>{p.label}</button>
-          ))}
-        </div>
-        <div className="schedule-cron-hint">min hour day month weekday</div>
+      <div className="prompt-form-row">
+        <label className="prompt-schedule-toggle-label">
+          <input type="checkbox" checked={showSchedule} onChange={e => { setShowSchedule(e.target.checked); if (e.target.checked && !cronExpr) setCronExpr('0 9 * * *') }} />
+          Schedule (optional)
+        </label>
+        {showSchedule && (
+          <>
+            <input
+              className="prompt-form-input"
+              value={cronExpr}
+              onChange={e => setCronExpr(e.target.value)}
+              placeholder="* * * * *"
+              spellCheck={false}
+            />
+            <div className="prompt-cron-presets">
+              {cronPresets.map(p => (
+                <button key={p.value} type="button" className={`prompt-preset-btn ${cronExpr === p.value ? 'active' : ''}`} onClick={() => setCronExpr(p.value)}>{p.label}</button>
+              ))}
+            </div>
+            <div className="prompt-cron-hint">min hour day month weekday</div>
+          </>
+        )}
+        {!showSchedule && <div className="prompt-ondemand-hint">On-demand only — use Run to execute</div>}
       </div>
-      <div className="schedule-form-row">
-        <label>Messages <span className="schedule-msg-count">({messages.length})</span></label>
+      <div className="prompt-form-row">
+        <label>Messages <span className="prompt-msg-count">({messages.length})</span></label>
         {messages.map((msg, idx) => (
-          <div key={idx} className={`schedule-msg-entry ${activeMsg === idx ? 'active' : ''}`}>
-            <div className="schedule-msg-entry-header">
-              <span className="schedule-msg-label">#{idx + 1}</span>
-              <span className={`schedule-msg-chars ${msg.length > MSG_CHAR_LIMIT * 0.9 ? 'warn' : ''} ${msg.length >= MSG_CHAR_LIMIT ? 'over' : ''}`}>
+          <div key={idx} className={`prompt-msg-entry ${activeMsg === idx ? 'active' : ''}`}>
+            <div className="prompt-msg-entry-header">
+              <span className="prompt-msg-label">#{idx + 1}</span>
+              <span className={`prompt-msg-chars ${msg.length > MSG_CHAR_LIMIT * 0.9 ? 'warn' : ''} ${msg.length >= MSG_CHAR_LIMIT ? 'over' : ''}`}>
                 {msg.length}/{MSG_CHAR_LIMIT}
               </span>
-              <div className="schedule-msg-entry-btns">
-                <button type="button" className="schedule-msg-move-btn" onClick={() => moveMsg(idx, -1)} disabled={idx === 0} title="Move up">&uarr;</button>
-                <button type="button" className="schedule-msg-move-btn" onClick={() => moveMsg(idx, 1)} disabled={idx === messages.length - 1} title="Move down">&darr;</button>
-                <button type="button" className="schedule-msg-remove-btn" onClick={() => removeMsg(idx)} disabled={messages.length <= 1} title="Remove">&times;</button>
+              <div className="prompt-msg-entry-btns">
+                <button type="button" className="prompt-msg-move-btn" onClick={() => moveMsg(idx, -1)} disabled={idx === 0} title="Move up">&uarr;</button>
+                <button type="button" className="prompt-msg-move-btn" onClick={() => moveMsg(idx, 1)} disabled={idx === messages.length - 1} title="Move down">&darr;</button>
+                <button type="button" className="prompt-msg-remove-btn" onClick={() => removeMsg(idx)} disabled={messages.length <= 1} title="Remove">&times;</button>
               </div>
             </div>
             <textarea
-              className="schedule-form-input schedule-form-textarea"
+              className="prompt-form-input prompt-form-textarea"
               value={msg}
               onChange={e => updateMsg(idx, e.target.value)}
               onFocus={() => setActiveMsg(idx)}
@@ -766,48 +797,42 @@ function ScheduleForm({ initial, channels, onSave, onCancel }) {
               rows={2}
               maxLength={MSG_CHAR_LIMIT}
             />
-            <div className="schedule-msg-tools">
-              <span className="schedule-msg-tools-label">Tools</span>
-              <button type="button" className="schedule-msg-tool-btn" onClick={() => { setActiveMsg(idx); setFeedPostMode('markup') }}>
+            <div className="prompt-msg-tools">
+              <span className="prompt-msg-tools-label">Tools</span>
+              <button type="button" className="prompt-msg-tool-btn" onClick={() => { setActiveMsg(idx); setFeedPostMode('markup') }}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
                 Post Feed Markup
               </button>
-              <button type="button" className="schedule-msg-tool-btn" onClick={() => { setActiveMsg(idx); setFeedPostMode('document') }}>
+              <button type="button" className="prompt-msg-tool-btn" onClick={() => { setActiveMsg(idx); setFeedPostMode('document') }}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                 Post Feed Document
               </button>
-              <button type="button" className="schedule-msg-tool-btn" onClick={() => { setActiveMsg(idx); setMarkupToolMode('read') }}>
+              <button type="button" className="prompt-msg-tool-btn" onClick={() => { setActiveMsg(idx); setMarkupToolMode('read') }}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 Read Markup
               </button>
-              <button type="button" className="schedule-msg-tool-btn" onClick={() => { setActiveMsg(idx); setMarkupToolMode('update') }}>
+              <button type="button" className="prompt-msg-tool-btn" onClick={() => { setActiveMsg(idx); setMarkupToolMode('update') }}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 Update Markup
               </button>
             </div>
           </div>
         ))}
-        <button type="button" className="schedule-add-msg-btn" onClick={addMsg}>+ Add message</button>
+        <button type="button" className="prompt-add-msg-btn" onClick={addMsg}>+ Add message</button>
         {feedPostMode && <FeedPostModal mode={feedPostMode} onInsert={insertIntoActiveMsg} onClose={() => setFeedPostMode(null)} />}
         {markupToolMode && <MarkupToolModal mode={markupToolMode} onInsert={insertIntoActiveMsg} onClose={() => setMarkupToolMode(null)} />}
       </div>
-      <div className="schedule-form-row schedule-form-toggle-row">
-        <label>Enabled</label>
-        <button type="button" className={`schedule-toggle ${enabled ? 'on' : 'off'}`} onClick={() => setEnabled(!enabled)}>
-          {enabled ? 'ON' : 'OFF'}
-        </button>
-      </div>
-      <div className="schedule-form-actions">
-        <button type="submit" className="schedule-save-btn" disabled={!hasContent || !title.trim()}>
+      <div className="prompt-form-actions">
+        <button type="submit" className="prompt-save-btn" disabled={!hasContent || !title.trim()}>
           {initial.id ? 'Update' : 'Create'}
         </button>
-        <button type="button" className="schedule-cancel-btn" onClick={onCancel}>Cancel</button>
+        <button type="button" className="prompt-cancel-btn" onClick={onCancel}>Cancel</button>
       </div>
     </form>
   )
 }
 
-function ScheduleItem({ s, onEdit, onClone, onDelete, onToggle, onRun }) {
+function PromptItem({ s, onEdit, onClone, onDelete, onRun }) {
   const [running, setRunning] = useState(false)
   const msgs = parseMessages(s.message)
 
@@ -817,35 +842,38 @@ function ScheduleItem({ s, onEdit, onClone, onDelete, onToggle, onRun }) {
     try { await onRun(s.id) } finally { setRunning(false) }
   }
 
+  const isScheduled = s.cron_expr && s.cron_expr.trim()
+
   return (
-    <div className={`schedule-item ${s.enabled ? '' : 'disabled'}`}>
-      <div className="schedule-item-header">
-        <span className="schedule-title">{s.title || msgs[0]?.slice(0, 60)}</span>
-        {msgs.length > 1 && <span className="schedule-msg-badge">{msgs.length} msgs</span>}
-        <span className="schedule-channel">{s.channel}</span>
-        <code className="schedule-cron">{s.cron_expr}</code>
-        <span className={`schedule-status ${s.enabled ? 'on' : 'off'}`} onClick={e => { e.stopPropagation(); onToggle(s) }} title={s.enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}>
-          {s.enabled ? 'ON' : 'OFF'}
-        </span>
-        <div className="schedule-item-inline-actions" onClick={e => e.stopPropagation()}>
-          <button className="schedule-inline-btn" onClick={() => onEdit(s)} title="Edit">
+    <div className="prompt-item">
+      <div className="prompt-item-header">
+        <span className="prompt-title">{s.title || msgs[0]?.slice(0, 60)}</span>
+        {msgs.length > 1 && <span className="prompt-msg-badge">{msgs.length} msgs</span>}
+        <span className="prompt-channel">{s.channel}</span>
+        {isScheduled ? (
+          <code className="prompt-cron">{s.cron_expr}</code>
+        ) : (
+          <span className="prompt-ondemand-badge">On-demand</span>
+        )}
+        <div className="prompt-item-inline-actions" onClick={e => e.stopPropagation()}>
+          <button className="prompt-inline-btn" onClick={() => onEdit(s)} title="Edit">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
             </svg>
           </button>
-          <button className="schedule-inline-btn" onClick={() => onClone(s)} title="Clone">
+          <button className="prompt-inline-btn" onClick={() => onClone(s)} title="Clone">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
             </svg>
           </button>
-          <button className="schedule-inline-btn run" onClick={handleRun} disabled={running} title="Run now">
+          <button className="prompt-inline-btn run" onClick={handleRun} disabled={running} title="Run now">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polygon points="5 3 19 12 5 21 5 3" />
             </svg>
           </button>
-          <button className="schedule-inline-btn delete" onClick={() => onDelete(s.id)} title="Delete">
+          <button className="prompt-inline-btn delete" onClick={() => onDelete(s.id)} title="Delete">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
               <path d="M10 11v6" /><path d="M14 11v6" />
@@ -882,10 +910,11 @@ function App() {
   const [showHiddenChannels, setShowHiddenChannels] = useState(false)
   const [unreadCounts, setUnreadCounts] = useState({})
   const lastSeenTsRef = useRef({})
-  const [showSchedulePanel, setShowSchedulePanel] = useState(false)
-  const [schedules, setSchedules] = useState([])
-  const [scheduleEditing, setScheduleEditing] = useState(null)
-  const [scheduleFilterChannel, setScheduleFilterChannel] = useState('')
+  const [showPromptPanel, setShowPromptPanel] = useState(false)
+  const [prompts, setPrompts] = useState([])
+  const [promptEditing, setPromptEditing] = useState(null)
+  const [promptFilterChannel, setPromptFilterChannel] = useState('')
+  const [promptSearch, setPromptSearch] = useState('')
   const [universes, setUniverses] = useState([])
   const [currentUniverseId, setCurrentUniverseId] = useState(null)
   const [sidebarTab, setSidebarTab] = useState('actions')
@@ -1020,44 +1049,35 @@ function App() {
       .catch(() => {})
   }
 
-  const fetchSchedules = () => {
-    fetch('/api/scheduled-messages')
+  const fetchPrompts = () => {
+    fetch('/api/prompts')
       .then(r => r.json())
-      .then(setSchedules)
+      .then(setPrompts)
       .catch(() => {})
   }
 
-  const saveSchedule = async (data) => {
+  const savePrompt = async (data) => {
     const method = data.id ? 'PUT' : 'POST'
-    const url = data.id ? `/api/scheduled-messages/${data.id}` : '/api/scheduled-messages'
+    const url = data.id ? `/api/prompts/${data.id}` : '/api/prompts'
     await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     })
-    fetchSchedules()
-    setScheduleEditing(null)
+    fetchPrompts()
+    setPromptEditing(null)
   }
 
-  const deleteSchedule = async (id) => {
-    if (!confirm('Delete this scheduled message?')) return
-    await fetch(`/api/scheduled-messages/${id}`, { method: 'DELETE' })
-    fetchSchedules()
+  const deletePrompt = async (id) => {
+    if (!confirm('Delete this prompt?')) return
+    await fetch(`/api/prompts/${id}`, { method: 'DELETE' })
+    fetchPrompts()
   }
 
-  const toggleScheduleEnabled = async (sched) => {
-    await fetch(`/api/scheduled-messages/${sched.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...sched, enabled: !sched.enabled }),
-    })
-    fetchSchedules()
-  }
-
-  const runScheduleNow = async (id) => {
+  const runPromptNow = async (id) => {
     try {
-      await fetch(`/api/scheduled-messages/${id}/run`, { method: 'POST' })
-      fetchSchedules()
+      await fetch(`/api/prompts/${id}/run`, { method: 'POST' })
+      fetchPrompts()
     } catch {}
   }
 
@@ -1867,14 +1887,14 @@ function App() {
                   </button>
                 )}
                 <button
-                  className="irc-channel-tab irc-schedule-tab"
-                  onClick={() => { setShowSchedulePanel(true); fetchSchedules() }}
-                  title="Scheduled messages"
+                  className="irc-channel-tab irc-prompt-tab"
+                  onClick={() => { setShowPromptPanel(true); fetchPrompts() }}
+                  title="Prompts"
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
                   </svg>
-                  Schedules
+                  Prompts
                 </button>
               </div>
               <div className="irc-chat-body">
@@ -2058,50 +2078,55 @@ function App() {
           onRefresh={fetchUniverses}
         />
       )}
-      {showSchedulePanel && (
-        <div className="schedule-modal-overlay">
-          <div className="schedule-modal">
-            <div className="schedule-panel-header">
-              <h3>Scheduled Messages</h3>
+      {showPromptPanel && (
+        <div className="prompt-modal-overlay">
+          <div className="prompt-modal">
+            <div className="prompt-panel-header">
+              <h3>Prompts</h3>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <select className="schedule-filter-select" value={scheduleFilterChannel} onChange={e => setScheduleFilterChannel(e.target.value)}>
+                <select className="prompt-filter-select" value={promptFilterChannel} onChange={e => setPromptFilterChannel(e.target.value)}>
                   <option value="">All channels</option>
-                  {[...new Set(schedules.map(s => s.channel))].sort().map(ch => (
+                  {[...new Set(prompts.map(s => s.channel))].sort().map(ch => (
                     <option key={ch} value={ch}>{ch}</option>
                   ))}
                 </select>
-                <button className="schedule-add-btn" onClick={() => setScheduleEditing({ channel: '#astro', message: '', cron_expr: '0 9 * * *', enabled: true })}>
+                <button className="prompt-add-btn" onClick={() => setPromptEditing({ channel: '#astro', message: '', cron_expr: '' })}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
                   </svg>
                   New
                 </button>
-                <button className="quickview-close" onClick={() => { setShowSchedulePanel(false); setScheduleEditing(null); setScheduleFilterChannel('') }}>
+                <button className="quickview-close" onClick={() => { setShowPromptPanel(false); setPromptEditing(null); setPromptFilterChannel(''); setPromptSearch('') }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                   </svg>
                 </button>
               </div>
             </div>
-            {scheduleEditing ? (
-              <ScheduleForm
-                initial={scheduleEditing}
+            {promptEditing ? (
+              <PromptForm
+                initial={promptEditing}
                 channels={ircChannels}
-                onSave={saveSchedule}
-                onCancel={() => setScheduleEditing(null)}
+                onSave={savePrompt}
+                onCancel={() => setPromptEditing(null)}
               />
             ) : (
-              <div className="schedule-list">
-                {schedules.filter(s => !scheduleFilterChannel || s.channel === scheduleFilterChannel).length === 0 && (
-                  <div className="schedule-empty">No scheduled messages{scheduleFilterChannel ? ` for ${scheduleFilterChannel}` : ''}</div>
+              <div className="prompt-list">
+                <input
+                  className="prompt-search-input"
+                  value={promptSearch}
+                  onChange={e => setPromptSearch(e.target.value)}
+                  placeholder="Search prompts..."
+                />
+                {prompts.filter(s => (!promptFilterChannel || s.channel === promptFilterChannel) && (!promptSearch || (s.title || '').toLowerCase().includes(promptSearch.toLowerCase()))).length === 0 && (
+                  <div className="prompt-empty">No prompts{promptFilterChannel ? ` for ${promptFilterChannel}` : ''}{promptSearch ? ` matching "${promptSearch}"` : ''}</div>
                 )}
-                {schedules.filter(s => !scheduleFilterChannel || s.channel === scheduleFilterChannel).map(s => (
-                  <ScheduleItem key={s.id} s={s}
-                    onEdit={setScheduleEditing}
-                    onClone={(sched) => setScheduleEditing({ ...sched, id: undefined, title: `${sched.title || ''} (copy)`.trim() })}
-                    onDelete={deleteSchedule}
-                    onToggle={toggleScheduleEnabled}
-                    onRun={runScheduleNow}
+                {prompts.filter(s => (!promptFilterChannel || s.channel === promptFilterChannel) && (!promptSearch || (s.title || '').toLowerCase().includes(promptSearch.toLowerCase()))).map(s => (
+                  <PromptItem key={s.id} s={s}
+                    onEdit={setPromptEditing}
+                    onClone={(p) => setPromptEditing({ ...p, id: undefined, title: `${p.title || ''} (copy)`.trim() })}
+                    onDelete={deletePrompt}
+                    onRun={runPromptNow}
                   />
                 ))}
               </div>

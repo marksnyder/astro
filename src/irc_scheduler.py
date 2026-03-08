@@ -1,18 +1,20 @@
-"""Background scheduler that sends IRC messages on cron schedules.
+"""Background scheduler that sends IRC prompt messages on cron schedules.
 
-Uses a dedicated nick ('astro-schedule') that joins a channel, sends the
-message, then parts — keeping the channel clean between scheduled posts.
+Only prompts with a non-empty cron_expr are scheduled; on-demand prompts
+are skipped.  Uses a dedicated nick ('astro-schedule') that joins a channel,
+sends the message, then parts.
 """
 
 import json
 import socket
 import threading
 import time
+import uuid
 from datetime import datetime, timezone
 
 from croniter import croniter
 
-from src.markups import list_scheduled_messages, mark_scheduled_message_run
+from src.markups import list_prompts, mark_prompt_run
 
 
 def _parse_messages(raw: str) -> list[str]:
@@ -103,38 +105,38 @@ class IRCScheduler:
                 remaining = self._channel_cooldown_remaining(channel)
 
     def _tick(self):
-        messages = list_scheduled_messages()
+        prompts = list_prompts()
         now = datetime.now(timezone.utc)
 
-        for msg in messages:
-            if not msg.enabled:
+        for p in prompts:
+            if not p.cron_expr or not p.cron_expr.strip():
                 continue
             try:
-                if not croniter.is_valid(msg.cron_expr):
+                if not croniter.is_valid(p.cron_expr):
                     continue
-                cron = croniter(msg.cron_expr, now)
+                cron = croniter(p.cron_expr, now)
                 prev_fire = cron.get_prev(datetime)
                 since_fire = (now - prev_fire).total_seconds()
 
                 if since_fire > CHECK_INTERVAL + 5:
                     continue
 
-                if msg.last_run_at:
-                    last_run = datetime.fromisoformat(msg.last_run_at.replace("Z", "+00:00"))
+                if p.last_run_at:
+                    last_run = datetime.fromisoformat(p.last_run_at.replace("Z", "+00:00"))
                     if (now - last_run).total_seconds() < 50:
                         continue
 
-                self._wait_for_channel(msg.channel)
+                self._wait_for_channel(p.channel)
                 if self._stopping:
                     return
 
-                parts = _parse_messages(msg.message)
-                self._send_messages(msg.channel, parts)
-                self._record_channel_send(msg.channel)
-                mark_scheduled_message_run(msg.id)
-                print(f"[IRC Scheduler] Sent {len(parts)} message(s) to {msg.channel}")
+                parts = _parse_messages(p.message)
+                self._send_messages(p.channel, parts)
+                self._record_channel_send(p.channel)
+                mark_prompt_run(p.id)
+                print(f"[IRC Scheduler] Sent {len(parts)} message(s) to {p.channel}")
             except Exception as e:
-                print(f"[IRC Scheduler] Failed for schedule id={msg.id}: {e}")
+                print(f"[IRC Scheduler] Failed for prompt id={p.id}: {e}")
 
     def _send_message(self, channel: str, message: str):
         """Public interface used by the run-now API endpoint."""
@@ -152,6 +154,9 @@ class IRCScheduler:
         except (TypeError, ValueError):
             port = IRC_PORT
 
+        multi = len(messages) > 1
+        session_id = str(uuid.uuid4()) if multi else None
+
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         sock.settimeout(10)
@@ -166,17 +171,33 @@ class IRCScheduler:
             self._raw(sock, f"JOIN {channel}")
             time.sleep(0.3)
 
+            if multi:
+                intro = (
+                    f"I am going to send you multiple messages under a session "
+                    f"identified by {session_id}. Listen until I tell you that "
+                    f"session is complete. Each message will be tagged with this "
+                    f"identifier."
+                )
+                self._raw(sock, f"PRIVMSG {channel} :{intro}")
+                time.sleep(0.2)
+
             for msg in messages:
                 text = msg.replace("\r\n", " ").replace("\n", " ").replace("\r", " ").strip()
                 if not text:
                     continue
-                while len(text) > 400:
-                    chunk = text[:400]
-                    text = text[400:]
+                if multi:
+                    text = f"[{session_id}] {text}"
+                while len(text) > 350:
+                    chunk = text[:350]
+                    text = text[350:]
                     self._raw(sock, f"PRIVMSG {channel} :{chunk}")
                     time.sleep(0.1)
                 if text:
                     self._raw(sock, f"PRIVMSG {channel} :{text}")
+                time.sleep(0.2)
+
+            if multi:
+                self._raw(sock, f"PRIVMSG {channel} :Session {session_id} is now complete. Please acknowledge")
                 time.sleep(0.2)
 
             time.sleep(0.1)

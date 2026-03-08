@@ -401,20 +401,29 @@
   color: var(--accent, #7c8aff);
 }
 
-.irc-schedule-tab {
+.irc-prompt-tab {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   font-size: 11px;
-  color: var(--text-secondary);
-  opacity: 0.7;
-  margin-top: 4px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: #a78bfa;
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.1), rgba(124, 138, 255, 0.08));
+  border: 1px solid rgba(167, 139, 250, 0.25) !important;
+  border-right: 1px solid rgba(167, 139, 250, 0.25) !important;
+  border-radius: 8px !important;
+  margin-top: 8px;
   justify-content: center;
+  padding: 8px 14px;
+  transition: all 0.2s;
 }
 
-.irc-schedule-tab:hover {
-  opacity: 1;
-  color: var(--accent, #7c8aff);
+.irc-prompt-tab:hover {
+  color: #c4b5fd;
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.2), rgba(124, 138, 255, 0.15));
+  border-color: rgba(167, 139, 250, 0.45) !important;
+  box-shadow: 0 0 12px rgba(167, 139, 250, 0.15);
 }
 
 .hidden-channels-modal {
@@ -551,9 +560,9 @@
 }
 
 
-/* ── Scheduled Messages Panel ────────────────────── */
+/* ── Prompts Panel ────────────────────────────────── */
 
-.schedule-modal-overlay {
+.prompt-modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.6);
@@ -563,7 +572,7 @@
   z-index: 1000;
 }
 
-.schedule-modal {
+.prompt-modal {
   width: 80%;
   height: 80%;
   background: var(--bg-primary);
@@ -575,7 +584,7 @@
   overflow-y: auto;
 }
 
-.schedule-panel {
+.prompt-panel {
   background: var(--bg-primary);
   max-height: 50vh;
   overflow-y: auto;
@@ -583,21 +592,21 @@
   border-top: 1px solid var(--border);
 }
 
-.schedule-panel-header {
+.prompt-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 10px;
 }
 
-.schedule-panel-header h3 {
+.prompt-panel-header h3 {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.schedule-add-btn {
+.prompt-add-btn {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -611,43 +620,56 @@
   transition: border-color .15s, color .15s;
 }
 
-.schedule-add-btn:hover {
+.prompt-add-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
 
-.schedule-list {
+.prompt-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.schedule-empty {
+.prompt-search-input {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.prompt-search-input:focus {
+  border-color: var(--accent, #7c8aff);
+}
+
+.prompt-empty {
   color: var(--text-secondary);
   font-size: 13px;
   text-align: center;
   padding: 16px 0;
 }
 
-.schedule-item {
+.prompt-item {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 12px;
 }
 
-.schedule-item.disabled {
-  opacity: 0.5;
-}
 
-.schedule-item-header {
+.prompt-item-header {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 6px;
 }
 
-.schedule-item-inline-actions {
+.prompt-item-inline-actions {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -656,11 +678,11 @@
   transition: opacity 0.15s;
 }
 
-.schedule-item:hover .schedule-item-inline-actions {
+.prompt-item:hover .prompt-item-inline-actions {
   opacity: 1;
 }
 
-.schedule-inline-btn {
+.prompt-inline-btn {
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -673,27 +695,27 @@
   transition: all 0.15s;
 }
 
-.schedule-inline-btn:hover {
+.prompt-inline-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
 
-.schedule-inline-btn.run:hover {
+.prompt-inline-btn.run:hover {
   border-color: #4caf50;
   color: #4caf50;
 }
 
-.schedule-inline-btn.delete:hover {
+.prompt-inline-btn.delete:hover {
   border-color: #f44336;
   color: #f44336;
 }
 
-.schedule-inline-btn:disabled {
+.prompt-inline-btn:disabled {
   opacity: 0.4;
   cursor: default;
 }
 
-.schedule-filter-select {
+.prompt-filter-select {
   font-size: 12px;
   font-family: inherit;
   padding: 4px 8px;
@@ -704,7 +726,7 @@
   outline: none;
 }
 
-.schedule-title {
+.prompt-title {
   font-weight: 600;
   font-size: 13px;
   color: var(--text-primary);
@@ -715,14 +737,14 @@
   white-space: nowrap;
 }
 
-.schedule-channel {
+.prompt-channel {
   font-weight: 500;
   font-size: 12px;
   color: var(--accent);
   flex-shrink: 0;
 }
 
-.schedule-cron {
+.prompt-cron {
   font-size: 12px;
   background: var(--bg-primary);
   padding: 2px 6px;
@@ -731,30 +753,17 @@
   flex-shrink: 0;
 }
 
-.schedule-status {
-  margin-left: auto;
+.prompt-ondemand-badge {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   padding: 2px 8px;
   border-radius: 4px;
-  cursor: pointer;
+  background: rgba(124, 138, 255, 0.12);
+  color: var(--accent, #7c8aff);
   user-select: none;
-  transition: opacity .15s;
 }
 
-.schedule-status:hover { opacity: 0.7; }
-
-.schedule-status.on {
-  background: rgba(76, 175, 80, 0.15);
-  color: #4caf50;
-}
-
-.schedule-status.off {
-  background: rgba(244, 67, 54, 0.15);
-  color: #f44336;
-}
-
-.schedule-item-message {
+.prompt-item-message {
   font-size: 13px;
   color: var(--text-primary);
   white-space: pre-wrap;
@@ -763,26 +772,26 @@
   margin-bottom: 6px;
 }
 
-.schedule-item-footer {
+.prompt-item-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-.schedule-last-run {
+.prompt-last-run {
   font-size: 11px;
   color: var(--text-secondary);
 }
 
-.schedule-item-actions {
+.prompt-item-actions {
   display: flex;
   gap: 6px;
   margin-left: auto;
 }
 
-.schedule-run-btn,
-.schedule-edit-btn,
-.schedule-delete-btn {
+.prompt-run-btn,
+.prompt-edit-btn,
+.prompt-delete-btn {
   font-size: 11px;
   padding: 2px 8px;
   border-radius: 4px;
@@ -793,29 +802,29 @@
   transition: color .15s, border-color .15s;
 }
 
-.schedule-run-btn:hover:not(:disabled) {
+.prompt-run-btn:hover:not(:disabled) {
   color: #4caf50;
   border-color: #4caf50;
 }
 
-.schedule-run-btn:disabled {
+.prompt-run-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.schedule-edit-btn:hover {
+.prompt-edit-btn:hover {
   color: var(--accent);
   border-color: var(--accent);
 }
 
-.schedule-delete-btn:hover {
+.prompt-delete-btn:hover {
   color: #f44336;
   border-color: #f44336;
 }
 
-/* ── Schedule Form ─── */
+/* ── Prompt Form ──── */
 
-.schedule-form {
+.prompt-form {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -826,19 +835,19 @@
   gap: 10px;
 }
 
-.schedule-form-row {
+.prompt-form-row {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.schedule-form-row label {
+.prompt-form-row label {
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
 }
 
-.schedule-form-input {
+.prompt-form-input {
   font-size: 13px;
   font-family: inherit;
   padding: 6px 10px;
@@ -852,24 +861,24 @@
   box-sizing: border-box;
 }
 
-.schedule-form-input:focus {
+.prompt-form-input:focus {
   border-color: var(--accent);
 }
 
-.schedule-form-textarea {
+.prompt-form-textarea {
   resize: none;
   min-height: 48px;
   line-height: 1.4;
   overflow: hidden;
 }
 
-.schedule-msg-count {
+.prompt-msg-count {
   font-size: 11px;
   color: var(--text-secondary);
   font-weight: normal;
 }
 
-.schedule-msg-entry {
+.prompt-msg-entry {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px 8px;
@@ -877,42 +886,42 @@
   background: rgba(255, 255, 255, 0.02);
 }
 
-.schedule-msg-entry-header {
+.prompt-msg-entry-header {
   display: flex;
   align-items: center;
   gap: 6px;
   margin-bottom: 4px;
 }
 
-.schedule-msg-label {
+.prompt-msg-label {
   font-size: 11px;
   font-weight: 700;
   color: var(--accent);
 }
 
-.schedule-msg-chars {
+.prompt-msg-chars {
   font-size: 11px;
   color: var(--text-secondary);
   font-family: monospace;
 }
 
-.schedule-msg-chars.warn {
+.prompt-msg-chars.warn {
   color: #f9a825;
 }
 
-.schedule-msg-chars.over {
+.prompt-msg-chars.over {
   color: #f44336;
   font-weight: 700;
 }
 
-.schedule-msg-entry-btns {
+.prompt-msg-entry-btns {
   margin-left: auto;
   display: flex;
   gap: 2px;
 }
 
-.schedule-msg-move-btn,
-.schedule-msg-remove-btn {
+.prompt-msg-move-btn,
+.prompt-msg-remove-btn {
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -928,24 +937,24 @@
   transition: all 0.15s;
 }
 
-.schedule-msg-move-btn:hover:not(:disabled),
-.schedule-msg-remove-btn:hover:not(:disabled) {
+.prompt-msg-move-btn:hover:not(:disabled),
+.prompt-msg-remove-btn:hover:not(:disabled) {
   border-color: var(--accent);
   color: var(--accent);
 }
 
-.schedule-msg-remove-btn:hover:not(:disabled) {
+.prompt-msg-remove-btn:hover:not(:disabled) {
   border-color: #f44336;
   color: #f44336;
 }
 
-.schedule-msg-move-btn:disabled,
-.schedule-msg-remove-btn:disabled {
+.prompt-msg-move-btn:disabled,
+.prompt-msg-remove-btn:disabled {
   opacity: 0.3;
   cursor: default;
 }
 
-.schedule-add-msg-btn {
+.prompt-add-msg-btn {
   font-size: 12px;
   padding: 4px 12px;
   border-radius: 4px;
@@ -957,16 +966,16 @@
   margin-top: 2px;
 }
 
-.schedule-add-msg-btn:hover {
+.prompt-add-msg-btn:hover {
   border-color: var(--accent);
   background: rgba(124, 138, 255, 0.08);
 }
 
-.schedule-msg-entry.active {
+.prompt-msg-entry.active {
   border-color: var(--accent);
 }
 
-.schedule-msg-tools {
+.prompt-msg-tools {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -975,7 +984,7 @@
   margin-top: 4px;
 }
 
-.schedule-msg-tools-label {
+.prompt-msg-tools-label {
   font-size: 10px;
   color: var(--text-secondary);
   opacity: 0.6;
@@ -984,7 +993,7 @@
   font-weight: 600;
 }
 
-.schedule-msg-tool-btn {
+.prompt-msg-tool-btn {
   font-size: 11px;
   padding: 2px 8px;
   border-radius: 4px;
@@ -998,7 +1007,7 @@
   transition: all 0.15s;
 }
 
-.schedule-msg-tool-btn:hover {
+.prompt-msg-tool-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
@@ -1130,7 +1139,7 @@
   white-space: nowrap;
 }
 
-.schedule-msg-badge {
+.prompt-msg-badge {
   font-size: 10px;
   padding: 1px 6px;
   border-radius: 8px;
@@ -1139,28 +1148,28 @@
   font-weight: 600;
 }
 
-.schedule-item-messages {
+.prompt-item-messages {
   display: flex;
   flex-direction: column;
   gap: 4px;
   padding: 4px 0;
 }
 
-.schedule-item-msg-num {
+.prompt-item-msg-num {
   font-size: 10px;
   font-weight: 700;
   color: var(--accent);
   margin-right: 4px;
 }
 
-.schedule-cron-presets {
+.prompt-cron-presets {
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
   margin-top: 2px;
 }
 
-.schedule-preset-btn {
+.prompt-preset-btn {
   font-size: 11px;
   padding: 2px 8px;
   border-radius: 4px;
@@ -1171,58 +1180,50 @@
   transition: all .15s;
 }
 
-.schedule-preset-btn:hover {
+.prompt-preset-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
 
-.schedule-preset-btn.active {
+.prompt-preset-btn.active {
   border-color: var(--accent);
   background: rgba(124, 138, 255, 0.1);
   color: var(--accent);
 }
 
-.schedule-cron-hint {
+.prompt-cron-hint {
   font-size: 11px;
   color: var(--text-secondary);
   opacity: 0.6;
   font-family: monospace;
 }
 
-.schedule-form-toggle-row {
-  flex-direction: row;
+
+.prompt-schedule-toggle-label {
+  display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.schedule-toggle {
-  font-size: 12px;
-  font-weight: 700;
-  padding: 3px 12px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
+  gap: 6px;
+  font-size: 13px;
   cursor: pointer;
-  transition: all .15s;
 }
 
-.schedule-toggle.on {
-  background: rgba(76, 175, 80, 0.15);
-  color: #4caf50;
-  border-color: rgba(76, 175, 80, 0.3);
+.prompt-schedule-toggle-label input[type="checkbox"] {
+  accent-color: var(--accent, #7c8aff);
 }
 
-.schedule-toggle.off {
-  background: rgba(244, 67, 54, 0.15);
-  color: #f44336;
-  border-color: rgba(244, 67, 54, 0.3);
+.prompt-ondemand-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-style: italic;
+  margin-top: 2px;
 }
 
-.schedule-form-actions {
+.prompt-form-actions {
   display: flex;
   gap: 8px;
 }
 
-.schedule-save-btn {
+.prompt-save-btn {
   padding: 6px 16px;
   border-radius: 6px;
   border: none;
@@ -1234,9 +1235,9 @@
   transition: opacity .15s;
 }
 
-.schedule-save-btn:hover { opacity: 0.85; }
+.prompt-save-btn:hover { opacity: 0.85; }
 
-.schedule-cancel-btn {
+.prompt-cancel-btn {
   padding: 6px 16px;
   border-radius: 6px;
   border: 1px solid var(--border);
@@ -1247,7 +1248,7 @@
   transition: color .15s, border-color .15s;
 }
 
-.schedule-cancel-btn:hover {
+.prompt-cancel-btn:hover {
   color: var(--text-primary);
   border-color: var(--text-secondary);
 }
@@ -5092,7 +5093,7 @@
   margin-top: 2px;
 }
 
-.ap-schedule-badge {
+.ap-prompt-badge {
   font-size: 10px;
   font-weight: 600;
   padding: 1px 6px;
@@ -5638,6 +5639,54 @@
   white-space: pre-wrap;
 }
 
+.guid-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 20px;
+  height: 18px;
+  background: rgba(167, 139, 250, 0.15);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  border-radius: 4px;
+  cursor: default;
+  vertical-align: text-bottom;
+  margin: 0 2px;
+  color: #a78bfa;
+}
+.guid-chip:hover {
+  background: rgba(167, 139, 250, 0.25);
+}
+.guid-chip:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-primary, #1a1a2e);
+  color: var(--text-primary, #e0e0e0);
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+  white-space: nowrap;
+  z-index: 100;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+.guid-chip:hover::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: rgba(167, 139, 250, 0.4);
+  z-index: 100;
+  pointer-events: none;
+}
+
 .irc-event {
   padding: 2px 12px;
   font-size: 12px;
@@ -6053,12 +6102,15 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 20px;
-  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
   position: sticky;
   top: 0;
   background: var(--bg-primary);
   z-index: 10;
+  width: 60%;
+  margin: 12px auto 0;
 }
 
 .timeline-back-btn {
@@ -6092,15 +6144,6 @@
   color: var(--text-secondary);
   margin-left: auto;
   margin-right: 8px;
-}
-
-.timeline-search {
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 49px;
-  background: var(--bg-primary);
-  z-index: 10;
 }
 
 .timeline-feed {
