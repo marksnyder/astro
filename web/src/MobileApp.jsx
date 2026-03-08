@@ -909,7 +909,7 @@ function MobileArtifactTimeline({ category, onBack }) {
             <div className="timeline-card-body">
               {art.content_type === 'markup' ? (
                 <div className="markdown-body">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{art.markup || ''}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}>{art.markup || ''}</ReactMarkdown>
                 </div>
               ) : (
                 <div className="timeline-card-file">
