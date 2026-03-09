@@ -204,27 +204,62 @@ layout: default
 
 <div class="lightbox" id="screenshotLightbox" onclick="closeLightbox(event)">
   <button class="lightbox-close" onclick="closeLightbox(event)" aria-label="Close">&times;</button>
+  <button class="lightbox-nav lightbox-prev" onclick="navLightbox(-1, event)" aria-label="Previous">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <button class="lightbox-nav lightbox-next" onclick="navLightbox(1, event)" aria-label="Next">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+  </button>
   <img class="lightbox-img" id="lightboxImg" src="" alt="">
   <p class="lightbox-caption" id="lightboxCaption"></p>
+  <p class="lightbox-counter" id="lightboxCounter"></p>
 </div>
 
 <script>
+var _lbCards = [];
+var _lbIdx = 0;
+
+document.addEventListener('DOMContentLoaded', function() {
+  _lbCards = Array.from(document.querySelectorAll('.screenshot-card'));
+});
+
 function openLightbox(card) {
+  _lbIdx = _lbCards.indexOf(card);
+  if (_lbIdx < 0) _lbIdx = 0;
+  showLightboxSlide();
+  document.getElementById('screenshotLightbox').classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function showLightboxSlide() {
+  var card = _lbCards[_lbIdx];
   var img = card.querySelector('img');
   var cap = card.querySelector('figcaption');
   document.getElementById('lightboxImg').src = img.src;
   document.getElementById('lightboxImg').alt = img.alt;
   document.getElementById('lightboxCaption').textContent = cap ? cap.textContent : '';
-  document.getElementById('screenshotLightbox').classList.add('active');
-  document.body.style.overflow = 'hidden';
+  document.getElementById('lightboxCounter').textContent = (_lbIdx + 1) + ' / ' + _lbCards.length;
 }
+
+function navLightbox(dir, e) {
+  e.stopPropagation();
+  _lbIdx = (_lbIdx + dir + _lbCards.length) % _lbCards.length;
+  showLightboxSlide();
+}
+
 function closeLightbox(e) {
   if (e.target.classList.contains('lightbox-img')) return;
+  if (e.target.closest('.lightbox-nav')) return;
   document.getElementById('screenshotLightbox').classList.remove('active');
   document.body.style.overflow = '';
 }
+
 document.addEventListener('keydown', function(e) {
+  var lb = document.getElementById('screenshotLightbox');
+  if (!lb.classList.contains('active')) return;
   if (e.key === 'Escape') closeLightbox(e);
+  else if (e.key === 'ArrowLeft') navLightbox(-1, e);
+  else if (e.key === 'ArrowRight') navLightbox(1, e);
 });
 </script>
 {% endif %}
