@@ -5583,10 +5583,18 @@
 .irc-status-text {
   font-size: 12px;
   color: var(--text-secondary);
-  margin-right: auto;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.irc-connection-info {
+  font-size: 11px;
+  color: var(--text-tertiary, #888);
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  margin-right: auto;
+  white-space: nowrap;
+  opacity: 0.7;
 }
 
 .irc-hint {

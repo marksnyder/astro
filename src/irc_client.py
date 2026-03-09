@@ -320,6 +320,8 @@ class IRCClient:
             "connected": self.connected,
             "nick": self.nick,
             "channel": self.channel,
+            "host": self.host,
+            "port": self.port,
         }
 
     def _raw_send(self, line: str):

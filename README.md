@@ -150,3 +150,9 @@ cd astro
 - **Docker** 20.10+
 - **OpenAI API key** (for chat and embeddings)
 - **Tailscale auth key** (optional, for remote access)
+
+---
+
+## Contact
+
+Questions, feedback, or issues? Reach out at **[mark@runastro.com](mailto:mark@runastro.com)**.

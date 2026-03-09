@@ -958,7 +958,7 @@ function MobileApp() {
   const [chatMode, setChatMode] = useState('llm')
   const [ircNick, setIrcNick] = useState('')
   const [ircMessages, setIrcMessages] = useState([])
-  const [ircStatus, setIrcStatus] = useState({ connected: false, nick: '', channel: '' })
+  const [ircStatus, setIrcStatus] = useState({ connected: false, nick: '', channel: '', host: '', port: 0 })
   const ircWsRef = useRef(null)
   const ircHistoryTsRef = useRef(0)
   const [ircHasMore, setIrcHasMore] = useState(false)
@@ -1146,7 +1146,7 @@ function MobileApp() {
             if (data.timestamp && data.timestamp <= ircHistoryTsRef.current) return
             setIrcMessages(prev => [...prev, data])
           } else if (data.type === 'status') {
-            setIrcStatus({ connected: data.connected, nick: data.nick, channel: data.channel })
+            setIrcStatus({ connected: data.connected, nick: data.nick, channel: data.channel, host: data.host || '', port: data.port || 0 })
           }
         } catch {}
       }
@@ -1500,6 +1500,9 @@ function MobileApp() {
               <div className="m-irc-status-bar">
                 <div className={`m-irc-dot ${ircStatus.connected ? 'connected' : ''}`} />
                 <span>{ircStatus.connected ? `${ircStatus.nick} on ${ircStatus.channel}` : 'Connecting...'}</span>
+                {ircStatus.connected && ircStatus.host && (
+                  <span className="irc-connection-info">{ircStatus.host}:{ircStatus.port}</span>
+                )}
                 <button className="m-irc-toolbar-btn" onClick={() => {
                   const ch = ircNick || ircStatus.channel || '#astro'
                   if (!confirm(`Purge all message history for ${ch}?`)) return
