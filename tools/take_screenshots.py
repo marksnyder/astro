@@ -31,16 +31,16 @@ SCREENSHOTS = [
         "actions": "action_items",
     },
     {
-        "file": "markups-list.png",
-        "description": "Markups — Rich markdown notes organized by universe and category",
+        "file": "markdowns-list.png",
+        "description": "Markdowns — Rich markdown notes organized by universe and category",
         "view": "desktop",
-        "actions": "markups_list",
+        "actions": "markdowns_list",
     },
     {
-        "file": "markup-editor.png",
-        "description": "Markup Editor — Full-featured editor with live markdown preview",
+        "file": "markdown-editor.png",
+        "description": "Markdown Editor — Full-featured editor with live markdown preview",
         "view": "desktop",
-        "actions": "markup_editor",
+        "actions": "markdown_editor",
     },
     {
         "file": "documents-archive.png",
@@ -103,10 +103,10 @@ SCREENSHOTS = [
         "actions": "mobile_chat",
     },
     {
-        "file": "mobile-markups.png",
-        "description": "Mobile Markups — Read and edit notes on the go",
+        "file": "mobile-markdowns.png",
+        "description": "Mobile Markdowns — Read and edit notes on the go",
         "view": "mobile",
-        "actions": "mobile_markups",
+        "actions": "mobile_markdowns",
     },
     {
         "file": "mobile-actions.png",
@@ -155,19 +155,19 @@ async def take_desktop_screenshot(page, shot):
         await click_sidebar_tab(page, "Action Items")
         await page.wait_for_timeout(500)
 
-    elif action == "markups_list":
-        await click_sidebar_tab(page, "Markups")
+    elif action == "markdowns_list":
+        await click_sidebar_tab(page, "Markdowns")
         await page.wait_for_timeout(500)
 
-    elif action == "markup_editor":
-        await click_sidebar_tab(page, "Markups")
+    elif action == "markdown_editor":
+        await click_sidebar_tab(page, "Markdowns")
         await page.wait_for_timeout(500)
-        markup_card = page.locator(".markup-card").first
-        if await markup_card.is_visible(timeout=3000):
-            await markup_card.click()
+        markdown_card = page.locator(".markdown-card").first
+        if await markdown_card.is_visible(timeout=3000):
+            await markdown_card.click()
             await page.wait_for_timeout(1500)
             # Ensure the editor is fully rendered in the main area
-            await page.locator(".markup-inline-editor").wait_for(timeout=3000)
+            await page.locator(".markdown-inline-editor").wait_for(timeout=3000)
             await page.wait_for_timeout(300)
 
     elif action == "archive":
@@ -256,9 +256,9 @@ async def take_desktop_screenshot(page, shot):
         if await close_btn.is_visible(timeout=1000):
             await close_btn.click()
             await page.wait_for_timeout(300)
-    elif action == "markup_editor":
-        # Close button is .timeline-back-btn inside the .markup-inline-editor
-        close_btn = page.locator(".markup-inline-editor .timeline-back-btn")
+    elif action == "markdown_editor":
+        # Close button is .timeline-back-btn inside the .markdown-inline-editor
+        close_btn = page.locator(".markdown-inline-editor .timeline-back-btn")
         if await close_btn.is_visible(timeout=1000):
             await close_btn.click()
             await page.wait_for_timeout(500)
@@ -284,8 +284,8 @@ async def take_mobile_screenshot(page, shot):
             await tab.click()
             await page.wait_for_timeout(500)
 
-    elif action == "mobile_markups":
-        tab = page.locator('.m-tab:has-text("Markups")')
+    elif action == "mobile_markdowns":
+        tab = page.locator('.m-tab:has-text("Markdowns")')
         if await tab.is_visible(timeout=2000):
             await tab.click()
             await page.wait_for_timeout(500)

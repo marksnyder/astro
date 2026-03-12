@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import './App.css'
-import MarkupsPanel, { MarkupEditorView } from './MarkupsPanel'
+import MarkdownsPanel, { MarkdownEditorView } from './MarkdownsPanel'
 import ArchivePanel from './ArchivePanel'
 import LinksPanel from './LinksPanel'
 import ActionItemsPanel from './ActionItemsPanel'
@@ -103,13 +103,13 @@ const MODELS = [
 
 function QuickView({ item, onClose }) {
   if (!item) return null
-  const isMarkup = item.type === 'markup'
+  const isMarkdown = item.type === 'markdown'
   return (
     <div className="quickview-overlay">
       <div className="quickview-modal">
         <div className="quickview-header">
-          <span className="quickview-type">{isMarkup ? 'Markup' : 'Document'}</span>
-          <h3 className="quickview-title">{isMarkup ? (item.title || 'Untitled') : item.name}</h3>
+          <span className="quickview-type">{isMarkdown ? 'Markdown' : 'Document'}</span>
+          <h3 className="quickview-title">{isMarkdown ? (item.title || 'Untitled') : item.name}</h3>
           <button className="quickview-close" onClick={onClose}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -117,8 +117,8 @@ function QuickView({ item, onClose }) {
           </button>
         </div>
         <div className="quickview-body">
-          {isMarkup ? (
-            <div className="quickview-markup-body" dangerouslySetInnerHTML={{ __html: item.body || '<em>Empty markup</em>' }} />
+          {isMarkdown ? (
+            <div className="quickview-markdown-body" dangerouslySetInnerHTML={{ __html: item.body || '<em>Empty markdown</em>' }} />
           ) : (
             <div className="quickview-doc-info">
               <p><strong>File:</strong> {item.name}</p>
@@ -157,7 +157,7 @@ function SaveChatModal({ categories, messages, onClose, onSaved, universeId }) {
       .map(m => `<p><strong>${m.role === 'user' ? 'You' : 'Astro'}:</strong> ${m.content}</p>`)
       .join('\n')
     try {
-      await fetch(`/api/markups?universe_id=${universeId || 1}`, {
+      await fetch(`/api/markdowns?universe_id=${universeId || 1}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: title.trim(), body, category_id: categoryId }),
@@ -165,7 +165,7 @@ function SaveChatModal({ categories, messages, onClose, onSaved, universeId }) {
       onSaved?.()
       onClose()
     } catch {
-      alert('Failed to save chat as markup.')
+      alert('Failed to save chat as markdown.')
     } finally {
       setSaving(false)
     }
@@ -175,7 +175,7 @@ function SaveChatModal({ categories, messages, onClose, onSaved, universeId }) {
     <div className="quickview-overlay">
       <div className="save-chat-modal">
         <div className="quickview-header">
-          <span className="quickview-type">Save as Markup</span>
+          <span className="quickview-type">Save as Markdown</span>
           <h3 className="quickview-title">Save Chat</h3>
           <button className="quickview-close" onClick={onClose}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -187,8 +187,8 @@ function SaveChatModal({ categories, messages, onClose, onSaved, universeId }) {
           <label className="save-chat-label">Title</label>
           <input
             ref={titleRef}
-            className="markup-title-input"
-            placeholder="Markup title..."
+            className="markdown-title-input"
+            placeholder="Markdown title..."
             value={title}
             onChange={e => setTitle(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleSave() }}
@@ -196,10 +196,10 @@ function SaveChatModal({ categories, messages, onClose, onSaved, universeId }) {
           <label className="save-chat-label">Category</label>
           <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId} />
           <div className="save-chat-actions">
-            <button className="markup-save-btn" onClick={handleSave} disabled={saving || !title.trim()}>
+            <button className="markdown-save-btn" onClick={handleSave} disabled={saving || !title.trim()}>
               {saving ? 'Saving...' : 'Save'}
             </button>
-            <button className="markup-delete-btn" onClick={onClose}>Cancel</button>
+            <button className="markdown-delete-btn" onClick={onClose}>Cancel</button>
           </div>
         </div>
       </div>
@@ -245,7 +245,7 @@ function UniverseManager({ universes, currentId, onSwitch, onClose, onRefresh })
       alert('Cannot delete the last universe.')
       return
     }
-    if (!confirm(`DELETE UNIVERSE "${uname}"?\n\nThis will permanently destroy ALL markups, documents, action items, links, and categories in this universe.\n\nThis action CANNOT be undone.`)) return
+    if (!confirm(`DELETE UNIVERSE "${uname}"?\n\nThis will permanently destroy ALL markdowns, documents, action items, links, and categories in this universe.\n\nThis action CANNOT be undone.`)) return
     if (!confirm(`Are you absolutely sure? Type the universe name to confirm.\n\n(Click OK to proceed with deletion of "${uname}")`)) return
     const res = await fetch(`/api/universes/${uid}`, { method: 'DELETE' })
     if (res.ok) {
@@ -275,7 +275,7 @@ function UniverseManager({ universes, currentId, onSwitch, onClose, onRefresh })
               <div key={u.id} className={`universe-row${u.id === currentId ? ' universe-active' : ''}`}>
                 {editingId === u.id ? (
                   <input
-                    className="markup-title-input"
+                    className="markdown-title-input"
                     value={editName}
                     onChange={e => setEditName(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') handleRename(u.id); if (e.key === 'Escape') setEditingId(null) }}
@@ -303,13 +303,13 @@ function UniverseManager({ universes, currentId, onSwitch, onClose, onRefresh })
           </div>
           <div className="universe-create-row">
             <input
-              className="markup-title-input"
+              className="markdown-title-input"
               placeholder="New universe name..."
               value={newName}
               onChange={e => setNewName(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleCreate() }}
             />
-            <button className="markup-save-btn" onClick={handleCreate} disabled={!newName.trim()}>Create</button>
+            <button className="markdown-save-btn" onClick={handleCreate} disabled={!newName.trim()}>Create</button>
           </div>
         </div>
       </div>
@@ -378,7 +378,7 @@ function SettingsDialog({ onClose, onRestored }) {
 
   const handleRestore = async () => {
     if (!selectedFile) return
-    if (!confirm('This will replace ALL current data (markups, documents, action items, links, etc.) with the backup. This cannot be undone. Continue?')) return
+    if (!confirm('This will replace ALL current data (markdowns, documents, action items, links, etc.) with the backup. This cannot be undone. Continue?')) return
     setBusy(true)
     setStatus({ type: 'info', text: 'Restoring from backup...' })
     try {
@@ -412,7 +412,7 @@ function SettingsDialog({ onClose, onRestored }) {
       const data = await res.json()
       setStatus({
         type: 'success',
-        text: `Reindex complete! Markups: ${data.reindexed.markups}, Action items: ${data.reindexed.action_items}, Document chunks: ${data.reindexed.document_chunks}.`,
+        text: `Reindex complete! Markdowns: ${data.reindexed.markdowns}, Action items: ${data.reindexed.action_items}, Document chunks: ${data.reindexed.document_chunks}.`,
       })
     } catch (e) {
       setStatus({ type: 'error', text: `Reindex failed: ${e.message}` })
@@ -541,19 +541,19 @@ function FeedPostModal({ mode, onInsert, onClose }) {
 
   const filtered = feeds.filter(f => !search || f.title.toLowerCase().includes(search.toLowerCase()) || f.api_key?.toLowerCase().includes(search.toLowerCase()))
   const baseUrl = `${window.location.origin}/api/feeds`
-  const isMarkup = mode === 'markup'
+  const isMarkdown = mode === 'markdown'
 
   const handleSelect = (f) => {
     const url = `${baseUrl}/${f.id}/ingest`
     let text
-    if (isMarkup) {
+    if (isMarkdown) {
       text = [
         `POST ${url}`,
         `Content-Type: multipart/form-data`,
         `X-Feed-Key: ${f.api_key}`,
         ``,
-        `Payload: title=<title>&markup=<markup_content>`,
-        `Response: {"ok":true,"artifact_id":<id>,"content_type":"markup"}`,
+        `Payload: title=<title>&markdown=<markdown_content>`,
+        `Response: {"ok":true,"artifact_id":<id>,"content_type":"markdown"}`,
       ].join('\n')
     } else {
       text = [
@@ -574,12 +574,12 @@ function FeedPostModal({ mode, onInsert, onClose }) {
     <div className="feed-key-modal-overlay">
       <div className="feed-key-modal">
         <div className="feed-key-modal-header">
-          <h3>{isMarkup ? 'Post Feed Markup' : 'Post Feed Document'}</h3>
+          <h3>{isMarkdown ? 'Post Feed Markdown' : 'Post Feed Document'}</h3>
           <button type="button" className="feed-key-modal-close" onClick={onClose}>&times;</button>
         </div>
         <p className="feed-post-modal-desc">
-          {isMarkup
-            ? 'Select a feed to insert a markup POST template into your message.'
+          {isMarkdown
+            ? 'Select a feed to insert a markdown POST template into your message.'
             : 'Select a feed to insert a document POST template into your message.'}
         </p>
         <input
@@ -604,17 +604,17 @@ function FeedPostModal({ mode, onInsert, onClose }) {
   )
 }
 
-function MarkupToolModal({ mode, onInsert, onClose }) {
-  const [markups, setMarkups] = useState([])
+function MarkdownToolModal({ mode, onInsert, onClose }) {
+  const [markdowns, setMarkdowns] = useState([])
   const [search, setSearch] = useState('')
   const [inserted, setInserted] = useState(null)
 
   useEffect(() => {
-    fetch('/api/markups').then(r => r.json()).then(setMarkups).catch(() => {})
+    fetch('/api/markdowns').then(r => r.json()).then(setMarkdowns).catch(() => {})
   }, [])
 
-  const filtered = markups.filter(n => !search || n.title?.toLowerCase().includes(search.toLowerCase()) || String(n.id).includes(search))
-  const baseUrl = `${window.location.origin}/api/markups`
+  const filtered = markdowns.filter(n => !search || n.title?.toLowerCase().includes(search.toLowerCase()) || String(n.id).includes(search))
+  const baseUrl = `${window.location.origin}/api/markdowns`
   const isRead = mode === 'read'
 
   const handleSelect = (n) => {
@@ -643,23 +643,23 @@ function MarkupToolModal({ mode, onInsert, onClose }) {
     <div className="feed-key-modal-overlay">
       <div className="feed-key-modal">
         <div className="feed-key-modal-header">
-          <h3>{isRead ? 'Read Markup' : 'Update Markup'}</h3>
+          <h3>{isRead ? 'Read Markdown' : 'Update Markdown'}</h3>
           <button type="button" className="feed-key-modal-close" onClick={onClose}>&times;</button>
         </div>
         <p className="feed-post-modal-desc">
           {isRead
-            ? 'Select a markup to insert a GET template into your message.'
-            : 'Select a markup to insert a PUT update template into your message.'}
+            ? 'Select a markdown to insert a GET template into your message.'
+            : 'Select a markdown to insert a PUT update template into your message.'}
         </p>
         <input
           className="prompt-form-input feed-key-modal-search"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search markups..."
+          placeholder="Search markdowns..."
           autoFocus
         />
         <div className="feed-key-modal-list">
-          {filtered.length === 0 && <div className="feed-key-lookup-empty">No markups found</div>}
+          {filtered.length === 0 && <div className="feed-key-lookup-empty">No markdowns found</div>}
           {filtered.map(n => (
             <div key={n.id} className="feed-key-lookup-item" onClick={() => handleSelect(n)} style={{ cursor: 'pointer' }}>
               <span className="feed-key-lookup-title">{n.title || 'Untitled'}</span>
@@ -681,7 +681,7 @@ function PromptForm({ initial, channels, onSave, onCancel }) {
   const [showSchedule, setShowSchedule] = useState(Boolean(initial.cron_expr))
   const [activeMsg, setActiveMsg] = useState(0)
   const [feedPostMode, setFeedPostMode] = useState(null)
-  const [markupToolMode, setMarkupToolMode] = useState(null)
+  const [markdownToolMode, setMarkdownToolMode] = useState(null)
 
   const updateMsg = (idx, val) => {
     if (val.length > MSG_CHAR_LIMIT) return
@@ -799,28 +799,28 @@ function PromptForm({ initial, channels, onSave, onCancel }) {
             />
             <div className="prompt-msg-tools">
               <span className="prompt-msg-tools-label">Tools</span>
-              <button type="button" className="prompt-msg-tool-btn" onClick={() => { setActiveMsg(idx); setFeedPostMode('markup') }}>
+              <button type="button" className="prompt-msg-tool-btn" onClick={() => { setActiveMsg(idx); setFeedPostMode('markdown') }}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
-                Post Feed Markup
+                Post Feed Markdown
               </button>
               <button type="button" className="prompt-msg-tool-btn" onClick={() => { setActiveMsg(idx); setFeedPostMode('document') }}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                 Post Feed Document
               </button>
-              <button type="button" className="prompt-msg-tool-btn" onClick={() => { setActiveMsg(idx); setMarkupToolMode('read') }}>
+              <button type="button" className="prompt-msg-tool-btn" onClick={() => { setActiveMsg(idx); setMarkdownToolMode('read') }}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                Read Markup
+                Read Markdown
               </button>
-              <button type="button" className="prompt-msg-tool-btn" onClick={() => { setActiveMsg(idx); setMarkupToolMode('update') }}>
+              <button type="button" className="prompt-msg-tool-btn" onClick={() => { setActiveMsg(idx); setMarkdownToolMode('update') }}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                Update Markup
+                Update Markdown
               </button>
             </div>
           </div>
         ))}
         <button type="button" className="prompt-add-msg-btn" onClick={addMsg}>+ Add message</button>
         {feedPostMode && <FeedPostModal mode={feedPostMode} onInsert={insertIntoActiveMsg} onClose={() => setFeedPostMode(null)} />}
-        {markupToolMode && <MarkupToolModal mode={markupToolMode} onInsert={insertIntoActiveMsg} onClose={() => setMarkupToolMode(null)} />}
+        {markdownToolMode && <MarkdownToolModal mode={markdownToolMode} onInsert={insertIntoActiveMsg} onClose={() => setMarkdownToolMode(null)} />}
       </div>
       <div className="prompt-form-actions">
         <button type="submit" className="prompt-save-btn" disabled={!hasContent || !title.trim()}>
@@ -926,11 +926,11 @@ function App() {
   })
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const lastWidthRef = useRef(sidebarWidth)
-  const [pinnedItems, setPinnedItems] = useState({ markups: [], documents: [], links: [], feed_categories: [] })
+  const [pinnedItems, setPinnedItems] = useState({ markdowns: [], documents: [], links: [], feed_categories: [] })
   const [quickView, setQuickView] = useState(null)
-  const [editMarkupRequest, setEditMarkupRequest] = useState(null)
-  const [activeMarkup, setActiveMarkup] = useState(null)
-  const [markupRefreshKey, setMarkupRefreshKey] = useState(0)
+  const [editMarkdownRequest, setEditMarkdownRequest] = useState(null)
+  const [activeMarkdown, setActiveMarkdown] = useState(null)
+  const [markdownRefreshKey, setMarkdownRefreshKey] = useState(0)
   const [openFeedRequest, setOpenFeedRequest] = useState(null)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -1566,10 +1566,10 @@ function App() {
             </button>
           )}
         </div>
-        {(pinnedItems.markups.length > 0 || pinnedItems.documents.length > 0 || pinnedItems.links?.length > 0 || pinnedItems.feed_categories?.length > 0) && (
+        {(pinnedItems.markdowns.length > 0 || pinnedItems.documents.length > 0 || pinnedItems.links?.length > 0 || pinnedItems.feed_categories?.length > 0) && (
           <div className="pinned-bar">
-            {pinnedItems.markups.map((n) => (
-              <button key={`n-${n.id}`} className="pinned-chip pinned-markup" onClick={() => { setSidebarTab('markups'); setEditMarkupRequest(n); }} title={n.title || 'Untitled'}>
+            {pinnedItems.markdowns.map((n) => (
+              <button key={`n-${n.id}`} className="pinned-chip pinned-markdown" onClick={() => { setSidebarTab('markdowns'); setEditMarkdownRequest(n); }} title={n.title || 'Untitled'}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                   <polyline points="14 2 14 8 20 8" />
@@ -1702,7 +1702,7 @@ function App() {
                 <path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z" />
               </svg>
             </button>
-            <button className={`rail-tab ${sidebarTab === 'markups' ? 'active' : ''}`} onClick={() => setSidebarTab('markups')} title="Markups">
+            <button className={`rail-tab ${sidebarTab === 'markdowns' ? 'active' : ''}`} onClick={() => setSidebarTab('markdowns')} title="Markdowns">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                 <polyline points="14 2 14 8 20 8" />
@@ -1741,8 +1741,8 @@ function App() {
           <div className="sidebar-content">
           {sidebarTab === 'categories' && (
             <div className="categories-panel">
-              <div className="markups-header">
-                <span className="markups-header-title">Categories</span>
+              <div className="markdowns-header">
+                <span className="markdowns-header-title">Categories</span>
               </div>
               <CategoryTree
                 categories={categories}
@@ -1755,15 +1755,15 @@ function App() {
               />
             </div>
           )}
-          {sidebarTab === 'markups' && (
-            <MarkupsPanel
+          {sidebarTab === 'markdowns' && (
+            <MarkdownsPanel
               categories={categories}
               onPinChange={fetchPinned}
-              editMarkupRequest={editMarkupRequest}
-              onEditMarkupRequestHandled={() => setEditMarkupRequest(null)}
+              editMarkdownRequest={editMarkdownRequest}
+              onEditMarkdownRequestHandled={() => setEditMarkdownRequest(null)}
               universeId={currentUniverseId}
-              onEditMarkup={(m) => setActiveMarkup(m._new ? { ...m, _key: 'new' } : m)}
-              refreshKey={markupRefreshKey}
+              onEditMarkdown={(m) => setActiveMarkdown(m._new ? { ...m, _key: 'new' } : m)}
+              refreshKey={markdownRefreshKey}
             />
           )}
           {sidebarTab === 'archive' && (
@@ -1795,14 +1795,14 @@ function App() {
             <ActionItemsPanel
               categories={categories}
               universeId={currentUniverseId}
-              onOpenMarkup={(markupId) => {
-                fetch(`/api/markups/${markupId}`).then(r => {
+              onOpenMarkdown={(markdownId) => {
+                fetch(`/api/markdowns/${markdownId}`).then(r => {
                   if (!r.ok) return
                   return r.json()
-                }).then(markup => {
-                  if (markup) {
-                    setSidebarTab('markups')
-                    setEditMarkupRequest(markup)
+                }).then(markdown => {
+                  if (markdown) {
+                    setSidebarTab('markdowns')
+                    setEditMarkdownRequest(markdown)
                   }
                 })
               }}
@@ -1824,16 +1824,16 @@ function App() {
         </div>
 
         <div className="chat-container">
-          {activeMarkup ? (
-            <MarkupEditorView
-              markup={activeMarkup}
+          {activeMarkdown ? (
+            <MarkdownEditorView
+              markdown={activeMarkdown}
               categories={categories}
-              onClose={() => setActiveMarkup(null)}
+              onClose={() => setActiveMarkdown(null)}
               onSaved={(created, closed) => {
-                setMarkupRefreshKey(k => k + 1)
+                setMarkdownRefreshKey(k => k + 1)
                 fetchPinned()
-                if (created && !closed) setActiveMarkup(created)
-                if (closed) setActiveMarkup(null)
+                if (created && !closed) setActiveMarkdown(created)
+                if (closed) setActiveMarkdown(null)
               }}
             />
           ) : artifactViewCategory ? (
@@ -1986,13 +1986,13 @@ function App() {
                     </svg>
                     New Chat
                   </button>
-                  <button className="chat-toolbar-btn" onClick={() => setShowSaveChatModal(true)} disabled={loading} title="Save this chat as a markup">
+                  <button className="chat-toolbar-btn" onClick={() => setShowSaveChatModal(true)} disabled={loading} title="Save this chat as a markdown">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
                       <polyline points="17 21 17 13 7 13 7 21" />
                       <polyline points="7 3 7 8 15 8" />
                     </svg>
-                    Save as Markup
+                    Save as Markdown
                   </button>
                   <span className="chat-msg-count">{messages.length} messages</span>
                 </div>
@@ -2031,7 +2031,7 @@ function App() {
             </>
           )}
 
-          {!artifactViewCategory && !activeMarkup && <footer className="input-area">
+          {!artifactViewCategory && !activeMarkdown && <footer className="input-area">
             <form onSubmit={handleSubmit} className="input-form">
               <textarea
                 ref={inputRef}

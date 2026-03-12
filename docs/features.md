@@ -10,25 +10,25 @@ Astro includes a conversational AI interface powered by OpenAI (with additional 
 
 - Chat-based interaction
 - Toggle Retrieval on/off per message
-- Answers grounded in your markups, documents, and action items
+- Answers grounded in your markdowns, documents, and action items
 - Persistent knowledgebase that grows with use
 
 When Retrieval is enabled, Astro pulls relevant context from your stored knowledge before generating a response — making conversations contextual and meaningful.
 
 ---
 
-## Markups
+## Markdowns
 
-Create and organize structured markups.
+Create and organize structured markdowns.
 
 - Title + body
 - Category assignment
-- Rich formatting via markup
+- Rich formatting via markdown
 - Embed images (PNG, JPG, GIF, WebP, BMP, SVG)
 - Fully searchable
 - Included in AI retrieval context
 
-Markups are first-class citizens in your Universe.
+Markdowns are first-class citizens in your Universe.
 
 ---
 
@@ -89,7 +89,7 @@ Links become part of your searchable knowledge base.
 
 ## Universes
 
-Universes isolate all content: markups, documents, tasks, links, and categories.
+Universes isolate all content: markdowns, documents, tasks, links, and categories.
 
 Use separate Universes for:
 
@@ -109,7 +109,7 @@ Organize everything using a parent/child category tree.
 
 Categories apply across:
 
-- Markups
+- Markdowns
 - Documents
 - Tasks
 - Links
@@ -120,13 +120,13 @@ This creates consistent structure across your entire workspace.
 
 ## Pinned Items Bar
 
-Pin important markups, documents, and links. They appear in a unified header bar for quick access.
+Pin important markdowns, documents, and links. They appear in a unified header bar for quick access.
 
 ---
 
 ## Unified Search
 
-Quickly search across markups, documents, and links. Find what you need instantly.
+Quickly search across markdowns, documents, and links. Find what you need instantly.
 
 ---
 
@@ -171,11 +171,11 @@ Ingest data from external services into Astro through authenticated API endpoint
 
 1. Create a feed and assign it a category
 2. Copy the auto-generated API key
-3. POST markup or files to `/api/feeds/{id}/ingest` with the `X-Feed-Key` header
+3. POST markdown or files to `/api/feeds/{id}/ingest` with the `X-Feed-Key` header
 
 ### Capabilities
 
-- **Markup artifacts** — push HTML content with a title
+- **Markdown artifacts** — push HTML content with a title
 - **File artifacts** — upload PDF, DOCX, images, or any file type
 - **API key authentication** — each feed has its own key
 - **Timeline view** — artifacts are displayed chronologically with expand/collapse

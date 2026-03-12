@@ -103,7 +103,7 @@ class IRCClient:
             time.sleep(RECONNECT_DELAY)
 
     def _connect(self):
-        from src.markups import get_setting
+        from src.markdowns import get_setting
         try:
             self.port = int(get_setting("irc_port") or IRC_PORT)
         except (TypeError, ValueError):

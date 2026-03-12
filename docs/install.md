@@ -94,7 +94,7 @@ After installation:
 1. Open **http://localhost:8000** in your browser
 2. Click the **gear icon** in the header to open Settings
 3. Enter your **OpenAI API key** (required for chat and embeddings)
-4. Start uploading documents, creating markups, or just chatting
+4. Start uploading documents, creating markdowns, or just chatting
 
 ## Useful Commands
 

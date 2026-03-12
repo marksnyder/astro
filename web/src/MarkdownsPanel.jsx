@@ -137,23 +137,23 @@ function MarkdownEditor({ value, onChange, placeholder }) {
   )
 }
 
-// ── Image gallery for markup editor ─────────────────────
+// ── Image gallery for markdown editor ─────────────────────
 
-function MarkupImageGallery({ markupId }) {
+function MarkdownImageGallery({ markdownId }) {
   const [images, setImages] = useState([])
   const [uploading, setUploading] = useState(false)
   const [lightbox, setLightbox] = useState(null)
   const fileRef = useRef(null)
 
   const fetchImages = () => {
-    if (!markupId) return
-    fetch(`/api/markups/${markupId}/images`)
+    if (!markdownId) return
+    fetch(`/api/markdowns/${markdownId}/images`)
       .then(r => r.json())
       .then(setImages)
       .catch(() => {})
   }
 
-  useEffect(() => { fetchImages() }, [markupId])
+  useEffect(() => { fetchImages() }, [markdownId])
 
   const handleUpload = async (e) => {
     const files = e.target.files
@@ -163,7 +163,7 @@ function MarkupImageGallery({ markupId }) {
       for (const file of files) {
         const form = new FormData()
         form.append('file', file)
-        await fetch(`/api/markups/${markupId}/images`, { method: 'POST', body: form })
+        await fetch(`/api/markdowns/${markdownId}/images`, { method: 'POST', body: form })
       }
       fetchImages()
     } finally {
@@ -174,18 +174,18 @@ function MarkupImageGallery({ markupId }) {
 
   const removeImage = async (imgId) => {
     if (!confirm('Remove this image?')) return
-    await fetch(`/api/markup-images/${imgId}`, { method: 'DELETE' })
+    await fetch(`/api/markdown-images/${imgId}`, { method: 'DELETE' })
     fetchImages()
   }
 
-  if (!markupId) return null
+  if (!markdownId) return null
 
   return (
-    <div className="markup-images-section">
-      <div className="markup-images-header">
-        <span className="markup-images-label">Reference Images</span>
+    <div className="markdown-images-section">
+      <div className="markdown-images-header">
+        <span className="markdown-images-label">Reference Images</span>
         <button
-          className="markup-images-add-btn"
+          className="markdown-images-add-btn"
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
           title="Add images"
@@ -206,18 +206,18 @@ function MarkupImageGallery({ markupId }) {
         />
       </div>
       {images.length > 0 && (
-        <div className="markup-images-grid">
+        <div className="markdown-images-grid">
           {images.map(img => (
-            <div key={img.id} className="markup-image-thumb" onClick={() => setLightbox(img)}>
-              <img src={`/api/markup-images/file/${img.filename}`} alt={img.original_name} />
+            <div key={img.id} className="markdown-image-thumb" onClick={() => setLightbox(img)}>
+              <img src={`/api/markdown-images/file/${img.filename}`} alt={img.original_name} />
               <button
-                className="markup-image-remove"
+                className="markdown-image-remove"
                 onClick={(e) => { e.stopPropagation(); removeImage(img.id) }}
                 title="Remove image"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
-              <div className="markup-image-name">{img.original_name}</div>
+              <div className="markdown-image-name">{img.original_name}</div>
             </div>
           ))}
         </div>
@@ -231,7 +231,7 @@ function MarkupImageGallery({ markupId }) {
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
-            <img className="lightbox-image" src={`/api/markup-images/file/${lightbox.filename}`} alt={lightbox.original_name} />
+            <img className="lightbox-image" src={`/api/markdown-images/file/${lightbox.filename}`} alt={lightbox.original_name} />
           </div>
         </div>
       )}
@@ -239,9 +239,9 @@ function MarkupImageGallery({ markupId }) {
   )
 }
 
-// ── Action items linked to a markup ─────────────────────
+// ── Action items linked to a markdown ─────────────────────
 
-function MarkupActionItems({ markupId, categories }) {
+function MarkdownActionItems({ markdownId, categories }) {
   const [items, setItems] = useState([])
   const [adding, setAdding] = useState(false)
   const [newTitle, setNewTitle] = useState('')
@@ -258,14 +258,14 @@ function MarkupActionItems({ markupId, categories }) {
   const editRef = useRef(null)
 
   const fetchItems = () => {
-    if (!markupId) return
-    fetch(`/api/markups/${markupId}/action-items`)
+    if (!markdownId) return
+    fetch(`/api/markdowns/${markdownId}/action-items`)
       .then(r => r.json())
       .then(setItems)
       .catch(() => {})
   }
 
-  useEffect(() => { fetchItems() }, [markupId])
+  useEffect(() => { fetchItems() }, [markdownId])
 
   const startAdd = () => {
     setAdding(true)
@@ -296,7 +296,7 @@ function MarkupActionItems({ markupId, categories }) {
       await fetch(`/api/action-items/${created.id}/links`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ link_type: 'markup', markup_id: markupId }),
+        body: JSON.stringify({ link_type: 'markdown', markdown_id: markdownId }),
       })
       setAdding(false)
       fetchItems()
@@ -364,13 +364,13 @@ function MarkupActionItems({ markupId, categories }) {
     return new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
   }
 
-  if (!markupId) return null
+  if (!markdownId) return null
 
   return (
-    <div className="markup-ai-section">
-      <div className="markup-ai-header">
-        <span className="markup-ai-label">Action Items</span>
-        <button className="markup-ai-add-btn" onClick={startAdd} title="Add action item">
+    <div className="markdown-ai-section">
+      <div className="markdown-ai-header">
+        <span className="markdown-ai-label">Action Items</span>
+        <button className="markdown-ai-add-btn" onClick={startAdd} title="Add action item">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
           </svg>
@@ -378,16 +378,16 @@ function MarkupActionItems({ markupId, categories }) {
       </div>
 
       {adding && (
-        <div className="markup-ai-add-form">
+        <div className="markdown-ai-add-form">
           <input
             ref={addRef}
-            className="markup-ai-input"
+            className="markdown-ai-input"
             placeholder="Action item title..."
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') saveNew(); if (e.key === 'Escape') cancelAdd() }}
           />
-          <div className="markup-ai-form-row">
+          <div className="markdown-ai-form-row">
             <button
               className={`ai-hot-toggle small ${newHot ? 'active' : ''}`}
               onClick={() => setNewHot(!newHot)}
@@ -403,29 +403,29 @@ function MarkupActionItems({ markupId, categories }) {
               value={newDueDate}
               onChange={(e) => setNewDueDate(e.target.value)}
             />
-            <div className="markup-ai-form-actions">
-              <button className="markup-ai-save-btn" onClick={saveNew} disabled={!newTitle.trim() || saving}>
+            <div className="markdown-ai-form-actions">
+              <button className="markdown-ai-save-btn" onClick={saveNew} disabled={!newTitle.trim() || saving}>
                 {saving ? 'Adding...' : 'Add'}
               </button>
-              <button className="markup-ai-cancel-btn" onClick={cancelAdd}>Cancel</button>
+              <button className="markdown-ai-cancel-btn" onClick={cancelAdd}>Cancel</button>
             </div>
           </div>
         </div>
       )}
 
       {items.length > 0 && (
-        <div className="markup-ai-list">
+        <div className="markdown-ai-list">
           {items.map((item) => (
             editingId === item.id ? (
-              <div key={item.id} className="markup-ai-item editing">
+              <div key={item.id} className="markdown-ai-item editing">
                 <input
                   ref={editRef}
-                  className="markup-ai-input"
+                  className="markdown-ai-input"
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(item); if (e.key === 'Escape') cancelEdit() }}
                 />
-                <div className="markup-ai-form-row">
+                <div className="markdown-ai-form-row">
                   <button
                     className={`ai-hot-toggle small ${editHot ? 'active' : ''}`}
                     onClick={() => setEditHot(!editHot)}
@@ -440,16 +440,16 @@ function MarkupActionItems({ markupId, categories }) {
                     value={editDueDate}
                     onChange={(e) => setEditDueDate(e.target.value)}
                   />
-                  <div className="markup-ai-form-actions">
-                    <button className="markup-ai-save-btn" onClick={() => saveEdit(item)} disabled={!editTitle.trim()}>Save</button>
-                    <button className="markup-ai-cancel-btn" onClick={cancelEdit}>Cancel</button>
+                  <div className="markdown-ai-form-actions">
+                    <button className="markdown-ai-save-btn" onClick={() => saveEdit(item)} disabled={!editTitle.trim()}>Save</button>
+                    <button className="markdown-ai-cancel-btn" onClick={cancelEdit}>Cancel</button>
                   </div>
                 </div>
               </div>
             ) : (
-              <div key={item.id} className={`markup-ai-item ${item.hot ? 'hot' : ''} ${item.completed ? 'done' : ''}`}>
+              <div key={item.id} className={`markdown-ai-item ${item.hot ? 'hot' : ''} ${item.completed ? 'done' : ''}`}>
                 <button
-                  className={`markup-ai-check ${item.completed ? 'checked' : ''}`}
+                  className={`markdown-ai-check ${item.completed ? 'checked' : ''}`}
                   onClick={() => toggleCompleted(item)}
                   title={item.completed ? 'Mark incomplete' : 'Mark complete'}
                 >
@@ -463,29 +463,29 @@ function MarkupActionItems({ markupId, categories }) {
                     </svg>
                   )}
                 </button>
-                <div className="markup-ai-body" onClick={() => startEdit(item)}>
-                  <span className={`markup-ai-title ${item.completed ? 'strike' : ''}`}>
+                <div className="markdown-ai-body" onClick={() => startEdit(item)}>
+                  <span className={`markdown-ai-title ${item.completed ? 'strike' : ''}`}>
                     {item.hot && (
-                      <svg className="markup-ai-hot-icon" width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+                      <svg className="markdown-ai-hot-icon" width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z" />
                       </svg>
                     )}
                     {item.title}
                   </span>
                   {item.due_date && (
-                    <span className={`markup-ai-due ${!item.completed && isOverdue(item.due_date) ? 'overdue' : ''}`}>
+                    <span className={`markdown-ai-due ${!item.completed && isOverdue(item.due_date) ? 'overdue' : ''}`}>
                       {formatDue(item.due_date)}
                     </span>
                   )}
                 </div>
-                <button className="markup-ai-unlink" onClick={() => unlinkItem(item)} title="Unlink from markup">
+                <button className="markdown-ai-unlink" onClick={() => unlinkItem(item)} title="Unlink from markdown">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M18.84 12.25l1.72-1.71a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
                     <path d="M5.16 11.75l-1.72 1.71a5 5 0 0 0 7.07 7.07l1.72-1.71" />
                     <line x1="1" y1="1" x2="23" y2="23" />
                   </svg>
                 </button>
-                <button className="markup-ai-del" onClick={() => deleteItem(item)} title="Delete action item">
+                <button className="markdown-ai-del" onClick={() => deleteItem(item)} title="Delete action item">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="3 6 5 6 21 6" />
                     <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
@@ -501,16 +501,16 @@ function MarkupActionItems({ markupId, categories }) {
   )
 }
 
-// ── Markups panel ───────────────────────────────────────
+// ── Markdowns panel ───────────────────────────────────────
 
-export function MarkupEditorView({ markup, categories, onClose, onSaved }) {
+export function MarkdownEditorView({ markdown, categories, onClose, onSaved }) {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [categoryId, setCategoryId] = useState(null)
   const [saving, setSaving] = useState(false)
   const [previewMode, setPreviewMode] = useState(false)
   const titleRef = useRef(null)
-  const isNew = !!markup?._new
+  const isNew = !!markdown?._new
 
   const htmlToMarkdownText = (html) => {
     if (!html) return ''
@@ -529,13 +529,13 @@ export function MarkupEditorView({ markup, categories, onClose, onSaved }) {
       setBody('')
       setCategoryId(null)
     } else {
-      setTitle(markup.title || '')
-      setBody(htmlToMarkdownText(markup.body))
-      setCategoryId(markup.category_id)
+      setTitle(markdown.title || '')
+      setBody(htmlToMarkdownText(markdown.body))
+      setCategoryId(markdown.category_id)
     }
     setPreviewMode(!isNew)
     if (isNew) setTimeout(() => titleRef.current?.focus(), 50)
-  }, [markup])
+  }, [markdown])
 
   const save = async (close = true) => {
     if (!title.trim() && !body.trim()) return
@@ -543,7 +543,7 @@ export function MarkupEditorView({ markup, categories, onClose, onSaved }) {
     try {
       const payload = { title, body, category_id: categoryId }
       if (isNew) {
-        const res = await fetch(`/api/markups?universe_id=${markup.universeId || 1}`, {
+        const res = await fetch(`/api/markdowns?universe_id=${markdown.universeId || 1}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -554,7 +554,7 @@ export function MarkupEditorView({ markup, categories, onClose, onSaved }) {
           return
         }
       } else {
-        await fetch(`/api/markups/${markup.id}`, {
+        await fetch(`/api/markdowns/${markdown.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -565,10 +565,10 @@ export function MarkupEditorView({ markup, categories, onClose, onSaved }) {
     } finally { setSaving(false) }
   }
 
-  const currentId = isNew ? null : markup.id
+  const currentId = isNew ? null : markdown.id
 
   return (
-    <div className="markup-inline-editor">
+    <div className="markdown-inline-editor">
       <div className="timeline-header">
         <button className="timeline-back-btn" onClick={onClose} title="Close editor">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -576,34 +576,34 @@ export function MarkupEditorView({ markup, categories, onClose, onSaved }) {
           </svg>
           Close
         </button>
-        <h3 className="timeline-title">{isNew ? 'New Markup' : 'Edit Markup'}</h3>
-        <div className="markup-mode-toggle">
-          <button className={`markup-mode-btn ${!previewMode ? 'active' : ''}`} onClick={() => setPreviewMode(false)}>Edit</button>
-          <button className={`markup-mode-btn ${previewMode ? 'active' : ''}`} onClick={() => setPreviewMode(true)}>Preview</button>
+        <h3 className="timeline-title">{isNew ? 'New Markdown' : 'Edit Markdown'}</h3>
+        <div className="markdown-mode-toggle">
+          <button className={`markdown-mode-btn ${!previewMode ? 'active' : ''}`} onClick={() => setPreviewMode(false)}>Edit</button>
+          <button className={`markdown-mode-btn ${previewMode ? 'active' : ''}`} onClick={() => setPreviewMode(true)}>Preview</button>
         </div>
       </div>
-      <div className="markup-inline-body">
-        <input ref={titleRef} className="markup-title-input" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
+      <div className="markdown-inline-body">
+        <input ref={titleRef} className="markdown-title-input" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
         <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId} />
         {previewMode ? (
-          <div className="markup-preview markdown-body">
+          <div className="markdown-preview markdown-body">
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}>{body}</ReactMarkdown>
           </div>
         ) : (
           <MarkdownEditor
-            key={isNew ? 'new' : markup.id}
+            key={isNew ? 'new' : markdown.id}
             value={body}
             onChange={setBody}
-            placeholder="Write your markup using markdown..."
+            placeholder="Write your markdown..."
           />
         )}
-        {currentId && <MarkupImageGallery markupId={currentId} />}
-        {currentId && <MarkupActionItems markupId={currentId} categories={categories} />}
-        <div className="markup-editor-actions">
-          <button className="markup-save-btn" onClick={() => save(true)} disabled={saving || (!title.trim() && !body.trim())}>
+        {currentId && <MarkdownImageGallery markdownId={currentId} />}
+        {currentId && <MarkdownActionItems markdownId={currentId} categories={categories} />}
+        <div className="markdown-editor-actions">
+          <button className="markdown-save-btn" onClick={() => save(true)} disabled={saving || (!title.trim() && !body.trim())}>
             {saving ? 'Saving...' : 'Save & Close'}
           </button>
-          <button className="markup-save-continue-btn" onClick={() => save(false)} disabled={saving || (!title.trim() && !body.trim())}>
+          <button className="markdown-save-continue-btn" onClick={() => save(false)} disabled={saving || (!title.trim() && !body.trim())}>
             {saving ? 'Saving...' : 'Save'}
           </button>
         </div>
@@ -612,67 +612,67 @@ export function MarkupEditorView({ markup, categories, onClose, onSaved }) {
   )
 }
 
-function MarkupsPanel({ categories, onPinChange, editMarkupRequest, onEditMarkupRequestHandled, universeId, onEditMarkup, refreshKey }) {
-  const [markups, setMarkups] = useState([])
+function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMarkdownRequestHandled, universeId, onEditMarkdown, refreshKey }) {
+  const [markdowns, setMarkdowns] = useState([])
   const [search, setSearch] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
   const [onlyLinked, setOnlyLinked] = useState(false)
-  const [linkedMarkupIds, setLinkedMarkupIds] = useState(null)
+  const [linkedMarkdownIds, setLinkedMarkdownIds] = useState(null)
 
   const catMap = Object.fromEntries(categories.map((c) => [c.id, c.name]))
   const catEmojiMap = Object.fromEntries(categories.map((c) => [c.id, c.emoji || null]))
 
-  const fetchMarkups = () => {
+  const fetchMarkdowns = () => {
     const params = new URLSearchParams()
     if (search) params.set('q', search)
     if (selectedCategoryId !== null) params.set('category_id', selectedCategoryId)
     if (universeId) params.set('universe_id', universeId)
-    fetch(`/api/markups?${params}`)
+    fetch(`/api/markdowns?${params}`)
       .then(res => res.json())
-      .then(data => setMarkups(data))
+      .then(data => setMarkdowns(data))
       .catch(() => {})
   }
 
   const fetchLinkedIds = () => {
     fetch('/api/action-item-links/linked-targets')
       .then(r => r.json())
-      .then(data => setLinkedMarkupIds(new Set(data.markup_ids)))
+      .then(data => setLinkedMarkdownIds(new Set(data.markdown_ids)))
       .catch(() => {})
   }
 
-  useEffect(() => { fetchMarkups(); fetchLinkedIds() }, [universeId, refreshKey])
+  useEffect(() => { fetchMarkdowns(); fetchLinkedIds() }, [universeId, refreshKey])
   useEffect(() => {
-    const timer = setTimeout(fetchMarkups, 300)
+    const timer = setTimeout(fetchMarkdowns, 300)
     return () => clearTimeout(timer)
   }, [search, selectedCategoryId, universeId])
 
   useEffect(() => {
-    if (editMarkupRequest) {
-      onEditMarkup?.(editMarkupRequest)
-      onEditMarkupRequestHandled?.()
+    if (editMarkdownRequest) {
+      onEditMarkdown?.(editMarkdownRequest)
+      onEditMarkdownRequestHandled?.()
     }
-  }, [editMarkupRequest])
+  }, [editMarkdownRequest])
 
   const startNew = () => {
-    onEditMarkup?.({ _new: true, universeId })
+    onEditMarkdown?.({ _new: true, universeId })
   }
 
-  const startEdit = (markup) => {
-    onEditMarkup?.(markup)
+  const startEdit = (markdown) => {
+    onEditMarkdown?.(markdown)
   }
 
-  const remove = async (markupId) => {
-    if (!confirm('Are you sure you want to delete this markup?')) return
-    await fetch(`/api/markups/${markupId}`, { method: 'DELETE' })
-    fetchMarkups()
+  const remove = async (markdownId) => {
+    if (!confirm('Are you sure you want to delete this markdown?')) return
+    await fetch(`/api/markdowns/${markdownId}`, { method: 'DELETE' })
+    fetchMarkdowns()
     onPinChange?.()
   }
 
-  const togglePin = async (e, markup) => {
+  const togglePin = async (e, markdown) => {
     e.stopPropagation()
-    const newPinned = !markup.pinned
-    await fetch(`/api/markups/${markup.id}/pin?pinned=${newPinned}`, { method: 'PUT' })
-    fetchMarkups()
+    const newPinned = !markdown.pinned
+    await fetch(`/api/markdowns/${markdown.id}/pin?pinned=${newPinned}`, { method: 'PUT' })
+    fetchMarkdowns()
     onPinChange?.()
   }
 
@@ -696,22 +696,22 @@ function MarkupsPanel({ categories, onPinChange, editMarkupRequest, onEditMarkup
   }
 
   return (
-    <aside className="markups-panel">
-      <div className="markups-header">
-        <span className="markups-header-title">Markups</span>
-        <button className="markups-add-btn" onClick={startNew} title="New markup">
+    <aside className="markdowns-panel">
+      <div className="markdowns-header">
+        <span className="markdowns-header-title">Markdowns</span>
+        <button className="markdowns-add-btn" onClick={startNew} title="New markdown">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
           </svg>
         </button>
       </div>
-      <div className="markups-search">
+      <div className="markdowns-search">
         <div className="ai-search-row">
-          <input className="markups-search-input" placeholder="Search markups..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input className="markdowns-search-input" placeholder="Search markdowns..." value={search} onChange={(e) => setSearch(e.target.value)} />
           <button
             className={`linked-filter-btn ${onlyLinked ? 'active' : ''}`}
             onClick={() => setOnlyLinked(!onlyLinked)}
-            title={onlyLinked ? 'Show all markups' : 'Show only markups with action items'}
+            title={onlyLinked ? 'Show all markdowns' : 'Show only markdowns with action items'}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
@@ -721,14 +721,14 @@ function MarkupsPanel({ categories, onPinChange, editMarkupRequest, onEditMarkup
         </div>
         <CategoryFilterPicker categories={categories} value={selectedCategoryId} onChange={setSelectedCategoryId} />
       </div>
-      <div className="markups-list">
+      <div className="markdowns-list">
         {(() => {
-          const filtered = onlyLinked && linkedMarkupIds
-            ? markups.filter(n => linkedMarkupIds.has(n.id))
-            : markups
+          const filtered = onlyLinked && linkedMarkdownIds
+            ? markdowns.filter(n => linkedMarkdownIds.has(n.id))
+            : markdowns
           if (filtered.length === 0) return (
-            <div className="markups-empty">
-              {onlyLinked ? 'No markups with linked action items.' : search || selectedCategoryId ? 'No matching markups.' : 'No markups yet. Click + to create one.'}
+            <div className="markdowns-empty">
+              {onlyLinked ? 'No markdowns with linked action items.' : search || selectedCategoryId ? 'No matching markdowns.' : 'No markdowns yet. Click + to create one.'}
             </div>
           )
           return buildGroups(filtered, catMap).map((group) => (
@@ -738,24 +738,24 @@ function MarkupsPanel({ categories, onPinChange, editMarkupRequest, onEditMarkup
                 <span className="ai-group-name">{group.name || 'Uncategorized'}</span>
                 <span className="ai-group-count">{group.items.length}</span>
               </div>
-              {group.items.map((markup) => (
-                <div key={markup.id} className="markup-card" onClick={() => startEdit(markup)}>
-                  <div className="markup-card-header">
-                    <div className="markup-card-title">{markup.title || 'Untitled'}</div>
+              {group.items.map((markdown) => (
+                <div key={markdown.id} className="markdown-card" onClick={() => startEdit(markdown)}>
+                  <div className="markdown-card-header">
+                    <div className="markdown-card-title">{markdown.title || 'Untitled'}</div>
                     <button
-                      className={`pin-btn ${markup.pinned ? 'pinned' : ''}`}
-                      onClick={(e) => togglePin(e, markup)}
-                      title={markup.pinned ? 'Unpin' : 'Pin to header'}
+                      className={`pin-btn ${markdown.pinned ? 'pinned' : ''}`}
+                      onClick={(e) => togglePin(e, markdown)}
+                      title={markdown.pinned ? 'Unpin' : 'Pin to header'}
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill={markup.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill={markdown.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M12 17v5" />
                         <path d="M9 2h6l-1 7h4l-5 7H7l2-7H5l1-7z" />
                       </svg>
                     </button>
                     <button
-                      className="markup-card-delete-btn"
-                      onClick={(e) => { e.stopPropagation(); remove(markup.id) }}
-                      title="Delete markup"
+                      className="markdown-card-delete-btn"
+                      onClick={(e) => { e.stopPropagation(); remove(markdown.id) }}
+                      title="Delete markdown"
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="3 6 5 6 21 6" />
@@ -775,4 +775,4 @@ function MarkupsPanel({ categories, onPinChange, editMarkupRequest, onEditMarkup
   )
 }
 
-export default MarkupsPanel
+export default MarkdownsPanel

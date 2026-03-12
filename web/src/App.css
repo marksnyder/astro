@@ -206,7 +206,7 @@
   align-items: center;
 }
 
-.universe-create-row .markup-title-input {
+.universe-create-row .markdown-title-input {
   flex: 1;
 }
 
@@ -1399,7 +1399,7 @@
   background: rgba(124, 131, 247, 0.08);
 }
 
-.pinned-markup svg { color: var(--accent); }
+.pinned-markdown svg { color: var(--accent); }
 .pinned-doc svg { color: #ed8936; }
 .pinned-link svg { color: #48bb78; }
 
@@ -1446,7 +1446,7 @@
   color: var(--accent);
 }
 
-.markup-card:hover .pin-btn,
+.markdown-card:hover .pin-btn,
 .archive-card:hover .pin-btn {
   opacity: 1;
 }
@@ -1551,7 +1551,7 @@
   min-height: 0;
 }
 
-.quickview-markup-body {
+.quickview-markdown-body {
   font-size: 14px;
   line-height: 1.7;
   color: var(--text-primary);
@@ -2200,16 +2200,16 @@
   background: rgba(124, 131, 247, 0.12);
 }
 
-/* ── Markups panel ───────────────────────────────────── */
+/* ── Markdowns panel ───────────────────────────────────── */
 
-.markups-panel {
+.markdowns-panel {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
 
-.markups-header {
+.markdowns-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2218,12 +2218,12 @@
   flex-shrink: 0;
 }
 
-.markups-header-title {
+.markdowns-header-title {
   font-size: 15px;
   font-weight: 700;
 }
 
-.markups-add-btn {
+.markdowns-add-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2237,13 +2237,13 @@
   transition: border-color 0.2s, background 0.2s;
 }
 
-.markups-add-btn:hover {
+.markdowns-add-btn:hover {
   border-color: var(--accent);
   background: var(--accent);
   color: #fff;
 }
 
-.markups-back-btn {
+.markdowns-back-btn {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -2256,16 +2256,16 @@
   padding: 0;
 }
 
-.markups-back-btn:hover {
+.markdowns-back-btn:hover {
   color: var(--accent-hover);
 }
 
-.markups-search {
+.markdowns-search {
   padding: 12px 16px;
   flex-shrink: 0;
 }
 
-.markups-search-input {
+.markdowns-search-input {
   width: 100%;
   padding: 8px 12px;
   border-radius: 8px;
@@ -2278,58 +2278,58 @@
   transition: border-color 0.2s;
 }
 
-.markups-search-input:focus {
+.markdowns-search-input:focus {
   border-color: var(--accent);
 }
 
-.markups-search-input::placeholder {
+.markdowns-search-input::placeholder {
   color: var(--text-secondary);
 }
 
-.markups-list {
+.markdowns-list {
   flex: 1;
   overflow-y: auto;
 }
 
-.markups-list::-webkit-scrollbar {
+.markdowns-list::-webkit-scrollbar {
   width: 4px;
 }
 
-.markups-list::-webkit-scrollbar-track {
+.markdowns-list::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.markups-list::-webkit-scrollbar-thumb {
+.markdowns-list::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 2px;
 }
 
-.markups-empty {
+.markdowns-empty {
   padding: 24px 16px;
   text-align: center;
   font-size: 13px;
   color: var(--text-secondary);
 }
 
-.markup-card {
+.markdown-card {
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   transition: background 0.15s;
 }
 
-.markup-card:hover {
+.markdown-card:hover {
   background: rgba(236, 201, 75, 0.10);
 }
 
-.markup-card-header {
+.markdown-card-header {
   display: flex;
   align-items: center;
   gap: 4px;
   margin-bottom: 2px;
 }
 
-.markup-card-title {
+.markdown-card-title {
   flex: 1;
   font-size: 14px;
   font-weight: 600;
@@ -2339,7 +2339,7 @@
   min-width: 0;
 }
 
-.markup-card-delete-btn {
+.markdown-card-delete-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2355,22 +2355,22 @@
   transition: opacity 0.12s, color 0.15s, background 0.15s;
 }
 
-.markup-card:hover .markup-card-delete-btn {
+.markdown-card:hover .markdown-card-delete-btn {
   opacity: 1;
 }
 
-.markup-card-delete-btn:hover {
+.markdown-card-delete-btn:hover {
   color: #e53e3e;
   background: rgba(229, 62, 62, 0.1);
 }
 
-.markup-card-date {
+.markdown-card-date {
   font-size: 11px;
   color: var(--text-secondary);
   margin-bottom: 4px;
 }
 
-.markup-card-preview {
+.markdown-card-preview {
   font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.4;
@@ -2424,9 +2424,9 @@
   background: rgba(229, 62, 62, 0.1);
 }
 
-/* ── Markup editor modal ─────────────────────────────── */
+/* ── Markdown editor modal ─────────────────────────────── */
 
-.markup-modal-overlay {
+.markdown-modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.6);
@@ -2437,7 +2437,7 @@
   animation: fadeIn 0.15s ease;
 }
 
-.markup-modal {
+.markdown-modal {
   background: var(--bg-primary);
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -2451,7 +2451,7 @@
   animation: slideUp 0.2s ease;
 }
 
-.markup-modal-header {
+.markdown-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2460,7 +2460,7 @@
   flex-shrink: 0;
 }
 
-.markup-mode-toggle {
+.markdown-mode-toggle {
   display: flex;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -2469,7 +2469,7 @@
   margin-right: 12px;
 }
 
-.markup-mode-btn {
+.markdown-mode-btn {
   padding: 4px 12px;
   font-size: 12px;
   font-weight: 600;
@@ -2481,17 +2481,17 @@
   transition: background 0.12s, color 0.12s;
 }
 
-.markup-mode-btn.active {
+.markdown-mode-btn.active {
   background: var(--accent);
   color: #fff;
 }
 
-.markup-mode-btn:not(.active):hover {
+.markdown-mode-btn:not(.active):hover {
   background: rgba(124, 131, 247, 0.1);
   color: var(--text-primary);
 }
 
-.markup-preview {
+.markdown-preview {
   flex: 1;
   overflow-y: auto;
   padding: 16px;
@@ -2501,12 +2501,12 @@
   min-height: 200px;
 }
 
-.markup-modal-title {
+.markdown-modal-title {
   font-size: 16px;
   font-weight: 700;
 }
 
-.markup-modal-body {
+.markdown-modal-body {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -2516,28 +2516,28 @@
   min-height: 0;
 }
 
-.markup-modal-body .md-editor-wrapper {
+.markdown-modal-body .md-editor-wrapper {
   flex: 1;
   min-height: 200px;
 }
 
-/* Action-items modal – smaller than markups modal */
-.markup-modal.ai-modal {
+/* Action-items modal – smaller than markdowns modal */
+.markdown-modal.ai-modal {
   height: auto;
   max-height: 70vh;
   max-width: 540px;
 }
 
-.ai-modal .markup-modal-body {
+.ai-modal .markdown-modal-body {
   padding: 24px;
   gap: 14px;
 }
 
-.ai-modal .markup-title-input {
+.ai-modal .markdown-title-input {
   font-size: 15px;
 }
 
-.ai-modal .markup-editor-actions {
+.ai-modal .markdown-editor-actions {
   margin-top: 8px;
 }
 
@@ -2607,7 +2607,7 @@
   max-width: 200px;
 }
 
-.ai-link-chip.markup {
+.ai-link-chip.markdown {
   border-left: 3px solid #6366f1;
 }
 
@@ -2727,14 +2727,14 @@
   padding: 4px 0;
 }
 
-.ai-card-markup-links {
+.ai-card-markdown-links {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
   margin-top: 3px;
 }
 
-.ai-markup-link-btn {
+.ai-markdown-link-btn {
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -2749,13 +2749,13 @@
   transition: background 0.12s, border-color 0.12s;
 }
 
-.ai-markup-link-btn span {
+.ai-markdown-link-btn span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.ai-markup-link-btn:hover {
+.ai-markdown-link-btn:hover {
   background: rgba(99, 102, 241, 0.18);
   border-color: #6366f1;
 }
@@ -2769,9 +2769,9 @@
   margin-top: 2px;
 }
 
-/* ── Markup editor ───────────────────────────────────── */
+/* ── Markdown editor ───────────────────────────────────── */
 
-.markup-editor {
+.markdown-editor {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -2780,7 +2780,7 @@
   overflow-y: auto;
 }
 
-.markup-title-input {
+.markdown-title-input {
   font-size: 15px;
   font-weight: 600;
   padding: 10px 12px;
@@ -2793,11 +2793,11 @@
   transition: border-color 0.2s;
 }
 
-.markup-title-input:focus {
+.markdown-title-input:focus {
   border-color: var(--accent);
 }
 
-.markup-title-input::placeholder {
+.markdown-title-input::placeholder {
   color: var(--text-secondary);
 }
 
@@ -2893,12 +2893,12 @@
 .md-textarea::-webkit-scrollbar-track { background: transparent; }
 .md-textarea::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-.markup-editor-actions {
+.markdown-editor-actions {
   display: flex;
   gap: 8px;
 }
 
-.markup-save-btn {
+.markdown-save-btn {
   flex: 1;
   padding: 10px;
   border-radius: 8px;
@@ -2912,16 +2912,16 @@
   transition: background 0.2s;
 }
 
-.markup-save-btn:hover:not(:disabled) {
+.markdown-save-btn:hover:not(:disabled) {
   background: var(--accent-hover);
 }
 
-.markup-save-btn:disabled {
+.markdown-save-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
-.markup-save-continue-btn {
+.markdown-save-continue-btn {
   padding: 10px 18px;
   border-radius: 8px;
   border: 1px solid var(--accent);
@@ -2934,16 +2934,16 @@
   transition: background 0.2s, color 0.2s;
 }
 
-.markup-save-continue-btn:hover:not(:disabled) {
+.markdown-save-continue-btn:hover:not(:disabled) {
   background: rgba(124, 131, 247, 0.12);
 }
 
-.markup-save-continue-btn:disabled {
+.markdown-save-continue-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
-.markup-delete-btn {
+.markdown-delete-btn {
   padding: 10px 18px;
   border-radius: 8px;
   border: 1px solid #e53e3e;
@@ -2956,25 +2956,25 @@
   transition: background 0.2s, color 0.2s;
 }
 
-.markup-delete-btn:hover {
+.markdown-delete-btn:hover {
   background: #e53e3e;
   color: #fff;
 }
 
-/* ── Markup reference images ─────────────────────────── */
+/* ── Markdown reference images ─────────────────────────── */
 
-.markup-images-section {
+.markdown-images-section {
   flex-shrink: 0;
 }
 
-.markup-images-header {
+.markdown-images-header {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
 }
 
-.markup-images-label {
+.markdown-images-label {
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
@@ -2982,7 +2982,7 @@
   letter-spacing: 0.04em;
 }
 
-.markup-images-add-btn {
+.markdown-images-add-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2996,23 +2996,23 @@
   transition: border-color 0.2s, color 0.2s, background 0.2s;
 }
 
-.markup-images-add-btn:hover:not(:disabled) {
+.markdown-images-add-btn:hover:not(:disabled) {
   border-color: var(--accent);
   color: var(--accent);
 }
 
-.markup-images-add-btn:disabled {
+.markdown-images-add-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
-.markup-images-grid {
+.markdown-images-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
   gap: 8px;
 }
 
-.markup-image-thumb {
+.markdown-image-thumb {
   position: relative;
   aspect-ratio: 1;
   border-radius: 8px;
@@ -3023,19 +3023,19 @@
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.markup-image-thumb:hover {
+.markdown-image-thumb:hover {
   border-color: var(--accent);
   box-shadow: 0 2px 8px rgba(124, 131, 247, 0.15);
 }
 
-.markup-image-thumb img {
+.markdown-image-thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
 
-.markup-image-remove {
+.markdown-image-remove {
   position: absolute;
   top: 4px;
   right: 4px;
@@ -3053,15 +3053,15 @@
   transition: opacity 0.12s, background 0.15s;
 }
 
-.markup-image-thumb:hover .markup-image-remove {
+.markdown-image-thumb:hover .markdown-image-remove {
   opacity: 1;
 }
 
-.markup-image-remove:hover {
+.markdown-image-remove:hover {
   background: #e53e3e;
 }
 
-.markup-image-name {
+.markdown-image-name {
   position: absolute;
   bottom: 0;
   left: 0;
@@ -3076,9 +3076,9 @@
   pointer-events: none;
 }
 
-/* ── Markup action-items section ────────────────────── */
+/* ── Markdown action-items section ────────────────────── */
 
-.markup-ai-section {
+.markdown-ai-section {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -3086,13 +3086,13 @@
   padding-top: 12px;
 }
 
-.markup-ai-header {
+.markdown-ai-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-.markup-ai-label {
+.markdown-ai-label {
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
@@ -3100,7 +3100,7 @@
   letter-spacing: 0.04em;
 }
 
-.markup-ai-add-btn {
+.markdown-ai-add-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3114,14 +3114,14 @@
   transition: background 0.15s, color 0.15s;
 }
 
-.markup-ai-add-btn:hover {
+.markdown-ai-add-btn:hover {
   background: var(--accent);
   color: #fff;
   border-color: var(--accent);
 }
 
 /* Add / edit form */
-.markup-ai-add-form {
+.markdown-ai-add-form {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -3131,7 +3131,7 @@
   background: var(--bg-secondary);
 }
 
-.markup-ai-input {
+.markdown-ai-input {
   padding: 6px 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -3141,11 +3141,11 @@
   outline: none;
 }
 
-.markup-ai-input:focus {
+.markdown-ai-input:focus {
   border-color: var(--accent);
 }
 
-.markup-ai-form-row {
+.markdown-ai-form-row {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -3163,13 +3163,13 @@
   gap: 2px;
 }
 
-.markup-ai-form-actions {
+.markdown-ai-form-actions {
   display: flex;
   gap: 4px;
   margin-left: auto;
 }
 
-.markup-ai-save-btn {
+.markdown-ai-save-btn {
   padding: 4px 10px;
   border: none;
   border-radius: 6px;
@@ -3180,12 +3180,12 @@
   cursor: pointer;
 }
 
-.markup-ai-save-btn:disabled {
+.markdown-ai-save-btn:disabled {
   opacity: 0.5;
   cursor: default;
 }
 
-.markup-ai-cancel-btn {
+.markdown-ai-cancel-btn {
   padding: 4px 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -3196,13 +3196,13 @@
 }
 
 /* Item list */
-.markup-ai-list {
+.markdown-ai-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.markup-ai-item {
+.markdown-ai-item {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -3211,11 +3211,11 @@
   transition: background 0.12s;
 }
 
-.markup-ai-item:hover {
+.markdown-ai-item:hover {
   background: var(--bg-secondary);
 }
 
-.markup-ai-item.editing {
+.markdown-ai-item.editing {
   flex-direction: column;
   align-items: stretch;
   gap: 6px;
@@ -3225,11 +3225,11 @@
   background: var(--bg-secondary);
 }
 
-.markup-ai-item.hot .markup-ai-title {
+.markdown-ai-item.hot .markdown-ai-title {
   color: #e53e3e;
 }
 
-.markup-ai-check {
+.markdown-ai-check {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3243,11 +3243,11 @@
   padding: 0;
 }
 
-.markup-ai-check.checked {
+.markdown-ai-check.checked {
   color: var(--accent);
 }
 
-.markup-ai-body {
+.markdown-ai-body {
   flex: 1;
   min-width: 0;
   display: flex;
@@ -3256,7 +3256,7 @@
   cursor: pointer;
 }
 
-.markup-ai-title {
+.markdown-ai-title {
   font-size: 13px;
   color: var(--text-primary);
   display: flex;
@@ -3267,30 +3267,30 @@
   text-overflow: ellipsis;
 }
 
-.markup-ai-title.strike {
+.markdown-ai-title.strike {
   text-decoration: line-through;
   opacity: 0.5;
 }
 
-.markup-ai-hot-icon {
+.markdown-ai-hot-icon {
   color: #e53e3e;
   flex-shrink: 0;
 }
 
-.markup-ai-due {
+.markdown-ai-due {
   font-size: 11px;
   color: var(--text-secondary);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
-.markup-ai-due.overdue {
+.markdown-ai-due.overdue {
   color: #ef4444;
   font-weight: 600;
 }
 
-.markup-ai-unlink,
-.markup-ai-del {
+.markdown-ai-unlink,
+.markdown-ai-del {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3307,17 +3307,17 @@
   padding: 0;
 }
 
-.markup-ai-item:hover .markup-ai-unlink,
-.markup-ai-item:hover .markup-ai-del {
+.markdown-ai-item:hover .markdown-ai-unlink,
+.markdown-ai-item:hover .markdown-ai-del {
   opacity: 1;
 }
 
-.markup-ai-unlink:hover {
+.markdown-ai-unlink:hover {
   color: #f59e0b;
   background: rgba(245, 158, 11, 0.1);
 }
 
-.markup-ai-del:hover {
+.markdown-ai-del:hover {
   color: #e53e3e;
   background: rgba(229, 62, 62, 0.1);
 }
@@ -4059,7 +4059,7 @@
   gap: 6px;
 }
 
-.ai-search-row .markups-search-input {
+.ai-search-row .markdowns-search-input {
   flex: 1;
 }
 
@@ -5802,7 +5802,7 @@
   border-bottom: 1px solid var(--border-color);
 }
 
-.feed-artifact-search .markups-search-input {
+.feed-artifact-search .markdowns-search-input {
   flex: 1;
 }
 
@@ -5875,7 +5875,7 @@
   color: var(--text-secondary);
 }
 
-.feed-artifact-type.markup {
+.feed-artifact-type.markdown {
   background: rgba(100, 180, 255, 0.15);
   color: #7ab8ff;
 }
@@ -5925,7 +5925,7 @@
   color: var(--text-primary);
 }
 
-.feed-artifact-btn.markup-btn:hover {
+.feed-artifact-btn.markdown-btn:hover {
   color: #7ab8ff;
 }
 
@@ -5982,43 +5982,43 @@
   border: 1px solid var(--border-color);
 }
 
-.feed-artifact-markup {
+.feed-artifact-markdown {
   font-size: 13.5px;
   line-height: 1.65;
   color: var(--text-primary);
 }
 
-.feed-artifact-markup h1,
-.feed-artifact-markup h2,
-.feed-artifact-markup h3 {
+.feed-artifact-markdown h1,
+.feed-artifact-markdown h2,
+.feed-artifact-markdown h3 {
   margin-top: 0.8em;
   margin-bottom: 0.4em;
 }
 
-.feed-artifact-markup h2 { font-size: 1.25em; }
-.feed-artifact-markup h3 { font-size: 1.1em; }
+.feed-artifact-markdown h2 { font-size: 1.25em; }
+.feed-artifact-markdown h3 { font-size: 1.1em; }
 
-.feed-artifact-markup ul,
-.feed-artifact-markup ol {
+.feed-artifact-markdown ul,
+.feed-artifact-markdown ol {
   padding-left: 1.5em;
   margin: 0.5em 0;
 }
 
-.feed-artifact-markup li {
+.feed-artifact-markdown li {
   margin-bottom: 0.3em;
 }
 
-.feed-artifact-markup p {
+.feed-artifact-markdown p {
   margin: 0.5em 0;
 }
 
-.feed-artifact-markup hr {
+.feed-artifact-markdown hr {
   border: none;
   border-top: 1px solid var(--border-color);
   margin: 1em 0;
 }
 
-.feed-artifact-markup code {
+.feed-artifact-markdown code {
   background: var(--bg-secondary);
   padding: 1px 4px;
   border-radius: 3px;
@@ -6106,7 +6106,7 @@
   overflow-y: auto;
 }
 
-.markup-inline-editor {
+.markdown-inline-editor {
   height: 100%;
   width: 100%;
   overflow-y: auto;
@@ -6114,17 +6114,17 @@
   flex-direction: column;
 }
 
-.markup-inline-editor .timeline-header {
+.markdown-inline-editor .timeline-header {
   flex-shrink: 0;
   width: 85%;
 }
 
-.markup-inline-editor .timeline-header .markup-mode-toggle {
+.markdown-inline-editor .timeline-header .markdown-mode-toggle {
   margin-left: auto;
   margin-right: 0;
 }
 
-.markup-inline-body {
+.markdown-inline-body {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -6136,7 +6136,7 @@
   margin: 0 auto;
 }
 
-.markup-inline-body .md-editor-wrapper {
+.markdown-inline-body .md-editor-wrapper {
   flex: 1;
   min-height: 200px;
 }
@@ -6260,7 +6260,7 @@
   margin: 8px 0;
 }
 
-.timeline-card-markup {
+.timeline-card-markdown {
   font-size: 13px;
   line-height: 1.6;
   color: var(--text-primary);
@@ -6268,7 +6268,7 @@
   overflow-wrap: break-word;
 }
 
-.timeline-card-markup img {
+.timeline-card-markdown img {
   max-width: 100%;
   height: auto;
   border-radius: 8px;
@@ -6276,21 +6276,21 @@
   display: block;
 }
 
-.timeline-card-markup a {
+.timeline-card-markdown a {
   color: var(--accent);
 }
 
-.timeline-card-markup p {
+.timeline-card-markdown p {
   margin: 6px 0;
 }
 
-.timeline-card-markup ul,
-.timeline-card-markup ol {
+.timeline-card-markdown ul,
+.timeline-card-markdown ol {
   padding-left: 20px;
   margin: 6px 0;
 }
 
-.timeline-card-markup pre {
+.timeline-card-markdown pre {
   background: var(--bg-tertiary, rgba(0,0,0,0.2));
   padding: 8px 12px;
   border-radius: 6px;
@@ -6298,7 +6298,7 @@
   font-size: 12px;
 }
 
-.timeline-card-markup blockquote {
+.timeline-card-markdown blockquote {
   border-left: 3px solid var(--accent);
   margin: 6px 0;
   padding: 4px 12px;

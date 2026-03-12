@@ -85,10 +85,10 @@ function MobileCategorySelect({ categories, value, onChange }) {
   )
 }
 
-// ── Markups view ──────────────────────────────────────
+// ── Markdowns view ──────────────────────────────────────
 
-function MobileMarkups({ categories, universeId }) {
-  const [markups, setMarkups] = useState([])
+function MobileMarkdowns({ categories, universeId }) {
+  const [markdowns, setMarkdowns] = useState([])
   const [search, setSearch] = useState('')
   const [filterCatId, setFilterCatId] = useState(null)
   const [viewing, setViewing] = useState(null)
@@ -210,23 +210,23 @@ function MobileMarkups({ categories, universeId }) {
     return () => { wantListeningRef.current = false; releaseWakeLock(); if (recognitionRef.current) recognitionRef.current.stop() }
   }, [editing])
 
-  const fetchMarkups = useCallback(() => {
+  const fetchMarkdowns = useCallback(() => {
     const params = new URLSearchParams()
     if (search) params.set('q', search)
     if (filterCatId !== null) params.set('category_id', filterCatId)
     if (universeId) params.set('universe_id', universeId)
-    fetch(`/api/markups?${params}`)
+    fetch(`/api/markdowns?${params}`)
       .then(r => r.json())
       .then(data => {
         data.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
-        setMarkups(data)
+        setMarkdowns(data)
       })
       .catch(() => {})
   }, [search, filterCatId, universeId])
 
-  useEffect(() => { fetchMarkups() }, [universeId])
+  useEffect(() => { fetchMarkdowns() }, [universeId])
   useEffect(() => {
-    const t = setTimeout(fetchMarkups, 300)
+    const t = setTimeout(fetchMarkdowns, 300)
     return () => clearTimeout(t)
   }, [search, filterCatId, universeId])
 
@@ -234,18 +234,18 @@ function MobileMarkups({ categories, universeId }) {
     setEditing('new')
     const now = new Date()
     const ts = now.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
-    setTitle(`Mobile Markup # ${ts}`)
+    setTitle(`Mobile Markdown # ${ts}`)
     setBody('')
     setCategoryId(filterCatId ?? getLastCategoryId())
     setTimeout(() => titleRef.current?.focus(), 80)
   }
 
-  const startEdit = (markup) => {
+  const startEdit = (markdown) => {
     setViewing(null)
-    setEditing(markup)
-    setTitle(markup.title)
-    setBody(stripHtml(markup.body, true))
-    setCategoryId(markup.category_id)
+    setEditing(markdown)
+    setTitle(markdown.title)
+    setBody(stripHtml(markdown.body, true))
+    setCategoryId(markdown.category_id)
     setTimeout(() => titleRef.current?.focus(), 80)
   }
 
@@ -257,29 +257,29 @@ function MobileMarkups({ categories, universeId }) {
     try {
       const payload = { title, body, category_id: categoryId }
       if (editing === 'new') {
-        await fetch(`/api/markups?universe_id=${universeId || 1}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        await fetch(`/api/markdowns?universe_id=${universeId || 1}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       } else {
-        await fetch(`/api/markups/${editing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        await fetch(`/api/markdowns/${editing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       }
       saveLastCategoryId(categoryId)
       setEditing(null)
-      fetchMarkups()
+      fetchMarkdowns()
     } finally { setSaving(false) }
   }
 
-  const remove = async (markup) => {
-    if (!confirm(`Delete "${markup.title || 'Untitled'}"?`)) return
-    await fetch(`/api/markups/${markup.id}`, { method: 'DELETE' })
+  const remove = async (markdown) => {
+    if (!confirm(`Delete "${markdown.title || 'Untitled'}"?`)) return
+    await fetch(`/api/markdowns/${markdown.id}`, { method: 'DELETE' })
     setViewing(null)
     setEditing(null)
-    fetchMarkups()
+    fetchMarkdowns()
   }
 
-  const togglePin = async (markup) => {
-    const newPinned = !markup.pinned
-    await fetch(`/api/markups/${markup.id}/pin?pinned=${newPinned}`, { method: 'PUT' })
-    if (viewing) setViewing({ ...markup, pinned: newPinned })
-    fetchMarkups()
+  const togglePin = async (markdown) => {
+    const newPinned = !markdown.pinned
+    await fetch(`/api/markdowns/${markdown.id}/pin?pinned=${newPinned}`, { method: 'PUT' })
+    if (viewing) setViewing({ ...markdown, pinned: newPinned })
+    fetchMarkdowns()
   }
 
   const stripHtml = (html, preserveBreaks = false) => {
@@ -298,7 +298,7 @@ function MobileMarkups({ categories, universeId }) {
   const formatDate = (iso) =>
     new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 
-  // ── View markup ─────────────────────────
+  // ── View markdown ─────────────────────────
   if (viewing) {
     return (
       <div className="mn-view">
@@ -306,7 +306,7 @@ function MobileMarkups({ categories, universeId }) {
           <button className="mn-back-btn" onClick={() => setViewing(null)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
           </button>
-          <span className="mn-view-header-title">Markup</span>
+          <span className="mn-view-header-title">Markdown</span>
           <span style={{ flex: 1 }} />
           <button className={`mn-action-btn ${viewing.pinned ? 'mn-pin-active' : ''}`} onClick={() => togglePin(viewing)} title={viewing.pinned ? 'Unpin' : 'Pin to top'}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill={viewing.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l3 9h9l-7 5 3 9-8-6-8 6 3-9-7-5h9z" /></svg>
@@ -334,7 +334,7 @@ function MobileMarkups({ categories, universeId }) {
     )
   }
 
-  // ── Edit / New markup ───────────────────
+  // ── Edit / New markdown ───────────────────
   if (editing) {
     return (
       <div className="mn-edit">
@@ -342,7 +342,7 @@ function MobileMarkups({ categories, universeId }) {
           <button className="mn-back-btn" onClick={cancelEdit}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
           </button>
-          <span className="mn-view-header-title">{editing === 'new' ? 'New Markup' : 'Edit Markup'}</span>
+          <span className="mn-view-header-title">{editing === 'new' ? 'New Markdown' : 'Edit Markdown'}</span>
           <span style={{ flex: 1 }} />
           <button className={`mn-mic-header-btn ${listening ? 'active' : ''}`} onClick={toggleDictation} title={listening ? 'Stop dictation' : 'Start dictation'}>
             {listening ? (
@@ -359,38 +359,38 @@ function MobileMarkups({ categories, universeId }) {
         <div className="mn-edit-body">
           <input ref={titleRef} className="mn-edit-title" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
           <MobileCategorySelect categories={categories} value={categoryId} onChange={setCategoryId} />
-          <textarea className="mn-edit-content" placeholder="Write your markup..." value={body} onChange={(e) => setBody(e.target.value)} />
+          <textarea className="mn-edit-content" placeholder="Write your markdown..." value={body} onChange={(e) => setBody(e.target.value)} />
         </div>
       </div>
     )
   }
 
-  // ── Markups list ────────────────────────
+  // ── Markdowns list ────────────────────────
   return (
     <div className="mn-list-view">
       <div className="mn-search-bar">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-        <input className="mn-search-input" placeholder="Search markups..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        <button className="mn-new-btn" onClick={startNew} title="New markup">
+        <input className="mn-search-input" placeholder="Search markdowns..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <button className="mn-new-btn" onClick={startNew} title="New markdown">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
         </button>
       </div>
       <div className="mn-filter-bar">
         <MobileCategorySelect categories={categories} value={filterCatId} onChange={setFilterCatId} />
       </div>
-      <div className="mn-markups-list">
-        {markups.length === 0 ? (
-          <div className="mn-empty">{search || filterCatId ? 'No matching markups.' : 'No markups yet. Tap + to create one.'}</div>
-        ) : markups.map(markup => (
-          <div key={markup.id} className={`mn-markup-card ${markup.pinned ? 'pinned' : ''}`} onClick={() => setViewing(markup)}>
-            <div className="mn-markup-title">
-              {markup.pinned && <svg className="mn-pin-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1"><path d="M12 2l3 9h9l-7 5 3 9-8-6-8 6 3-9-7-5h9z" /></svg>}
-              {markup.title || 'Untitled'}
+      <div className="mn-markdowns-list">
+        {markdowns.length === 0 ? (
+          <div className="mn-empty">{search || filterCatId ? 'No matching markdowns.' : 'No markdowns yet. Tap + to create one.'}</div>
+        ) : markdowns.map(markdown => (
+          <div key={markdown.id} className={`mn-markdown-card ${markdown.pinned ? 'pinned' : ''}`} onClick={() => setViewing(markdown)}>
+            <div className="mn-markdown-title">
+              {markdown.pinned && <svg className="mn-pin-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1"><path d="M12 2l3 9h9l-7 5 3 9-8-6-8 6 3-9-7-5h9z" /></svg>}
+              {markdown.title || 'Untitled'}
             </div>
-            <div className="mn-markup-preview">{stripHtml(markup.body).slice(0, 100)}</div>
-            <div className="mn-markup-card-footer">
-              <span className="mn-markup-date">{formatDate(markup.updated_at)}</span>
-              {markup.category_id && catMap[markup.category_id] && <span className="mn-cat-badge small">{catLabel(markup.category_id)}</span>}
+            <div className="mn-markdown-preview">{stripHtml(markdown.body).slice(0, 100)}</div>
+            <div className="mn-markdown-card-footer">
+              <span className="mn-markdown-date">{formatDate(markdown.updated_at)}</span>
+              {markdown.category_id && catMap[markdown.category_id] && <span className="mn-cat-badge small">{catLabel(markdown.category_id)}</span>}
             </div>
           </div>
         ))}
@@ -547,7 +547,7 @@ function MobileActions({ categories, universeId }) {
           {showCompleted ? 'Hide Completed' : 'Show Completed'}
         </button>
       </div>
-      <div className="mn-markups-list">
+      <div className="mn-markdowns-list">
         {items.length === 0 ? (
           <div className="mn-empty">{search ? 'No matching items.' : 'No action items. Tap + to add one.'}</div>
         ) : (() => {
@@ -716,12 +716,12 @@ function MobileFeeds({ categories, universeId }) {
                 <code className="mf-api-code">X-Feed-Key: {editing.api_key}</code>
               </div>
 
-              <div className="mf-api-section-title" style={{ marginTop: 12 }}>Send Markup</div>
+              <div className="mf-api-section-title" style={{ marginTop: 12 }}>Send Markdown</div>
               <pre className="mf-api-pre">{`POST ${baseUrl}/${editing.id}/ingest
 Content-Type: multipart/form-data
 X-Feed-Key: ${editing.api_key}
 
-title=My Artifact&markup=<p>Hello</p>`}</pre>
+title=My Artifact&markdown=<p>Hello</p>`}</pre>
 
               <div className="mf-api-section-title" style={{ marginTop: 8 }}>Send File</div>
               <pre className="mf-api-pre">{`POST ${baseUrl}/${editing.id}/ingest
@@ -734,7 +734,7 @@ title=Report&file=@report.pdf`}</pre>
               <pre className="mf-api-pre">{`{
   "ok": true,
   "artifact_id": 42,
-  "content_type": "markup" | "file"
+  "content_type": "markdown" | "file"
 }`}</pre>
             </div>
           )}
@@ -756,7 +756,7 @@ title=Report&file=@report.pdf`}</pre>
       <div className="mn-filter-bar">
         <MobileCategorySelect categories={categories} value={filterCatId} onChange={setFilterCatId} />
       </div>
-      <div className="mn-markups-list">
+      <div className="mn-markdowns-list">
         {feeds.length === 0 ? (
           <div className="mn-empty">{search || filterCatId ? 'No matching feeds.' : 'No feeds yet. Tap + to create one.'}</div>
         ) : (() => {
@@ -785,10 +785,10 @@ title=Report&file=@report.pdf`}</pre>
                   </button>
                 </div>
                 {groups[key].map(feed => (
-                  <div key={feed.id} className="mn-markup-card">
-                    <div className="mn-markup-title">{feed.title || 'Untitled'}</div>
-                    <div className="mn-markup-card-footer">
-                      <span className="mn-markup-date">{feed.artifact_count} artifact{feed.artifact_count !== 1 ? 's' : ''}</span>
+                  <div key={feed.id} className="mn-markdown-card">
+                    <div className="mn-markdown-title">{feed.title || 'Untitled'}</div>
+                    <div className="mn-markdown-card-footer">
+                      <span className="mn-markdown-date">{feed.artifact_count} artifact{feed.artifact_count !== 1 ? 's' : ''}</span>
                       <button className="mf-edit-btn" onClick={e => { e.stopPropagation(); startEdit(feed) }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                       </button>
@@ -850,10 +850,10 @@ function MobileArtifactTimeline({ category, onBack }) {
     removeFromList(id)
   }
 
-  const addAsMarkup = async (id) => {
-    setBusy(prev => ({ ...prev, [id]: 'markup' }))
+  const addAsMarkdown = async (id) => {
+    setBusy(prev => ({ ...prev, [id]: 'markdown' }))
     try {
-      const res = await fetch(`/api/feed-artifacts/${id}/to-markup`, { method: 'POST' })
+      const res = await fetch(`/api/feed-artifacts/${id}/to-markdown`, { method: 'POST' })
       if (res.ok) {
         setBusy(prev => { const n = { ...prev }; delete n[id]; return n })
         setSaved(prev => ({ ...prev, [id]: true }))
@@ -907,9 +907,9 @@ function MobileArtifactTimeline({ category, onBack }) {
             </div>
             <h4 className="timeline-card-title">{art.title || 'Untitled'}</h4>
             <div className="timeline-card-body">
-              {art.content_type === 'markup' ? (
+              {art.content_type === 'markdown' ? (
                 <div className="markdown-body">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}>{art.markup || ''}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}>{art.markdown || ''}</ReactMarkdown>
                 </div>
               ) : (
                 <div className="timeline-card-file">
@@ -920,10 +920,10 @@ function MobileArtifactTimeline({ category, onBack }) {
               )}
             </div>
             <div className="timeline-card-actions">
-              {art.content_type === 'markup' && (
-                <button className={`timeline-action-btn ${saved[art.id] ? 'saved' : ''}`} onClick={() => addAsMarkup(art.id)} disabled={!!busy[art.id] || !!saved[art.id]}>
+              {art.content_type === 'markdown' && (
+                <button className={`timeline-action-btn ${saved[art.id] ? 'saved' : ''}`} onClick={() => addAsMarkdown(art.id)} disabled={!!busy[art.id] || !!saved[art.id]}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                  {busy[art.id] === 'markup' ? 'Saving...' : saved[art.id] ? 'Saved!' : 'Markup'}
+                  {busy[art.id] === 'markdown' ? 'Saving...' : saved[art.id] ? 'Saved!' : 'Markdown'}
                 </button>
               )}
               {art.content_type === 'file' && (
@@ -1669,7 +1669,7 @@ function MobileApp() {
             )}
           </div>
         )}
-        {view === 'markups' && <MobileMarkups categories={categories} universeId={currentUniverseId} />}
+        {view === 'markdowns' && <MobileMarkdowns categories={categories} universeId={currentUniverseId} />}
         {view === 'actions' && <MobileActions categories={categories} universeId={currentUniverseId} />}
         {view === 'feeds' && <MobileFeeds categories={categories} universeId={currentUniverseId} />}
       </div>
@@ -1680,9 +1680,9 @@ function MobileApp() {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
           <span>Chat</span>
         </button>
-        <button className={`m-tab ${view === 'markups' ? 'active' : ''}`} onClick={() => setView('markups')}>
+        <button className={`m-tab ${view === 'markdowns' ? 'active' : ''}`} onClick={() => setView('markdowns')}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
-          <span>Markups</span>
+          <span>Markdowns</span>
         </button>
         <button className={`m-tab ${view === 'actions' ? 'active' : ''}`} onClick={() => setView('actions')}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z" /></svg>

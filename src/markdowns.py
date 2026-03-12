@@ -1,4 +1,4 @@
-"""SQLite-backed markups, document-metadata, and category storage."""
+"""SQLite-backed markdowns, document-metadata, and category storage."""
 
 import os
 import sqlite3
@@ -32,7 +32,7 @@ class Universe:
 
 
 @dataclass
-class Markup:
+class Markdown:
     id: int | None
     title: str
     body: str
@@ -78,9 +78,9 @@ class Link:
 
 
 @dataclass
-class MarkupImage:
+class MarkdownImage:
     id: int
-    markup_id: int
+    markdown_id: int
     filename: str  # stored filename on disk
     original_name: str
     created_at: str
@@ -103,8 +103,8 @@ class FeedArtifact:
     id: int | None
     feed_id: int
     title: str
-    content_type: str  # 'markup' or 'file'
-    markup: str | None
+    content_type: str  # 'markdown' or 'file'
+    markdown: str | None
     file_path: str | None
     original_filename: str | None
     created_at: str
@@ -207,7 +207,7 @@ def delete_universe(uid: int) -> bool:
                 fp.unlink()
         conn.execute("DELETE FROM feed_artifacts WHERE feed_id = ?", (fid,))
     conn.execute("DELETE FROM feeds WHERE universe_id = ?", (uid,))
-    conn.execute("DELETE FROM markups WHERE universe_id = ?", (uid,))
+    conn.execute("DELETE FROM markdowns WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM links WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM action_items WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM document_meta WHERE universe_id = ?", (uid,))
@@ -218,9 +218,9 @@ def delete_universe(uid: int) -> bool:
     return True
 
 
-def get_universe_markup_ids(uid: int) -> list[int]:
+def get_universe_markdown_ids(uid: int) -> list[int]:
     conn = _get_conn()
-    rows = conn.execute("SELECT id FROM markups WHERE universe_id = ?", (uid,)).fetchall()
+    rows = conn.execute("SELECT id FROM markdowns WHERE universe_id = ?", (uid,)).fetchall()
     conn.close()
     return [r["id"] for r in rows]
 
@@ -336,11 +336,11 @@ def category_to_dict(cat: Category) -> dict:
     return asdict(cat)
 
 
-# ── Markups CRUD ────────────────────────────────────────────────────────────
+# ── Markdowns CRUD ──────────────────────────────────────────────────────────
 
 
-def _row_to_markup(row: sqlite3.Row) -> Markup:
-    return Markup(
+def _row_to_markdown(row: sqlite3.Row) -> Markdown:
+    return Markdown(
         id=row["id"],
         title=row["title"],
         body=row["body"],
@@ -352,7 +352,7 @@ def _row_to_markup(row: sqlite3.Row) -> Markup:
     )
 
 
-def list_markups(query: str = "", category_id: int | None = None, universe_id: int | None = None) -> list[Markup]:
+def list_markdowns(query: str = "", category_id: int | None = None, universe_id: int | None = None) -> list[Markdown]:
     conn = _get_conn()
     conditions: list[str] = []
     params: list = []
@@ -368,55 +368,55 @@ def list_markups(query: str = "", category_id: int | None = None, universe_id: i
         conditions.append(f"category_id IN ({placeholders})")
         params.extend(ids)
     where = f" WHERE {' AND '.join(conditions)}" if conditions else ""
-    rows = conn.execute(f"SELECT * FROM markups{where} ORDER BY updated_at DESC", params).fetchall()
+    rows = conn.execute(f"SELECT * FROM markdowns{where} ORDER BY updated_at DESC", params).fetchall()
     conn.close()
-    return [_row_to_markup(r) for r in rows]
+    return [_row_to_markdown(r) for r in rows]
 
 
-def get_markup(markup_id: int) -> Markup | None:
+def get_markdown(markdown_id: int) -> Markdown | None:
     conn = _get_conn()
-    row = conn.execute("SELECT * FROM markups WHERE id = ?", (markup_id,)).fetchone()
+    row = conn.execute("SELECT * FROM markdowns WHERE id = ?", (markdown_id,)).fetchone()
     conn.close()
-    return _row_to_markup(row) if row else None
+    return _row_to_markdown(row) if row else None
 
 
-def create_markup(title: str, body: str, category_id: int | None = None, universe_id: int = 1) -> Markup:
+def create_markdown(title: str, body: str, category_id: int | None = None, universe_id: int = 1) -> Markdown:
     now = _now()
     conn = _get_conn()
     cur = conn.execute(
-        "INSERT INTO markups (title, body, category_id, universe_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO markdowns (title, body, category_id, universe_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
         (title, body, category_id, universe_id, now, now),
     )
     conn.commit()
     nid = cur.lastrowid
     conn.close()
-    return get_markup(nid)  # type: ignore[return-value]
+    return get_markdown(nid)  # type: ignore[return-value]
 
 
-def update_markup(markup_id: int, title: str, body: str, category_id: int | None = None) -> Markup | None:
+def update_markdown(markdown_id: int, title: str, body: str, category_id: int | None = None) -> Markdown | None:
     now = _now()
     conn = _get_conn()
     cur = conn.execute(
-        "UPDATE markups SET title = ?, body = ?, category_id = ?, updated_at = ? WHERE id = ?",
-        (title, body, category_id, now, markup_id),
+        "UPDATE markdowns SET title = ?, body = ?, category_id = ?, updated_at = ? WHERE id = ?",
+        (title, body, category_id, now, markdown_id),
     )
     conn.commit()
     conn.close()
     if cur.rowcount == 0:
         return None
-    return get_markup(markup_id)
+    return get_markdown(markdown_id)
 
 
-def delete_markup(markup_id: int) -> bool:
+def delete_markdown(markdown_id: int) -> bool:
     conn = _get_conn()
-    cur = conn.execute("DELETE FROM markups WHERE id = ?", (markup_id,))
+    cur = conn.execute("DELETE FROM markdowns WHERE id = ?", (markdown_id,))
     conn.commit()
     conn.close()
     return cur.rowcount > 0
 
 
-def markup_to_dict(markup: Markup) -> dict:
-    return asdict(markup)
+def markdown_to_dict(markdown: Markdown) -> dict:
+    return asdict(markdown)
 
 
 # ── Document metadata ─────────────────────────────────────────────────────
@@ -478,22 +478,22 @@ def get_all_document_meta(universe_id: int | None = None) -> dict[str, dict]:
     return {r["path"]: {"category_id": r["category_id"], "pinned": bool(r["pinned"]), "universe_id": r["universe_id"]} for r in rows}
 
 
-def set_markup_pinned(markup_id: int, pinned: bool) -> bool:
+def set_markdown_pinned(markdown_id: int, pinned: bool) -> bool:
     conn = _get_conn()
-    cur = conn.execute("UPDATE markups SET pinned = ? WHERE id = ?", (int(pinned), markup_id))
+    cur = conn.execute("UPDATE markdowns SET pinned = ? WHERE id = ?", (int(pinned), markdown_id))
     conn.commit()
     conn.close()
     return cur.rowcount > 0
 
 
-def list_pinned_markups(universe_id: int | None = None) -> list[Markup]:
+def list_pinned_markdowns(universe_id: int | None = None) -> list[Markdown]:
     conn = _get_conn()
     if universe_id is not None:
-        rows = conn.execute("SELECT * FROM markups WHERE pinned = 1 AND universe_id = ? ORDER BY updated_at DESC", (universe_id,)).fetchall()
+        rows = conn.execute("SELECT * FROM markdowns WHERE pinned = 1 AND universe_id = ? ORDER BY updated_at DESC", (universe_id,)).fetchall()
     else:
-        rows = conn.execute("SELECT * FROM markups WHERE pinned = 1 ORDER BY updated_at DESC").fetchall()
+        rows = conn.execute("SELECT * FROM markdowns WHERE pinned = 1 ORDER BY updated_at DESC").fetchall()
     conn.close()
-    return [_row_to_markup(r) for r in rows]
+    return [_row_to_markdown(r) for r in rows]
 
 
 def set_document_pinned(path: str, pinned: bool, universe_id: int = 1) -> None:
@@ -636,20 +636,20 @@ def link_to_dict(link: Link) -> dict:
     return asdict(link)
 
 
-# ── Markup images ──────────────────────────────────────────────────────────
+# ── Markdown images ────────────────────────────────────────────────────────
 
 
-def _row_to_image(row: sqlite3.Row) -> MarkupImage:
-    return MarkupImage(
+def _row_to_image(row: sqlite3.Row) -> MarkdownImage:
+    return MarkdownImage(
         id=row["id"],
-        markup_id=row["markup_id"],
+        markdown_id=row["markdown_id"],
         filename=row["filename"],
         original_name=row["original_name"],
         created_at=row["created_at"],
     )
 
 
-def add_markup_image(markup_id: int, original_name: str, data: bytes) -> MarkupImage:
+def add_markdown_image(markdown_id: int, original_name: str, data: bytes) -> MarkdownImage:
     """Save image bytes to disk and record in DB."""
     IMAGES_DIR.mkdir(parents=True, exist_ok=True)
     ext = Path(original_name).suffix.lower() or ".png"
@@ -658,55 +658,55 @@ def add_markup_image(markup_id: int, original_name: str, data: bytes) -> MarkupI
     now = _now()
     conn = _get_conn()
     cur = conn.execute(
-        "INSERT INTO markup_images (markup_id, filename, original_name, created_at) VALUES (?, ?, ?, ?)",
-        (markup_id, filename, original_name, now),
+        "INSERT INTO markdown_images (markdown_id, filename, original_name, created_at) VALUES (?, ?, ?, ?)",
+        (markdown_id, filename, original_name, now),
     )
     conn.commit()
     img_id = cur.lastrowid
     conn.close()
-    return MarkupImage(id=img_id, markup_id=markup_id, filename=filename, original_name=original_name, created_at=now)
+    return MarkdownImage(id=img_id, markdown_id=markdown_id, filename=filename, original_name=original_name, created_at=now)
 
 
-def list_markup_images(markup_id: int) -> list[MarkupImage]:
+def list_markdown_images(markdown_id: int) -> list[MarkdownImage]:
     conn = _get_conn()
     rows = conn.execute(
-        "SELECT * FROM markup_images WHERE markup_id = ? ORDER BY created_at", (markup_id,)
+        "SELECT * FROM markdown_images WHERE markdown_id = ? ORDER BY created_at", (markdown_id,)
     ).fetchall()
     conn.close()
     return [_row_to_image(r) for r in rows]
 
 
-def delete_markup_image(image_id: int) -> bool:
+def delete_markdown_image(image_id: int) -> bool:
     conn = _get_conn()
-    row = conn.execute("SELECT filename FROM markup_images WHERE id = ?", (image_id,)).fetchone()
+    row = conn.execute("SELECT filename FROM markdown_images WHERE id = ?", (image_id,)).fetchone()
     if not row:
         conn.close()
         return False
     filepath = IMAGES_DIR / row["filename"]
     if filepath.is_file():
         filepath.unlink()
-    conn.execute("DELETE FROM markup_images WHERE id = ?", (image_id,))
+    conn.execute("DELETE FROM markdown_images WHERE id = ?", (image_id,))
     conn.commit()
     conn.close()
     return True
 
 
-def delete_all_markup_images(markup_id: int) -> int:
-    """Delete all images for a markup. Returns count removed."""
+def delete_all_markdown_images(markdown_id: int) -> int:
+    """Delete all images for a markdown. Returns count removed."""
     conn = _get_conn()
-    rows = conn.execute("SELECT filename FROM markup_images WHERE markup_id = ?", (markup_id,)).fetchall()
+    rows = conn.execute("SELECT filename FROM markdown_images WHERE markdown_id = ?", (markdown_id,)).fetchall()
     for r in rows:
         filepath = IMAGES_DIR / r["filename"]
         if filepath.is_file():
             filepath.unlink()
-    cur = conn.execute("DELETE FROM markup_images WHERE markup_id = ?", (markup_id,))
+    cur = conn.execute("DELETE FROM markdown_images WHERE markdown_id = ?", (markdown_id,))
     conn.commit()
     count = cur.rowcount
     conn.close()
     return count
 
 
-def markup_image_to_dict(img: MarkupImage) -> dict:
+def markdown_image_to_dict(img: MarkdownImage) -> dict:
     return asdict(img)
 
 
@@ -803,8 +803,8 @@ def action_item_to_dict(item: ActionItem) -> dict:
 class ActionItemLink:
     id: int
     action_item_id: int
-    link_type: str  # 'markup' or 'document'
-    markup_id: int | None
+    link_type: str  # 'markdown' or 'document'
+    markdown_id: int | None
     document_path: str | None
     created_at: str
 
@@ -814,7 +814,7 @@ def _row_to_link(row: sqlite3.Row) -> ActionItemLink:
         id=row["id"],
         action_item_id=row["action_item_id"],
         link_type=row["link_type"],
-        markup_id=row["markup_id"],
+        markdown_id=row["markdown_id"],
         document_path=row["document_path"],
         created_at=row["created_at"],
     )
@@ -833,16 +833,16 @@ def list_action_item_links(action_item_id: int) -> list[ActionItemLink]:
 def add_action_item_link(
     action_item_id: int,
     link_type: str,
-    markup_id: int | None = None,
+    markdown_id: int | None = None,
     document_path: str | None = None,
 ) -> ActionItemLink:
     now = _now()
     conn = _get_conn()
     # Prevent duplicate links
-    if link_type == "markup":
+    if link_type == "markdown":
         dup = conn.execute(
-            "SELECT id FROM action_item_links WHERE action_item_id = ? AND link_type = 'markup' AND markup_id = ?",
-            (action_item_id, markup_id),
+            "SELECT id FROM action_item_links WHERE action_item_id = ? AND link_type = 'markdown' AND markdown_id = ?",
+            (action_item_id, markdown_id),
         ).fetchone()
     else:
         dup = conn.execute(
@@ -854,15 +854,15 @@ def add_action_item_link(
         conn.close()
         return _row_to_link(row)
     cur = conn.execute(
-        "INSERT INTO action_item_links (action_item_id, link_type, markup_id, document_path, created_at) VALUES (?, ?, ?, ?, ?)",
-        (action_item_id, link_type, markup_id, document_path, now),
+        "INSERT INTO action_item_links (action_item_id, link_type, markdown_id, document_path, created_at) VALUES (?, ?, ?, ?, ?)",
+        (action_item_id, link_type, markdown_id, document_path, now),
     )
     conn.commit()
     link_id = cur.lastrowid
     conn.close()
     return ActionItemLink(
         id=link_id, action_item_id=action_item_id, link_type=link_type,
-        markup_id=markup_id, document_path=document_path, created_at=now,
+        markdown_id=markdown_id, document_path=document_path, created_at=now,
     )
 
 
@@ -874,18 +874,18 @@ def delete_action_item_link(link_id: int) -> bool:
     return cur.rowcount > 0
 
 
-def list_links_for_markup(markup_id: int) -> list[dict]:
-    """Return action items linked to a given markup, with link id."""
+def list_links_for_markdown(markdown_id: int) -> list[dict]:
+    """Return action items linked to a given markdown, with link id."""
     conn = _get_conn()
     rows = conn.execute(
         """
         SELECT l.id AS link_id, a.*
         FROM action_item_links l
         JOIN action_items a ON a.id = l.action_item_id
-        WHERE l.link_type = 'markup' AND l.markup_id = ?
+        WHERE l.link_type = 'markdown' AND l.markdown_id = ?
         ORDER BY a.updated_at DESC
         """,
-        (markup_id,),
+        (markdown_id,),
     ).fetchall()
     conn.close()
     results = []
@@ -898,17 +898,17 @@ def list_links_for_markup(markup_id: int) -> list[dict]:
 
 
 def get_linked_targets() -> dict:
-    """Return markup IDs and document paths that have at least one action-item link."""
+    """Return markdown IDs and document paths that have at least one action-item link."""
     conn = _get_conn()
-    markup_rows = conn.execute(
-        "SELECT DISTINCT markup_id FROM action_item_links WHERE link_type = 'markup' AND markup_id IS NOT NULL"
+    markdown_rows = conn.execute(
+        "SELECT DISTINCT markdown_id FROM action_item_links WHERE link_type = 'markdown' AND markdown_id IS NOT NULL"
     ).fetchall()
     doc_rows = conn.execute(
         "SELECT DISTINCT document_path FROM action_item_links WHERE link_type = 'document' AND document_path IS NOT NULL"
     ).fetchall()
     conn.close()
     return {
-        "markup_ids": [r["markup_id"] for r in markup_rows],
+        "markdown_ids": [r["markdown_id"] for r in markdown_rows],
         "document_paths": [r["document_path"] for r in doc_rows],
     }
 
@@ -1074,7 +1074,7 @@ def _row_to_artifact(row: sqlite3.Row) -> FeedArtifact:
         feed_id=row["feed_id"],
         title=row["title"],
         content_type=row["content_type"],
-        markup=row["markup"],
+        markdown=row["markdown"],
         file_path=row["file_path"],
         original_filename=row["original_filename"],
         created_at=row["created_at"],
@@ -1193,12 +1193,12 @@ def get_feed_artifact(artifact_id: int) -> FeedArtifact | None:
     return _row_to_artifact(row) if row else None
 
 
-def create_feed_artifact_markup(feed_id: int, title: str, markup: str) -> FeedArtifact:
+def create_feed_artifact_markdown(feed_id: int, title: str, markdown: str) -> FeedArtifact:
     now = _now()
     conn = _get_conn()
     cur = conn.execute(
-        "INSERT INTO feed_artifacts (feed_id, title, content_type, markup, created_at) VALUES (?, ?, 'markup', ?, ?)",
-        (feed_id, title, markup, now),
+        "INSERT INTO feed_artifacts (feed_id, title, content_type, markdown, created_at) VALUES (?, ?, 'markdown', ?, ?)",
+        (feed_id, title, markdown, now),
     )
     conn.commit()
     aid = cur.lastrowid

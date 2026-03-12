@@ -20,34 +20,34 @@ load_dotenv()
 
 from src.backup import create_backup, restore_backup
 from src.ingest import SUPPORTED_EXTENSIONS, chunk_documents, load_document
-from src.markups import (
+from src.markdowns import (
     FEED_FILES_DIR,
     IMAGES_DIR,
     action_item_link_to_dict,
     action_item_to_dict,
     add_action_item_link,
-    add_markup_image,
+    add_markdown_image,
     category_to_dict,
     create_action_item,
     create_category,
     create_feed,
     create_feed_artifact_file,
-    create_feed_artifact_markup,
+    create_feed_artifact_markdown,
     list_pinned_feeds,
     list_pinned_categories,
     create_link,
-    create_markup,
+    create_markdown,
     create_universe,
     delete_action_item,
     delete_action_item_link,
-    delete_all_markup_images,
+    delete_all_markdown_images,
     delete_category,
     delete_document_meta,
     delete_feed,
     delete_feed_artifact,
     delete_link,
-    delete_markup,
-    delete_markup_image,
+    delete_markdown,
+    delete_markdown_image,
     delete_universe,
     feed_artifact_to_dict,
     feed_to_dict,
@@ -61,12 +61,12 @@ from src.markups import (
     set_feed_pinned,
     set_category_pinned,
     get_link,
-    get_markup,
+    get_markdown,
     get_linked_targets,
     get_universe,
     get_universe_action_item_ids,
     get_universe_document_paths,
-    get_universe_markup_ids,
+    get_universe_markdown_ids,
     list_action_item_links,
     list_action_items,
     list_feed_artifacts,
@@ -75,17 +75,17 @@ from src.markups import (
     get_unread_counts_by_category,
     list_feeds,
     list_links,
-    list_links_for_markup,
+    list_links_for_markdown,
     list_categories,
-    list_markup_images,
-    list_markups,
+    list_markdown_images,
+    list_markdowns,
     list_pinned_documents,
     list_pinned_links,
-    list_pinned_markups,
+    list_pinned_markdowns,
     list_universes,
     link_to_dict,
-    markup_image_to_dict,
-    markup_to_dict,
+    markdown_image_to_dict,
+    markdown_to_dict,
     update_category,
     update_feed,
     rename_universe,
@@ -93,13 +93,13 @@ from src.markups import (
     set_document_pinned,
     set_document_universe,
     set_link_pinned,
-    set_markup_pinned,
+    set_markdown_pinned,
     get_setting,
     set_setting,
     universe_to_dict,
     update_action_item,
     update_link,
-    update_markup,
+    update_markdown,
     create_prompt,
     delete_prompt,
     get_prompt,
@@ -113,10 +113,10 @@ from src.store import (
     add_documents,
     delete_action_item_from_store,
     delete_document_chunks,
-    delete_markup_from_store,
+    delete_markdown_from_store,
     doc_count,
     upsert_action_item,
-    upsert_markup,
+    upsert_markdown,
 )
 
 DOCUMENTS_DIR = Path(__file__).resolve().parent.parent / "documents"
@@ -161,13 +161,13 @@ class StatsResponse(BaseModel):
     schema_version: int = 0
 
 
-class MarkupRequest(BaseModel):
+class MarkdownRequest(BaseModel):
     title: str
     body: str
     category_id: Optional[int] = None
 
 
-class MarkupResponse(BaseModel):
+class MarkdownResponse(BaseModel):
     id: int
     title: str
     body: str
@@ -228,8 +228,8 @@ class ActionItemUpdateRequest(BaseModel):
 
 
 class ActionItemLinkRequest(BaseModel):
-    link_type: str  # 'markup' or 'document'
-    markup_id: Optional[int] = None
+    link_type: str  # 'markdown' or 'document'
+    markdown_id: Optional[int] = None
     document_path: Optional[str] = None
 
 
@@ -237,7 +237,7 @@ class ActionItemLinkResponse(BaseModel):
     id: int
     action_item_id: int
     link_type: str
-    markup_id: Optional[int]
+    markdown_id: Optional[int]
     document_path: Optional[str]
     created_at: str
     # Resolved display fields
@@ -314,8 +314,8 @@ def api_delete_universe(uid: int):
         raise HTTPException(status_code=404, detail="Universe not found")
 
     # Clean up vector store entries before deleting DB rows
-    for nid in get_universe_markup_ids(uid):
-        delete_markup_from_store(nid)
+    for nid in get_universe_markdown_ids(uid):
+        delete_markdown_from_store(nid)
     for aid in get_universe_action_item_ids(uid):
         delete_action_item_from_store(aid)
     for path in get_universe_document_paths(uid):
@@ -366,60 +366,60 @@ def api_pin_category(cat_id: int, pinned: bool = True):
     return {"ok": True}
 
 
-# ── Markups ───────────────────────────────────────────────────────────────
+# ── Markdowns ─────────────────────────────────────────────────────────────
 
 
-@app.get("/api/markups", response_model=list[MarkupResponse])
-def api_list_markups(q: str = "", category_id: Optional[int] = None, universe_id: Optional[int] = None):
-    return [markup_to_dict(n) for n in list_markups(q, category_id, universe_id=universe_id)]
+@app.get("/api/markdowns", response_model=list[MarkdownResponse])
+def api_list_markdowns(q: str = "", category_id: Optional[int] = None, universe_id: Optional[int] = None):
+    return [markdown_to_dict(n) for n in list_markdowns(q, category_id, universe_id=universe_id)]
 
 
-@app.get("/api/markups/{markup_id}", response_model=MarkupResponse)
-def api_get_markup(markup_id: int):
-    markup = get_markup(markup_id)
-    if not markup:
-        raise HTTPException(status_code=404, detail="Markup not found")
-    return markup_to_dict(markup)
+@app.get("/api/markdowns/{markdown_id}", response_model=MarkdownResponse)
+def api_get_markdown(markdown_id: int):
+    markdown = get_markdown(markdown_id)
+    if not markdown:
+        raise HTTPException(status_code=404, detail="Markdown not found")
+    return markdown_to_dict(markdown)
 
 
-@app.post("/api/markups", response_model=MarkupResponse, status_code=201)
-def api_create_markup(req: MarkupRequest, universe_id: int = 1):
-    markup = create_markup(req.title, req.body, req.category_id, universe_id=universe_id)
+@app.post("/api/markdowns", response_model=MarkdownResponse, status_code=201)
+def api_create_markdown(req: MarkdownRequest, universe_id: int = 1):
+    markdown = create_markdown(req.title, req.body, req.category_id, universe_id=universe_id)
     try:
-        upsert_markup(markup.id, f"{markup.title}\n\n{markup.body}", markup.title, universe_id=universe_id)
+        upsert_markdown(markdown.id, f"{markdown.title}\n\n{markdown.body}", markdown.title, universe_id=universe_id)
     except Exception as e:
-        print(f"[Astro] WARNING: Failed to upsert markup {markup.id} into vector store: {e}")
-    return markup_to_dict(markup)
+        print(f"[Astro] WARNING: Failed to upsert markdown {markdown.id} into vector store: {e}")
+    return markdown_to_dict(markdown)
 
 
-@app.put("/api/markups/{markup_id}", response_model=MarkupResponse)
-def api_update_markup(markup_id: int, req: MarkupRequest):
-    markup = update_markup(markup_id, req.title, req.body, req.category_id)
-    if not markup:
-        raise HTTPException(status_code=404, detail="Markup not found")
+@app.put("/api/markdowns/{markdown_id}", response_model=MarkdownResponse)
+def api_update_markdown(markdown_id: int, req: MarkdownRequest):
+    markdown = update_markdown(markdown_id, req.title, req.body, req.category_id)
+    if not markdown:
+        raise HTTPException(status_code=404, detail="Markdown not found")
     try:
-        upsert_markup(markup.id, f"{markup.title}\n\n{markup.body}", markup.title, universe_id=markup.universe_id)
+        upsert_markdown(markdown.id, f"{markdown.title}\n\n{markdown.body}", markdown.title, universe_id=markdown.universe_id)
     except Exception as e:
-        print(f"[Astro] WARNING: Failed to upsert markup {markup.id} into vector store: {e}")
-    return markup_to_dict(markup)
+        print(f"[Astro] WARNING: Failed to upsert markdown {markdown.id} into vector store: {e}")
+    return markdown_to_dict(markdown)
 
 
-@app.delete("/api/markups/{markup_id}")
-def api_delete_markup(markup_id: int):
-    delete_all_markup_images(markup_id)
-    if not delete_markup(markup_id):
-        raise HTTPException(status_code=404, detail="Markup not found")
-    delete_markup_from_store(markup_id)
+@app.delete("/api/markdowns/{markdown_id}")
+def api_delete_markdown(markdown_id: int):
+    delete_all_markdown_images(markdown_id)
+    if not delete_markdown(markdown_id):
+        raise HTTPException(status_code=404, detail="Markdown not found")
+    delete_markdown_from_store(markdown_id)
     return {"ok": True}
 
 
 # ── Pinned items ──────────────────────────────────────────────────────────
 
 
-@app.put("/api/markups/{markup_id}/pin")
-def api_toggle_markup_pin(markup_id: int, pinned: bool = True):
-    if not set_markup_pinned(markup_id, pinned):
-        raise HTTPException(status_code=404, detail="Markup not found")
+@app.put("/api/markdowns/{markdown_id}/pin")
+def api_toggle_markdown_pin(markdown_id: int, pinned: bool = True):
+    if not set_markdown_pinned(markdown_id, pinned):
+        raise HTTPException(status_code=404, detail="Markdown not found")
     return {"ok": True}
 
 
@@ -434,8 +434,8 @@ def api_toggle_document_pin(path: str, pinned: bool = True):
 
 @app.get("/api/pinned")
 def api_list_pinned(universe_id: Optional[int] = None):
-    """Return all pinned markups, documents, and links in one call."""
-    markups = [markup_to_dict(m) for m in list_pinned_markups(universe_id=universe_id)]
+    """Return all pinned markdowns, documents, and links in one call."""
+    markdowns = [markdown_to_dict(m) for m in list_pinned_markdowns(universe_id=universe_id)]
     doc_paths = list_pinned_documents(universe_id=universe_id)
     docs = []
     for rel_str in doc_paths:
@@ -450,7 +450,7 @@ def api_list_pinned(universe_id: Optional[int] = None):
     links = [link_to_dict(l) for l in list_pinned_links(universe_id=universe_id)]
     feeds = [feed_to_dict(f) for f in list_pinned_feeds(universe_id=universe_id)]
     pinned_cats = [category_to_dict(c) for c in list_pinned_categories(universe_id=universe_id)]
-    return {"markups": markups, "documents": docs, "links": links, "feeds": feeds, "feed_categories": pinned_cats}
+    return {"markdowns": markdowns, "documents": docs, "links": links, "feeds": feeds, "feed_categories": pinned_cats}
 
 
 # ── Links (bookmarks) ───────────────────────────────────────────────────
@@ -497,21 +497,21 @@ def api_toggle_link_pin(link_id: int, pinned: bool = True):
     return {"ok": True}
 
 
-# ── Markup images ────────────────────────────────────────────────────────
+# ── Markdown images ──────────────────────────────────────────────────────
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"}
 
 
-@app.get("/api/markups/{markup_id}/images")
-def api_list_markup_images(markup_id: int):
-    return [markup_image_to_dict(img) for img in list_markup_images(markup_id)]
+@app.get("/api/markdowns/{markdown_id}/images")
+def api_list_markdown_images(markdown_id: int):
+    return [markdown_image_to_dict(img) for img in list_markdown_images(markdown_id)]
 
 
-@app.post("/api/markups/{markup_id}/images", status_code=201)
-async def api_upload_markup_image(markup_id: int, file: UploadFile):
-    markup = get_markup(markup_id)
-    if not markup:
-        raise HTTPException(status_code=404, detail="Markup not found")
+@app.post("/api/markdowns/{markdown_id}/images", status_code=201)
+async def api_upload_markdown_image(markdown_id: int, file: UploadFile):
+    markdown = get_markdown(markdown_id)
+    if not markdown:
+        raise HTTPException(status_code=404, detail="Markdown not found")
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
     ext = Path(file.filename).suffix.lower()
@@ -521,32 +521,32 @@ async def api_upload_markup_image(markup_id: int, file: UploadFile):
             detail=f"Unsupported image type: {ext}. Supported: {', '.join(sorted(IMAGE_EXTENSIONS))}",
         )
     data = await file.read()
-    img = add_markup_image(markup_id, file.filename, data)
-    return markup_image_to_dict(img)
+    img = add_markdown_image(markdown_id, file.filename, data)
+    return markdown_image_to_dict(img)
 
 
-@app.delete("/api/markup-images/{image_id}")
-def api_delete_markup_image(image_id: int):
-    if not delete_markup_image(image_id):
+@app.delete("/api/markdown-images/{image_id}")
+def api_delete_markdown_image(image_id: int):
+    if not delete_markdown_image(image_id):
         raise HTTPException(status_code=404, detail="Image not found")
     return {"ok": True}
 
 
-@app.get("/api/markup-images/file/{filename}")
-def api_serve_markup_image(filename: str):
+@app.get("/api/markdown-images/file/{filename}")
+def api_serve_markdown_image(filename: str):
     safe = (IMAGES_DIR / filename).resolve()
     if not str(safe).startswith(str(IMAGES_DIR.resolve())) or not safe.is_file():
         raise HTTPException(status_code=404, detail="Image not found")
     return FileResponse(safe)
 
 
-# ── Action items linked to a markup ───────────────────────────────────────
+# ── Action items linked to a markdown ─────────────────────────────────────
 
 
-@app.get("/api/markups/{markup_id}/action-items")
-def api_markup_action_items(markup_id: int):
-    """Return action items linked to this markup (with link_id for unlinking)."""
-    return list_links_for_markup(markup_id)
+@app.get("/api/markdowns/{markdown_id}/action-items")
+def api_markdown_action_items(markdown_id: int):
+    """Return action items linked to this markdown (with link_id for unlinking)."""
+    return list_links_for_markdown(markdown_id)
 
 
 # ── Documents (archive) ──────────────────────────────────────────────────
@@ -746,9 +746,9 @@ def api_upload_document(file: UploadFile, universe_id: int = 1):
 
 def _resolve_link(link_dict: dict) -> dict:
     """Add display_name to a link dict."""
-    if link_dict["link_type"] == "markup" and link_dict["markup_id"]:
-        markup = get_markup(link_dict["markup_id"])
-        link_dict["display_name"] = (markup.title or "Untitled markup") if markup else "Deleted markup"
+    if link_dict["link_type"] == "markdown" and link_dict["markdown_id"]:
+        markdown = get_markdown(link_dict["markdown_id"])
+        link_dict["display_name"] = (markdown.title or "Untitled markdown") if markdown else "Deleted markdown"
     elif link_dict["link_type"] == "document" and link_dict["document_path"]:
         link_dict["display_name"] = Path(link_dict["document_path"]).name
     return link_dict
@@ -833,13 +833,13 @@ def api_list_action_item_links(item_id: int):
 def api_add_action_item_link(item_id: int, req: ActionItemLinkRequest):
     if not get_action_item(item_id):
         raise HTTPException(status_code=404, detail="Action item not found")
-    if req.link_type not in ("markup", "document"):
-        raise HTTPException(status_code=400, detail="link_type must be 'markup' or 'document'")
-    if req.link_type == "markup" and not req.markup_id:
-        raise HTTPException(status_code=400, detail="markup_id required for markup links")
+    if req.link_type not in ("markdown", "document"):
+        raise HTTPException(status_code=400, detail="link_type must be 'markdown' or 'document'")
+    if req.link_type == "markdown" and not req.markdown_id:
+        raise HTTPException(status_code=400, detail="markdown_id required for markdown links")
     if req.link_type == "document" and not req.document_path:
         raise HTTPException(status_code=400, detail="document_path required for document links")
-    link = add_action_item_link(item_id, req.link_type, req.markup_id, req.document_path)
+    link = add_action_item_link(item_id, req.link_type, req.markdown_id, req.document_path)
     return _resolve_link(action_item_link_to_dict(link))
 
 
@@ -852,7 +852,7 @@ def api_delete_action_item_link(link_id: int):
 
 @app.get("/api/action-item-links/linked-targets")
 def api_linked_targets():
-    """Return markup IDs and document paths that have action-item links."""
+    """Return markdown IDs and document paths that have action-item links."""
     return get_linked_targets()
 
 
@@ -924,20 +924,20 @@ def api_reindex():
     Call this after a restore to re-create all embeddings.
     """
     import traceback
-    from src.store import clear, add_documents as add_docs, upsert_markup, upsert_action_item
+    from src.store import clear, add_documents as add_docs, upsert_markdown, upsert_action_item
 
-    counts = {"markups": 0, "action_items": 0, "document_chunks": 0}
+    counts = {"markdowns": 0, "action_items": 0, "document_chunks": 0}
 
     try:
         # 1. Clear existing vector store
         print("[reindex] Clearing vector store...")
         clear()
 
-        # 2. Re-index markups
-        print("[reindex] Indexing markups...")
-        for markup in list_markups():
-            upsert_markup(markup.id, f"{markup.title}\n\n{markup.body}", markup.title, universe_id=markup.universe_id)
-            counts["markups"] += 1
+        # 2. Re-index markdowns
+        print("[reindex] Indexing markdowns...")
+        for markdown in list_markdowns():
+            upsert_markdown(markdown.id, f"{markdown.title}\n\n{markdown.body}", markdown.title, universe_id=markdown.universe_id)
+            counts["markdowns"] += 1
 
         # 3. Re-index action items
         print("[reindex] Indexing action items...")
@@ -1014,7 +1014,7 @@ class FeedArtifactResponse(BaseModel):
     feed_id: int
     title: str
     content_type: str
-    markup: Optional[str]
+    markdown: Optional[str]
     file_path: Optional[str]
     original_filename: Optional[str]
     created_at: str
@@ -1114,26 +1114,26 @@ def api_delete_feed_artifact(artifact_id: int):
     return {"ok": True}
 
 
-@app.post("/api/feed-artifacts/{artifact_id}/to-markup")
-def api_artifact_to_markup(artifact_id: int):
-    """Convert a markup artifact into a markup, preserving links and images as Markdown."""
+@app.post("/api/feed-artifacts/{artifact_id}/to-markdown")
+def api_artifact_to_markdown(artifact_id: int):
+    """Convert a markdown artifact into a markdown, preserving links and images as Markdown."""
     from markdownify import markdownify as md
 
     art = get_feed_artifact(artifact_id)
     if not art:
         raise HTTPException(status_code=404, detail="Artifact not found")
-    if art.content_type != "markup":
-        raise HTTPException(status_code=400, detail="Only markup artifacts can be converted to markups")
+    if art.content_type != "markdown":
+        raise HTTPException(status_code=400, detail="Only markdown artifacts can be converted to markdowns")
     feed = get_feed(art.feed_id)
     uid = feed.universe_id if feed else 1
     cat_id = feed.category_id if feed else None
-    markdown_body = md(art.markup or "", heading_style="ATX", bullets="-").strip()
-    markup = create_markup(art.title, markdown_body, category_id=cat_id, universe_id=uid)
+    markdown_body = md(art.markdown or "", heading_style="ATX", bullets="-").strip()
+    markdown = create_markdown(art.title, markdown_body, category_id=cat_id, universe_id=uid)
     try:
-        upsert_markup(markup.id, f"{markup.title}\n\n{markup.body}", markup.title, universe_id=uid)
+        upsert_markdown(markdown.id, f"{markdown.title}\n\n{markdown.body}", markdown.title, universe_id=uid)
     except Exception as e:
-        print(f"[Astro] WARNING: Failed to upsert markup {markup.id} into vector store: {e}")
-    return {"ok": True, "markup_id": markup.id}
+        print(f"[Astro] WARNING: Failed to upsert markdown {markdown.id} into vector store: {e}")
+    return {"ok": True, "markdown_id": markdown.id}
 
 
 @app.post("/api/feed-artifacts/{artifact_id}/to-document")
@@ -1196,7 +1196,7 @@ def _ensure_markdown(text: str) -> str:
 async def api_feed_ingest(
     feed_id: int,
     title: str = fastapi.Form(""),
-    markup: Optional[str] = fastapi.Form(None),
+    markdown: Optional[str] = fastapi.Form(None),
     file: Optional[UploadFile] = None,
     x_feed_key: Optional[str] = fastapi.Header(None),
 ):
@@ -1204,14 +1204,14 @@ async def api_feed_ingest(
 
     Authenticate with the X-Feed-Key header matching the feed's api_key.
 
-    Content in the ``markup`` field can be Markdown or HTML.  If HTML is
+    Content in the ``markdown`` field can be Markdown or HTML.  If HTML is
     detected it is automatically converted to Markdown before storage.
 
-    To send markup (Markdown or HTML):
+    To send markdown (Markdown or HTML):
       POST /api/feeds/{id}/ingest
       Content-Type: multipart/form-data
       X-Feed-Key: fk_...
-      title=...&markup=...
+      title=...&markdown=...
 
     To send a file:
       POST /api/feeds/{id}/ingest
@@ -1236,11 +1236,11 @@ async def api_feed_ingest(
         data = await file.read()
         art = create_feed_artifact_file(feed_id, title.strip(), file.filename, data)
         return {"ok": True, "artifact_id": art.id, "content_type": "file"}
-    elif markup is not None:
-        art = create_feed_artifact_markup(feed_id, title.strip(), _ensure_markdown(markup))
-        return {"ok": True, "artifact_id": art.id, "content_type": "markup"}
+    elif markdown is not None:
+        art = create_feed_artifact_markdown(feed_id, title.strip(), _ensure_markdown(markdown))
+        return {"ok": True, "artifact_id": art.id, "content_type": "markdown"}
     else:
-        raise HTTPException(status_code=400, detail="Provide either 'markup' or 'file'")
+        raise HTTPException(status_code=400, detail="Provide either 'markdown' or 'file'")
 
 
 @app.get("/api/feed-files/{filename}")
@@ -1636,7 +1636,7 @@ def api_query(req: QueryRequest):
 @app.get("/api/stats", response_model=StatsResponse)
 def api_stats():
     from src.migrate import get_current_version
-    from src.markups import _get_conn
+    from src.markdowns import _get_conn
     conn = _get_conn()
     version = get_current_version(conn)
     conn.close()

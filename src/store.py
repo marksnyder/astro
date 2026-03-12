@@ -7,7 +7,7 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 
-from src.markups import get_openai_api_key
+from src.markdowns import get_openai_api_key
 
 PERSIST_DIR = Path(__file__).resolve().parent.parent / "data" / "chroma"
 COLLECTION = "astro"
@@ -52,20 +52,20 @@ def doc_count(universe_id: int | None = None) -> int:
     return collection.count()
 
 
-def upsert_markup(markup_id: int, content: str, title: str, universe_id: int = 1) -> None:
-    """Add or update a markup in the vector store."""
+def upsert_markdown(markdown_id: int, content: str, title: str, universe_id: int = 1) -> None:
+    """Add or update a markdown in the vector store."""
     store = get_vectorstore()
-    doc_id = f"markup-{markup_id}"
+    doc_id = f"markdown-{markdown_id}"
     try:
         store._collection.delete(ids=[doc_id])
     except Exception:
         pass
     doc = Document(
         page_content=content,
-        metadata={"source": f"markup: {title}", "markup_id": markup_id, "universe_id": universe_id},
+        metadata={"source": f"markdown: {title}", "markdown_id": markdown_id, "universe_id": universe_id},
     )
     store.add_documents([doc], ids=[doc_id])
-    print(f"[Astro] Upserted markup id={markup_id} title={title!r} universe={universe_id} len={len(content)}")
+    print(f"[Astro] Upserted markdown id={markdown_id} title={title!r} universe={universe_id} len={len(content)}")
 
 
 def delete_document_chunks(source_path: str) -> int:
@@ -81,11 +81,11 @@ def delete_document_chunks(source_path: str) -> int:
     return len(ids)
 
 
-def delete_markup_from_store(markup_id: int) -> None:
-    """Remove a markup from the vector store."""
+def delete_markdown_from_store(markdown_id: int) -> None:
+    """Remove a markdown from the vector store."""
     store = get_vectorstore()
     try:
-        store._collection.delete(ids=[f"markup-{markup_id}"])
+        store._collection.delete(ids=[f"markdown-{markdown_id}"])
     except Exception:
         pass
 

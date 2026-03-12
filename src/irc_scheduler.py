@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 
 from croniter import croniter
 
-from src.markups import list_prompts, mark_prompt_run
+from src.markdowns import list_prompts, mark_prompt_run
 
 
 def _parse_messages(raw: str) -> list[str]:
@@ -148,7 +148,7 @@ class IRCScheduler:
         self._record_channel_send(channel)
 
     def _send_messages(self, channel: str, messages: list[str]):
-        from src.markups import get_setting
+        from src.markdowns import get_setting
         try:
             port = int(get_setting("irc_port") or IRC_PORT)
         except (TypeError, ValueError):

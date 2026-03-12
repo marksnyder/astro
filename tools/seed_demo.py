@@ -31,8 +31,8 @@ def clear_all():
         "feeds",
         "action_item_links",
         "action_items",
-        "markup_images",
-        "markups",
+        "markdown_images",
+        "markdowns",
         "links",
         "document_meta",
         "categories",
@@ -127,9 +127,9 @@ def seed():
 
     conn.commit()
 
-    # ── WORK Markups ─────────────────────────────────────────────────────
+    # ── WORK Markdowns ─────────────────────────────────────────────────────
 
-    work_markups = [
+    work_markdowns = [
         (
             "API Design Guidelines",
             work_cats["Architecture & Design"],
@@ -540,15 +540,15 @@ kubectl top pods -l app=api
         ),
     ]
 
-    for title, cat_id, created, body in work_markups:
+    for title, cat_id, created, body in work_markdowns:
         conn.execute(
-            "INSERT INTO markups (title, body, category_id, universe_id, pinned, created_at, updated_at) VALUES (?,?,?,?,0,?,?)",
+            "INSERT INTO markdowns (title, body, category_id, universe_id, pinned, created_at, updated_at) VALUES (?,?,?,?,0,?,?)",
             (title, body, cat_id, WORK, created, created),
         )
 
-    # ── HOME Markups ─────────────────────────────────────────────────────
+    # ── HOME Markdowns ─────────────────────────────────────────────────────
 
-    home_markups = [
+    home_markdowns = [
         (
             "Resume Power Words & Structure",
             home_cats["Resume & Portfolio"],
@@ -931,9 +931,9 @@ Instead of passive reading:
         ),
     ]
 
-    for title, cat_id, created, body in home_markups:
+    for title, cat_id, created, body in home_markdowns:
         conn.execute(
-            "INSERT INTO markups (title, body, category_id, universe_id, pinned, created_at, updated_at) VALUES (?,?,?,?,0,?,?)",
+            "INSERT INTO markdowns (title, body, category_id, universe_id, pinned, created_at, updated_at) VALUES (?,?,?,?,0,?,?)",
             (title, body, cat_id, HOME, created, created),
         )
 
@@ -1131,21 +1131,21 @@ Instead of passive reading:
          "## Free System Design Resources\n\n![Books and learning](https://images.unsplash.com/photo-1513001900722-370f803f498d?w=600)\n\nMIT 6.824, Gaurav Sen (YouTube), System Design Primer (GitHub 240K stars), Engineering blogs (Stripe, Netflix, Uber). Design a system every week."),
     ]
 
-    for feed_id_offset, title, created, markup in _artifact_data:
+    for feed_id_offset, title, created, markdown in _artifact_data:
         # feed_id_offset maps to the Nth feed inserted above
         actual_feed_id = conn.execute(
             "SELECT id FROM feeds ORDER BY id LIMIT 1 OFFSET ?", (feed_id_offset - 1,)
         ).fetchone()[0]
         conn.execute(
-            "INSERT INTO feed_artifacts (feed_id, title, content_type, markup, created_at) VALUES (?,?,'markup',?,?)",
-            (actual_feed_id, title, markup, created),
+            "INSERT INTO feed_artifacts (feed_id, title, content_type, markdown, created_at) VALUES (?,?,'markdown',?,?)",
+            (actual_feed_id, title, markdown, created),
         )
 
     conn.commit()
 
     # Print summary
     counts = {}
-    for table in ["categories", "markups", "links", "feeds", "action_items", "feed_artifacts"]:
+    for table in ["categories", "markdowns", "links", "feeds", "action_items", "feed_artifacts"]:
         counts[table] = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
 
     conn.close()

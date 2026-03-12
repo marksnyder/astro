@@ -348,8 +348,8 @@ const $readLaterStatus  = document.getElementById('readLaterStatus')
 const $summarizeBtn     = document.getElementById('summarizeBtn')
 const $summarizeStatus  = document.getElementById('summarizeStatus')
 const $summaryBox       = document.getElementById('summaryBox')
-const $saveMarkupBtn      = document.getElementById('saveMarkupBtn')
-const $saveMarkupStatus   = document.getElementById('saveMarkupStatus')
+const $saveMarkdownBtn      = document.getElementById('saveMarkdownBtn')
+const $saveMarkdownStatus   = document.getElementById('saveMarkdownStatus')
 
 let currentTabUrl = ''
 let currentTabTitle = ''
@@ -409,8 +409,8 @@ $summarizeBtn.addEventListener('click', async () => {
   $summarizeBtn.textContent = 'Extracting...'
   $summarizeStatus.className = 'tool-status'
   $summaryBox.className = 'summary-box'
-  $saveMarkupBtn.style.display = 'none'
-  $saveMarkupStatus.className = 'tool-status'
+  $saveMarkdownBtn.style.display = 'none'
+  $saveMarkdownStatus.className = 'tool-status'
 
   try {
     toolStatus($summarizeStatus, 'Extracting page content...', 'info')
@@ -443,7 +443,7 @@ $summarizeBtn.addEventListener('click', async () => {
 
     $summaryBox.textContent = lastSummary
     $summaryBox.className = 'summary-box visible'
-    $saveMarkupBtn.style.display = ''
+    $saveMarkdownBtn.style.display = ''
     $summarizeStatus.className = 'tool-status'
   } catch (e) {
     toolStatus($summarizeStatus, `Error: ${e.message}`, 'error')
@@ -452,18 +452,18 @@ $summarizeBtn.addEventListener('click', async () => {
   $summarizeBtn.textContent = 'Summarize This Page'
 })
 
-// ── Tools: Save summary as markup ────────────────────
+// ── Tools: Save summary as markdown ────────────────────
 
-$saveMarkupBtn.addEventListener('click', async () => {
-  $saveMarkupBtn.disabled = true
-  $saveMarkupBtn.textContent = 'Saving...'
-  $saveMarkupStatus.className = 'tool-status'
+$saveMarkdownBtn.addEventListener('click', async () => {
+  $saveMarkdownBtn.disabled = true
+  $saveMarkdownBtn.textContent = 'Saving...'
+  $saveMarkdownStatus.className = 'tool-status'
 
   try {
     const body = `${lastSummary}\n\n---\nSource: ${currentTabUrl}`
     const uid = getUniverseId()
     const qs = uid ? `?universe_id=${uid}` : ''
-    const res = await fetch(`${getServer()}/api/markups${qs}`, {
+    const res = await fetch(`${getServer()}/api/markdowns${qs}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -473,12 +473,12 @@ $saveMarkupBtn.addEventListener('click', async () => {
       }),
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    toolStatus($saveMarkupStatus, 'Markup saved!', 'success')
+    toolStatus($saveMarkdownStatus, 'Markdown saved!', 'success')
   } catch (e) {
-    toolStatus($saveMarkupStatus, `Error: ${e.message}`, 'error')
+    toolStatus($saveMarkdownStatus, `Error: ${e.message}`, 'error')
   }
-  $saveMarkupBtn.disabled = false
-  $saveMarkupBtn.textContent = 'Save Summary as Markup'
+  $saveMarkdownBtn.disabled = false
+  $saveMarkdownBtn.textContent = 'Save Summary as Markdown'
 })
 
 init()

@@ -122,25 +122,25 @@ function LinksPanel({ categories, onPinChange, universeId }) {
   }
 
   return (
-    <aside className="markups-panel">
-      <div className="markups-header">
-        <span className="markups-header-title">Links</span>
+    <aside className="markdowns-panel">
+      <div className="markdowns-header">
+        <span className="markdowns-header-title">Links</span>
         <div className="archive-header-actions">
-          <button className="markups-add-btn" onClick={startNew} title="New link">
+          <button className="markdowns-add-btn" onClick={startNew} title="New link">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
             </svg>
           </button>
         </div>
       </div>
-      <div className="markups-search">
-        <input className="markups-search-input" placeholder="Search links..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div className="markdowns-search">
+        <input className="markdowns-search-input" placeholder="Search links..." value={search} onChange={(e) => setSearch(e.target.value)} />
         <CategoryFilterPicker categories={categories} value={selectedCategoryId} onChange={setSelectedCategoryId} />
       </div>
-      <div className="markups-list">
+      <div className="markdowns-list">
         {(() => {
           if (links.length === 0) return (
-            <div className="markups-empty">
+            <div className="markdowns-empty">
               {search || selectedCategoryId ? 'No matching links.' : 'No links yet. Click + to add one.'}
             </div>
           )
@@ -185,10 +185,10 @@ function LinksPanel({ categories, onPinChange, universeId }) {
         })()}
       </div>
       {editing !== null && (
-        <div className="markup-modal-overlay">
-          <div className="markup-modal link-modal">
-            <div className="markup-modal-header">
-              <span className="markup-modal-title">
+        <div className="markdown-modal-overlay">
+          <div className="markdown-modal link-modal">
+            <div className="markdown-modal-header">
+              <span className="markdown-modal-title">
                 {editing === 'new' ? 'New Link' : 'Edit Link'}
               </span>
               <button className="quickview-close" onClick={cancel}>
@@ -197,15 +197,15 @@ function LinksPanel({ categories, onPinChange, universeId }) {
                 </svg>
               </button>
             </div>
-            <div className="markup-modal-body">
-              <input ref={titleRef} className="markup-title-input" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-              <input className="markup-title-input link-url-input" placeholder="https://..." value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') save() }} />
+            <div className="markdown-modal-body">
+              <input ref={titleRef} className="markdown-title-input" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
+              <input className="markdown-title-input link-url-input" placeholder="https://..." value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') save() }} />
               <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId} />
-              <div className="markup-editor-actions">
-                <button className="markup-save-btn" onClick={save} disabled={saving || (!title.trim() && !url.trim())}>
+              <div className="markdown-editor-actions">
+                <button className="markdown-save-btn" onClick={save} disabled={saving || (!title.trim() && !url.trim())}>
                   {saving ? 'Saving...' : 'Save'}
                 </button>
-                <button className="markup-delete-btn" onClick={cancel}>Cancel</button>
+                <button className="markdown-delete-btn" onClick={cancel}>Cancel</button>
               </div>
             </div>
           </div>

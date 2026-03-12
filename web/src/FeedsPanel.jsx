@@ -142,24 +142,24 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
   const baseUrl = `${window.location.origin}/api/feeds`
 
   return (
-    <aside className="markups-panel">
-      <div className="markups-header">
-        <span className="markups-header-title">Feeds</span>
+    <aside className="markdowns-panel">
+      <div className="markdowns-header">
+        <span className="markdowns-header-title">Feeds</span>
         <div className="archive-header-actions">
-          <button className="markups-add-btn" onClick={startNew} title="New feed">
+          <button className="markdowns-add-btn" onClick={startNew} title="New feed">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
             </svg>
           </button>
         </div>
       </div>
-      <div className="markups-search">
-        <input className="markups-search-input" placeholder="Search feeds..." value={search} onChange={e => setSearch(e.target.value)} />
+      <div className="markdowns-search">
+        <input className="markdowns-search-input" placeholder="Search feeds..." value={search} onChange={e => setSearch(e.target.value)} />
         <CategoryFilterPicker categories={categories} value={selectedCategoryId} onChange={setSelectedCategoryId} />
       </div>
-      <div className="markups-list">
+      <div className="markdowns-list">
         {feeds.length === 0 ? (
-          <div className="markups-empty">
+          <div className="markdowns-empty">
             {search || selectedCategoryId ? 'No matching feeds.' : 'No feeds yet. Click + to create one.'}
           </div>
         ) : buildGroups(feeds).map(group => (
@@ -223,18 +223,18 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
 
       {/* Edit / Create feed modal — portaled to body to escape sidebar stacking context */}
       {editing !== null && createPortal(
-        <div className="markup-modal-overlay">
-          <div className="markup-modal link-modal">
-            <div className="markup-modal-header">
-              <span className="markup-modal-title">{editing === 'new' ? 'New Feed' : 'Edit Feed'}</span>
+        <div className="markdown-modal-overlay">
+          <div className="markdown-modal link-modal">
+            <div className="markdown-modal-header">
+              <span className="markdown-modal-title">{editing === 'new' ? 'New Feed' : 'Edit Feed'}</span>
               <button className="quickview-close" onClick={cancel}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </button>
             </div>
-            <div className="markup-modal-body">
-              <input ref={titleRef} className="markup-title-input" placeholder="Feed title" value={title} onChange={e => setTitle(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') save() }} />
+            <div className="markdown-modal-body">
+              <input ref={titleRef} className="markdown-title-input" placeholder="Feed title" value={title} onChange={e => setTitle(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') save() }} />
               <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId} />
 
               {editing !== 'new' && editing.api_key && (
@@ -253,12 +253,12 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
                     <code className="feed-api-code">X-Feed-Key: {editing.api_key}</code>
                   </div>
 
-                  <div className="feed-api-section-title" style={{ marginTop: 12 }}>Send Markup</div>
+                  <div className="feed-api-section-title" style={{ marginTop: 12 }}>Send Markdown</div>
                   <pre className="feed-api-pre">{`POST ${baseUrl}/${editing.id}/ingest
 Content-Type: multipart/form-data
 X-Feed-Key: ${editing.api_key}
 
-title=My Artifact&markup=<p>Hello</p>`}</pre>
+title=My Artifact&markdown=<p>Hello</p>`}</pre>
 
                   <div className="feed-api-section-title" style={{ marginTop: 8 }}>Send File</div>
                   <pre className="feed-api-pre">{`POST ${baseUrl}/${editing.id}/ingest
@@ -271,16 +271,16 @@ title=Report&file=@report.pdf`}</pre>
                   <pre className="feed-api-pre">{`{
   "ok": true,
   "artifact_id": 42,
-  "content_type": "markup" | "file"
+  "content_type": "markdown" | "file"
 }`}</pre>
                 </div>
               )}
 
-              <div className="markup-editor-actions">
-                <button className="markup-save-btn" onClick={save} disabled={saving || !title.trim()}>
+              <div className="markdown-editor-actions">
+                <button className="markdown-save-btn" onClick={save} disabled={saving || !title.trim()}>
                   {saving ? 'Saving...' : 'Save'}
                 </button>
-                <button className="markup-delete-btn" onClick={cancel}>Cancel</button>
+                <button className="markdown-delete-btn" onClick={cancel}>Cancel</button>
               </div>
             </div>
           </div>
@@ -351,10 +351,10 @@ export const ArtifactTimeline = memo(function ArtifactTimeline({ category, onClo
     setTotal(prev => prev - 1)
   }
 
-  const addAsMarkup = async (id) => {
-    setBusy(prev => ({ ...prev, [id]: 'markup' }))
+  const addAsMarkdown = async (id) => {
+    setBusy(prev => ({ ...prev, [id]: 'markdown' }))
     try {
-      const res = await fetch(`/api/feed-artifacts/${id}/to-markup`, { method: 'POST' })
+      const res = await fetch(`/api/feed-artifacts/${id}/to-markdown`, { method: 'POST' })
       if (res.ok) {
         setBusy(prev => { const n = { ...prev }; delete n[id]; return n })
         setSaved(prev => ({ ...prev, [id]: true }))
@@ -412,9 +412,9 @@ export const ArtifactTimeline = memo(function ArtifactTimeline({ category, onClo
             </div>
             <h4 className="timeline-card-title">{art.title || 'Untitled'}</h4>
             <div className="timeline-card-body">
-              {art.content_type === 'markup' ? (
+              {art.content_type === 'markdown' ? (
                 <div className="markdown-body">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}>{art.markup || ''}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}>{art.markdown || ''}</ReactMarkdown>
                 </div>
               ) : (
                 <div className="timeline-card-file">
@@ -425,10 +425,10 @@ export const ArtifactTimeline = memo(function ArtifactTimeline({ category, onClo
               )}
             </div>
             <div className="timeline-card-actions">
-              {art.content_type === 'markup' && (
-                <button className={`timeline-action-btn ${saved[art.id] ? 'saved' : ''}`} onClick={() => addAsMarkup(art.id)} disabled={!!busy[art.id] || !!saved[art.id]} title="Save as markup">
+              {art.content_type === 'markdown' && (
+                <button className={`timeline-action-btn ${saved[art.id] ? 'saved' : ''}`} onClick={() => addAsMarkdown(art.id)} disabled={!!busy[art.id] || !!saved[art.id]} title="Save as markdown">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                  {busy[art.id] === 'markup' ? 'Saving...' : saved[art.id] ? 'Saved as Markup!' : 'Save as Markup'}
+                  {busy[art.id] === 'markdown' ? 'Saving...' : saved[art.id] ? 'Saved as Markdown!' : 'Save as Markdown'}
                 </button>
               )}
               {art.content_type === 'file' && (

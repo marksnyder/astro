@@ -7,11 +7,11 @@
 - file: action-items.png
   description: "Action Items — Track tasks with priorities, due dates, and categories"
 
-- file: markups-list.png
-  description: "Markups — Rich markdown notes organized by universe and category"
+- file: markdowns-list.png
+  description: "Markdowns — Rich markdown notes organized by universe and category"
 
-- file: markup-editor.png
-  description: "Markup Editor — Full-featured editor with live markdown preview"
+- file: markdown-editor.png
+  description: "Markdown Editor — Full-featured editor with live markdown preview"
 
 - file: documents-archive.png
   description: "Document Archive — Upload and manage PDFs, spreadsheets, and text files"
@@ -43,8 +43,8 @@
 - file: mobile-chat.png
   description: "Mobile Chat — Full AI chat experience optimized for phones"
 
-- file: mobile-markups.png
-  description: "Mobile Markups — Read and edit notes on the go"
+- file: mobile-markdowns.png
+  description: "Mobile Markdowns — Read and edit notes on the go"
 
 - file: mobile-actions.png
   description: "Mobile Actions — Manage tasks from anywhere"

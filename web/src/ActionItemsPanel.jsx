@@ -65,7 +65,7 @@ function launchFireworks() {
 /* ── Small link-picker component ─────────────────────────────────── */
 
 function LinkPicker({ actionItemId, links, onLinksChange }) {
-  const [mode, setMode] = useState(null) // null | 'markup' | 'document'
+  const [mode, setMode] = useState(null) // null | 'markdown' | 'document'
   const [searchQ, setSearchQ] = useState('')
   const [results, setResults] = useState([])
   const inputRef = useRef(null)
@@ -73,8 +73,8 @@ function LinkPicker({ actionItemId, links, onLinksChange }) {
   useEffect(() => {
     if (!mode) { setResults([]); return }
     const timer = setTimeout(() => {
-      const url = mode === 'markup'
-        ? `/api/markups?q=${encodeURIComponent(searchQ)}`
+      const url = mode === 'markdown'
+        ? `/api/markdowns?q=${encodeURIComponent(searchQ)}`
         : `/api/documents?q=${encodeURIComponent(searchQ)}`
       fetch(url).then(r => r.json()).then(data => setResults(data)).catch(() => {})
     }, 200)
@@ -88,8 +88,8 @@ function LinkPicker({ actionItemId, links, onLinksChange }) {
   }
 
   const addLink = async (item) => {
-    const body = mode === 'markup'
-      ? { link_type: 'markup', markup_id: item.id }
+    const body = mode === 'markdown'
+      ? { link_type: 'markdown', markdown_id: item.id }
       : { link_type: 'document', document_path: item.path }
     await fetch(`/api/action-items/${actionItemId}/links`, {
       method: 'POST',
@@ -106,11 +106,11 @@ function LinkPicker({ actionItemId, links, onLinksChange }) {
   }
 
   // Existing linked IDs to avoid duplicates in results
-  const linkedMarkupIds = new Set(links.filter(l => l.link_type === 'markup').map(l => l.markup_id))
+  const linkedMarkdownIds = new Set(links.filter(l => l.link_type === 'markdown').map(l => l.markdown_id))
   const linkedDocPaths = new Set(links.filter(l => l.link_type === 'document').map(l => l.document_path))
 
-  const filtered = mode === 'markup'
-    ? results.filter(r => !linkedMarkupIds.has(r.id))
+  const filtered = mode === 'markdown'
+    ? results.filter(r => !linkedMarkdownIds.has(r.id))
     : results.filter(r => !linkedDocPaths.has(r.path))
 
   return (
@@ -118,12 +118,12 @@ function LinkPicker({ actionItemId, links, onLinksChange }) {
       <div className="ai-links-header">
         <span className="ai-links-label">Linked Items</span>
         <div className="ai-links-add-btns">
-          <button className="ai-link-add-btn" onClick={() => openPicker('markup')} title="Link a markup">
+          <button className="ai-link-add-btn" onClick={() => openPicker('markdown')} title="Link a markdown">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
             </svg>
-            Markup
+            Markdown
           </button>
           <button className="ai-link-add-btn" onClick={() => openPicker('document')} title="Link a document">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -139,7 +139,7 @@ function LinkPicker({ actionItemId, links, onLinksChange }) {
         <div className="ai-links-list">
           {links.map((lk) => (
             <div key={lk.id} className={`ai-link-chip ${lk.link_type}`}>
-              {lk.link_type === 'markup' ? (
+              {lk.link_type === 'markdown' ? (
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                   <polyline points="14 2 14 8 20 8" />
@@ -166,22 +166,22 @@ function LinkPicker({ actionItemId, links, onLinksChange }) {
           <input
             ref={inputRef}
             className="ai-link-search"
-            placeholder={mode === 'markup' ? 'Search markups...' : 'Search documents...'}
+            placeholder={mode === 'markdown' ? 'Search markdowns...' : 'Search documents...'}
             value={searchQ}
             onChange={(e) => setSearchQ(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Escape') setMode(null) }}
           />
           <div className="ai-link-results">
             {filtered.length === 0 && (
-              <div className="ai-link-empty">No {mode === 'markup' ? 'markups' : 'documents'} found</div>
+              <div className="ai-link-empty">No {mode === 'markdown' ? 'markdowns' : 'documents'} found</div>
             )}
             {filtered.slice(0, 20).map((item) => (
               <button
-                key={mode === 'markup' ? item.id : item.path}
+                key={mode === 'markdown' ? item.id : item.path}
                 className="ai-link-result"
                 onClick={() => addLink(item)}
               >
-                {mode === 'markup' ? (item.title || 'Untitled') : item.name}
+                {mode === 'markdown' ? (item.title || 'Untitled') : item.name}
               </button>
             ))}
           </div>
@@ -195,7 +195,7 @@ function LinkPicker({ actionItemId, links, onLinksChange }) {
 
 /* ── Main panel ──────────────────────────────────────────────────── */
 
-function ActionItemsPanel({ categories, onOpenMarkup, universeId }) {
+function ActionItemsPanel({ categories, onOpenMarkdown, universeId }) {
   const [items, setItems] = useState([])
   const [search, setSearch] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
@@ -384,19 +384,19 @@ function ActionItemsPanel({ categories, onOpenMarkup, universeId }) {
   const groups = buildGroups(filteredItems)
 
   return (
-    <div className="markups-panel">
-      <div className="markups-header">
-        <span className="markups-header-title">Action Items</span>
-        <button className="markups-add-btn" onClick={startAdd} title="New action item">
+    <div className="markdowns-panel">
+      <div className="markdowns-header">
+        <span className="markdowns-header-title">Action Items</span>
+        <button className="markdowns-add-btn" onClick={startAdd} title="New action item">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
           </svg>
         </button>
       </div>
-      <div className="markups-search">
+      <div className="markdowns-search">
         <div className="ai-search-row">
           <input
-            className="markups-search-input"
+            className="markdowns-search-input"
             placeholder="Search action items..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -414,9 +414,9 @@ function ActionItemsPanel({ categories, onOpenMarkup, universeId }) {
         <CategoryFilterPicker categories={categories} value={selectedCategoryId} onChange={setSelectedCategoryId} />
       </div>
 
-      <div className="markups-list">
+      <div className="markdowns-list">
         {filteredItems.length === 0 ? (
-          <div className="markups-empty">
+          <div className="markdowns-empty">
             {search || selectedCategoryId ? 'No matching action items.' : showCompleted ? 'No action items.' : 'No open action items.'}
           </div>
         ) : (
@@ -467,17 +467,17 @@ function ActionItemsPanel({ categories, onOpenMarkup, universeId }) {
                         {!item.completed && isOverdue(item.due_date) && <span className="ai-overdue-label">overdue</span>}
                       </div>
                     )}
-                    {item.links && item.links.filter(l => l.link_type === 'markup').length > 0 && (
-                      <div className="ai-card-markup-links">
-                        {item.links.filter(l => l.link_type === 'markup').map(lk => (
+                    {item.links && item.links.filter(l => l.link_type === 'markdown').length > 0 && (
+                      <div className="ai-card-markdown-links">
+                        {item.links.filter(l => l.link_type === 'markdown').map(lk => (
                           <button
                             key={lk.id}
-                            className="ai-markup-link-btn"
+                            className="ai-markdown-link-btn"
                             onClick={(e) => {
                               e.stopPropagation()
-                              if (onOpenMarkup && lk.markup_id) onOpenMarkup(lk.markup_id)
+                              if (onOpenMarkdown && lk.markdown_id) onOpenMarkdown(lk.markdown_id)
                             }}
-                            title={`Open markup: ${lk.display_name}`}
+                            title={`Open markdown: ${lk.display_name}`}
                           >
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -527,10 +527,10 @@ function ActionItemsPanel({ categories, onOpenMarkup, universeId }) {
       </div>
 
       {editing !== null && (
-        <div className="markup-modal-overlay">
-          <div className="markup-modal ai-modal">
-            <div className="markup-modal-header">
-              <span className="markup-modal-title">
+        <div className="markdown-modal-overlay">
+          <div className="markdown-modal ai-modal">
+            <div className="markdown-modal-header">
+              <span className="markdown-modal-title">
                 {editing === 'new' ? 'New Action Item' : 'Edit Action Item'}
               </span>
               <button className="quickview-close" onClick={cancelModal}>
@@ -539,10 +539,10 @@ function ActionItemsPanel({ categories, onOpenMarkup, universeId }) {
                 </svg>
               </button>
             </div>
-            <div className="markup-modal-body">
+            <div className="markdown-modal-body">
               <input
                 ref={titleRef}
-                className="markup-title-input"
+                className="markdown-title-input"
                 placeholder="Action item title..."
                 value={formTitle}
                 onChange={(e) => setFormTitle(e.target.value)}
@@ -611,14 +611,14 @@ function ActionItemsPanel({ categories, onOpenMarkup, universeId }) {
                   onLinksChange={() => { fetchLinks(editingId); fetchItems() }}
                 />
               ) : (
-                <div className="ai-links-hint">Save the item first to link markups or documents.</div>
+                <div className="ai-links-hint">Save the item first to link markdowns or documents.</div>
               )}
 
-              <div className="markup-editor-actions">
-                <button className="markup-save-btn" onClick={() => saveItem(true)} disabled={!formTitle.trim() || saving}>
+              <div className="markdown-editor-actions">
+                <button className="markdown-save-btn" onClick={() => saveItem(true)} disabled={!formTitle.trim() || saving}>
                   {saving ? 'Saving...' : 'Save & Close'}
                 </button>
-                <button className="markup-save-continue-btn" onClick={() => saveItem(false)} disabled={!formTitle.trim() || saving}>
+                <button className="markdown-save-continue-btn" onClick={() => saveItem(false)} disabled={!formTitle.trim() || saving}>
                   {saving ? 'Saving...' : 'Save'}
                 </button>
               </div>
