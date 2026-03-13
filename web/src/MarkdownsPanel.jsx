@@ -503,12 +503,11 @@ function MarkdownActionItems({ markdownId, categories }) {
 
 // ── Markdowns panel ───────────────────────────────────────
 
-export function MarkdownEditorView({ markdown, categories, onClose, onSaved }) {
+export function MarkdownEditorView({ markdown, categories, onClose, onSaved, previewMode }) {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [categoryId, setCategoryId] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [previewMode, setPreviewMode] = useState(false)
   const titleRef = useRef(null)
   const isNew = !!markdown?._new
 
@@ -533,7 +532,6 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved }) {
       setBody(htmlToMarkdownText(markdown.body))
       setCategoryId(markdown.category_id)
     }
-    setPreviewMode(!isNew)
     if (isNew) setTimeout(() => titleRef.current?.focus(), 50)
   }, [markdown])
 
@@ -569,19 +567,6 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved }) {
 
   return (
     <div className="markdown-inline-editor">
-      <div className="timeline-header">
-        <button className="timeline-back-btn" onClick={onClose} title="Close editor">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-          Close
-        </button>
-        <h3 className="timeline-title">{isNew ? 'New Markdown' : 'Edit Markdown'}</h3>
-        <div className="markdown-mode-toggle">
-          <button className={`markdown-mode-btn ${!previewMode ? 'active' : ''}`} onClick={() => setPreviewMode(false)}>Edit</button>
-          <button className={`markdown-mode-btn ${previewMode ? 'active' : ''}`} onClick={() => setPreviewMode(true)}>Preview</button>
-        </div>
-      </div>
       <div className="markdown-inline-body">
         <input ref={titleRef} className="markdown-title-input" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
         <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId} />

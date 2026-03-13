@@ -893,7 +893,6 @@ function App() {
   const [model, setModel] = useState('gpt-5-mini')
   const [useContext, setUseContext] = useState(true)
   const [chatMode, setChatMode] = useState('llm') // 'llm' or 'irc'
-  const [artifactViewCategory, setArtifactViewCategory] = useState(null)
   const [feedUnreadCounts, setFeedUnreadCounts] = useState({})
   const [ircNick, setIrcNick] = useState('')
   const [ircMessages, setIrcMessages] = useState([])
@@ -929,12 +928,20 @@ function App() {
   const [pinnedItems, setPinnedItems] = useState({ markdowns: [], documents: [], links: [], feed_categories: [] })
   const [quickView, setQuickView] = useState(null)
   const [editMarkdownRequest, setEditMarkdownRequest] = useState(null)
-  const [activeMarkdown, setActiveMarkdown] = useState(null)
   const [markdownRefreshKey, setMarkdownRefreshKey] = useState(0)
   const [openFeedRequest, setOpenFeedRequest] = useState(null)
+
+  const [tabs, setTabs] = useState([
+    { id: 'llm', type: 'llm', title: 'LLM Chat', closable: false },
+    { id: 'irc', type: 'irc', title: 'Agent Network', closable: false },
+  ])
+  const [activeTabId, setActiveTabId] = useState('llm')
+  const [markdownPreviewMode, setMarkdownPreviewMode] = useState(false)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const resizing = useRef(false)
+  const tabsBarRef = useRef(null)
+  const [tabsOverflow, setTabsOverflow] = useState({ left: false, right: false })
 
   const BG_INTERVAL = 600_000 // 10 minutes
   const [chatBg, setChatBg] = useState({ current: null, next: null, fading: false, author: null, authorUrl: null })
@@ -981,7 +988,7 @@ function App() {
       .catch(() => {})
     fetch('/api/settings/chat_mode')
       .then(r => r.json())
-      .then(d => { if (d.value) setChatMode(d.value) })
+      .then(d => { if (d.value) { setChatMode(d.value); if (d.value === 'irc') setActiveTabId('irc') } })
       .catch(() => {})
     fetch('/api/settings/irc_channel')
       .then(r => r.json())
@@ -1329,10 +1336,77 @@ function App() {
       .catch(() => {})
   }, [currentUniverseId])
 
-  const closeArtifactView = useCallback(() => {
-    setArtifactViewCategory(null)
-    fetchUnreadCounts()
-  }, [fetchUnreadCounts])
+  const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0]
+
+  const switchToTab = useCallback((tabId) => {
+    setActiveTabId(tabId)
+    if (tabId === 'irc') {
+      setChatMode('irc')
+      fetch('/api/settings/chat_mode', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: 'irc' }) }).catch(() => {})
+      fetchIrcChannels()
+    } else if (tabId === 'llm') {
+      setChatMode('llm')
+      fetch('/api/settings/chat_mode', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: 'llm' }) }).catch(() => {})
+    }
+  }, [])
+
+  const openMarkdownTab = useCallback((markdown) => {
+    const key = markdown._new ? 'new' : markdown.id
+    const tabId = `markdown-${key}`
+    setTabs(prev => {
+      const existing = prev.find(t => t.id === tabId)
+      if (existing) {
+        return prev.map(t => t.id === tabId ? { ...t, data: markdown, title: markdown.title || 'Untitled' } : t)
+      }
+      return [...prev, { id: tabId, type: 'markdown', title: markdown.title || 'Untitled', closable: true, data: markdown }]
+    })
+    setActiveTabId(tabId)
+  }, [])
+
+  const openFeedTab = useCallback((category) => {
+    const tabId = `feed-${category.id}`
+    setTabs(prev => {
+      if (prev.find(t => t.id === tabId)) return prev
+      return [...prev, { id: tabId, type: 'feed', title: category.name || 'Feed', closable: true, data: category }]
+    })
+    setActiveTabId(tabId)
+  }, [])
+
+  const closeTab = useCallback((tabId) => {
+    setTabs(prev => prev.filter(t => t.id !== tabId))
+    setActiveTabId(prev => prev === tabId ? 'llm' : prev)
+  }, [])
+
+  const updateTabsOverflow = useCallback(() => {
+    const bar = tabsBarRef.current
+    if (!bar) return
+    const sl = bar.scrollLeft
+    const sw = bar.scrollWidth
+    const cw = bar.clientWidth
+    setTabsOverflow({ left: sl > 2, right: sw - sl - cw > 2 })
+  }, [])
+
+  useEffect(() => {
+    const bar = tabsBarRef.current
+    if (!bar) return
+    const el = bar.querySelector(`[data-tab-id="${activeTabId}"]`)
+    if (el) el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' })
+    requestAnimationFrame(updateTabsOverflow)
+  }, [activeTabId, tabs.length, updateTabsOverflow])
+
+  useEffect(() => {
+    const bar = tabsBarRef.current
+    if (!bar) return
+    bar.addEventListener('scroll', updateTabsOverflow, { passive: true })
+    const ro = new ResizeObserver(updateTabsOverflow)
+    ro.observe(bar)
+    return () => { bar.removeEventListener('scroll', updateTabsOverflow); ro.disconnect() }
+  }, [updateTabsOverflow])
+
+  const scrollTabs = useCallback((dir) => {
+    const bar = tabsBarRef.current
+    if (bar) bar.scrollBy({ left: dir * 150, behavior: 'smooth' })
+  }, [])
 
   const handleCategoryAction = async (action, payload) => {
     if (action === 'add') {
@@ -1596,7 +1670,7 @@ function App() {
               </button>
             ))}
             {(pinnedItems.feed_categories || []).map((c) => (
-              <button key={`fc-${c.id}`} className="pinned-chip pinned-feed" onClick={() => setArtifactViewCategory({ id: c.id, name: c.name })} title={`Artifacts for ${c.name}`}>
+              <button key={`fc-${c.id}`} className="pinned-chip pinned-feed" onClick={() => openFeedTab({ id: c.id, name: c.name })} title={`Artifacts for ${c.name}`}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4 11a9 9 0 0 1 9 9" />
                   <path d="M4 4a16 16 0 0 1 16 16" />
@@ -1611,26 +1685,7 @@ function App() {
           </div>
         )}
         <div className="header-controls">
-          <div className="mode-switcher">
-            <button
-              className={`mode-btn ${chatMode === 'llm' ? 'active' : ''}`}
-              onClick={() => {
-                setChatMode('llm')
-                fetch('/api/settings/chat_mode', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: 'llm' }) }).catch(() => {})
-              }}
-              disabled={loading}
-            >LLM</button>
-            <button
-              className={`mode-btn ${chatMode === 'irc' ? 'active' : ''}`}
-              onClick={() => {
-                setChatMode('irc')
-                fetch('/api/settings/chat_mode', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: 'irc' }) }).catch(() => {})
-                fetchIrcChannels()
-              }}
-              disabled={loading}
-            >Agent Network</button>
-          </div>
-          {chatMode === 'llm' && (
+          {activeTab.type === 'llm' && (
             <>
               <select
                 className="model-select"
@@ -1659,11 +1714,17 @@ function App() {
                 <span className="context-toggle-slider" />
                 <span className="context-toggle-label">{useContext ? 'RAG' : 'Chat'}</span>
               </label>
+              {stats !== null && (
+                <div className="header-stats">
+                  {stats.chunks} chunks indexed
+                </div>
+              )}
             </>
           )}
-          {chatMode === 'llm' && stats !== null && (
-            <div className="header-stats">
-              {stats.chunks} chunks indexed
+          {activeTab.type === 'markdown' && (
+            <div className="markdown-mode-toggle">
+              <button className={`markdown-mode-btn ${!markdownPreviewMode ? 'active' : ''}`} onClick={() => setMarkdownPreviewMode(false)}>Edit</button>
+              <button className={`markdown-mode-btn ${markdownPreviewMode ? 'active' : ''}`} onClick={() => setMarkdownPreviewMode(true)}>Preview</button>
             </div>
           )}
           <button className="backup-restore-btn" onClick={() => setShowSettings(true)} title="Settings">
@@ -1762,7 +1823,7 @@ function App() {
               editMarkdownRequest={editMarkdownRequest}
               onEditMarkdownRequestHandled={() => setEditMarkdownRequest(null)}
               universeId={currentUniverseId}
-              onEditMarkdown={(m) => setActiveMarkdown(m._new ? { ...m, _key: 'new' } : m)}
+              onEditMarkdown={(m) => openMarkdownTab(m._new ? { ...m, _key: 'new' } : m)}
               refreshKey={markdownRefreshKey}
             />
           )}
@@ -1787,7 +1848,7 @@ function App() {
               onPinChange={fetchPinned}
               openFeedRequest={openFeedRequest}
               onOpenFeedRequestHandled={() => setOpenFeedRequest(null)}
-              onViewArtifacts={(cat) => setArtifactViewCategory(cat)}
+              onViewArtifacts={(cat) => openFeedTab(cat)}
               unreadCounts={feedUnreadCounts}
             />
           )}
@@ -1823,26 +1884,78 @@ function App() {
           {!sidebarCollapsed && <div className="resize-drag-area" onMouseDown={startResize} />}
         </div>
 
-        <div className="chat-container">
-          {activeMarkdown ? (
+        <div className="main-panel">
+          <div className="workspace-tabs-bar">
+            {tabsOverflow.left && (
+              <button className="workspace-tabs-arrow left" onClick={() => scrollTabs(-1)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+            )}
+            <div
+              className="workspace-tabs"
+              ref={tabsBarRef}
+              onWheel={(e) => { if (tabsBarRef.current) tabsBarRef.current.scrollLeft += e.deltaY }}
+            >
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  className={`workspace-tab ${tab.id === activeTabId ? 'active' : ''}`}
+                  onClick={() => switchToTab(tab.id)}
+                  data-tab-id={tab.id}
+                >
+                  <span className="workspace-tab-title">{tab.title}</span>
+                  {tab.closable && (
+                    <span
+                      className="workspace-tab-close"
+                      onClick={(e) => { e.stopPropagation(); closeTab(tab.id) }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+            {tabsOverflow.right && (
+              <button className="workspace-tabs-arrow right" onClick={() => scrollTabs(1)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          <div className="chat-container">
+          {activeTab.type === 'markdown' && activeTab.data ? (
             <MarkdownEditorView
-              markdown={activeMarkdown}
+              key={activeTab.id}
+              markdown={activeTab.data}
               categories={categories}
-              onClose={() => setActiveMarkdown(null)}
+              previewMode={markdownPreviewMode}
+              onClose={() => closeTab(activeTab.id)}
               onSaved={(created, closed) => {
                 setMarkdownRefreshKey(k => k + 1)
                 fetchPinned()
-                if (created && !closed) setActiveMarkdown(created)
-                if (closed) setActiveMarkdown(null)
+                if (created && !closed) {
+                  setTabs(prev => prev.map(t => t.id === activeTab.id
+                    ? { ...t, data: created, title: created.title || 'Untitled' }
+                    : t
+                  ))
+                }
+                if (closed) closeTab(activeTab.id)
               }}
             />
-          ) : artifactViewCategory ? (
+          ) : activeTab.type === 'feed' && activeTab.data ? (
             <ArtifactTimeline
-              category={artifactViewCategory}
-              onClose={closeArtifactView}
+              key={activeTab.id}
+              category={activeTab.data}
+              onClose={() => { closeTab(activeTab.id); fetchUnreadCounts() }}
               onUnreadChange={fetchUnreadCounts}
             />
-          ) : chatMode === 'irc' ? (
+          ) : activeTab.type === 'irc' ? (
             <div className="irc-layout">
               <div className="irc-channel-tabs">
                 {(ircChannels.length > 0 ? ircChannels : (ircNick ? [{ name: ircNick }] : []))
@@ -2031,7 +2144,7 @@ function App() {
             </>
           )}
 
-          {!artifactViewCategory && !activeMarkdown && <footer className="input-area">
+          {(activeTab.type === 'llm' || activeTab.type === 'irc') && <footer className="input-area">
             <form onSubmit={handleSubmit} className="input-form">
               <textarea
                 ref={inputRef}
@@ -2065,6 +2178,7 @@ function App() {
               </button>
             </form>
           </footer>}
+        </div>
         </div>
       </div>
       {quickView && <QuickView item={quickView} onClose={() => setQuickView(null)} />}
