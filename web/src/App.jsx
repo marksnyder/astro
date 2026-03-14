@@ -7,7 +7,7 @@ import ActionItemsPanel from './ActionItemsPanel'
 import FeedsPanel, { ArtifactTimeline } from './FeedsPanel'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import CategoryTree, { CategoryPicker } from './CategoryTree'
+import CategoryTree, { CategoryPicker, EmojiPopover } from './CategoryTree'
 import BACKGROUNDS from './backgrounds'
 
 const LOGO_URL = '/logo.png'
@@ -81,6 +81,9 @@ function IrcMessageGroup({ group }) {
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
           </div>
         ))}
+        {group.messages.length > 1 && group.messages[group.messages.length - 1].timestamp !== group.timestamp && (
+          <span className="irc-ts irc-ts-end">{ircTimestamp(group.messages[group.messages.length - 1].timestamp)}</span>
+        )}
       </div>
     </div>
   )
@@ -518,7 +521,7 @@ function SettingsDialog({ onClose, onRestored }) {
   )
 }
 
-const MSG_CHAR_LIMIT = 350
+const MSG_CHUNK_LIMIT = 320
 
 function parseMessages(raw) {
   if (!raw) return ['']
@@ -527,6 +530,35 @@ function parseMessages(raw) {
     if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(String)
   } catch {}
   return [raw]
+}
+
+function joinMessages(raw) {
+  if (!raw) return ''
+  try {
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(String).join('\n')
+  } catch {}
+  return raw
+}
+
+function splitIntoChunks(text, limit) {
+  const cleaned = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
+  if (!cleaned) return []
+  if (cleaned.length <= limit) return [cleaned]
+  const chunks = []
+  let remaining = cleaned
+  while (remaining.length > 0) {
+    if (remaining.length <= limit) {
+      chunks.push(remaining)
+      break
+    }
+    let breakAt = remaining.lastIndexOf('\n', limit)
+    if (breakAt <= 0) breakAt = remaining.lastIndexOf(' ', limit)
+    if (breakAt <= 0) breakAt = limit
+    chunks.push(remaining.slice(0, breakAt).trimEnd())
+    remaining = remaining.slice(breakAt).replace(/^\n/, '').trimStart()
+  }
+  return chunks
 }
 
 function FeedPostModal({ mode, onInsert, onClose }) {
@@ -672,48 +704,37 @@ function MarkdownToolModal({ mode, onInsert, onClose }) {
   )
 }
 
-function PromptForm({ initial, channels, onSave, onCancel }) {
+function PromptForm({ initial, channels, categories, onSave, onCancel }) {
   const [title, setTitle] = useState(initial.title || '')
   const [channel, setChannel] = useState(initial.channel || '#astro')
-  const [messages, setMessages] = useState(() => parseMessages(initial.message))
+  const [message, setMessage] = useState(() => joinMessages(initial.message))
   const [cronExpr, setCronExpr] = useState(initial.cron_expr || '')
   const [showSchedule, setShowSchedule] = useState(Boolean(initial.cron_expr))
-  const [activeMsg, setActiveMsg] = useState(0)
+  const [categoryId, setCategoryId] = useState(initial.category_id ?? '')
   const [feedPostMode, setFeedPostMode] = useState(null)
   const [markdownToolMode, setMarkdownToolMode] = useState(null)
+  const textareaRef = useRef(null)
 
-  const updateMsg = (idx, val) => {
-    if (val.length > MSG_CHAR_LIMIT) return
-    setMessages(prev => prev.map((m, i) => i === idx ? val : m))
+  const insertText = (text) => {
+    const ta = textareaRef.current
+    if (ta) {
+      const start = ta.selectionStart
+      const newVal = message.slice(0, start) + text + message.slice(ta.selectionEnd)
+      setMessage(newVal)
+      setTimeout(() => { ta.focus(); const pos = start + text.length; ta.setSelectionRange(pos, pos) }, 0)
+    } else {
+      setMessage(prev => prev + text)
+    }
   }
 
-  const insertIntoActiveMsg = (text) => {
-    setMessages(prev => prev.map((m, i) => {
-      if (i !== activeMsg) return m
-      const newVal = m + text
-      return newVal.length <= MSG_CHAR_LIMIT ? newVal : m
-    }))
-  }
-  const addMsg = () => setMessages(prev => [...prev, ''])
-  const removeMsg = (idx) => setMessages(prev => prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx))
-  const moveMsg = (idx, dir) => {
-    setMessages(prev => {
-      const arr = [...prev]
-      const target = idx + dir
-      if (target < 0 || target >= arr.length) return arr
-      ;[arr[idx], arr[target]] = [arr[target], arr[idx]]
-      return arr
-    })
-  }
-
-  const hasContent = messages.some(m => m.trim())
+  const chunks = splitIntoChunks(message, MSG_CHUNK_LIMIT)
+  const hasContent = message.trim().length > 0
 
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!hasContent || !title.trim()) return
-    const cleaned = messages.filter(m => m.trim())
-    const msgPayload = JSON.stringify(cleaned)
-    onSave({ id: initial.id, channel, message: msgPayload, cron_expr: showSchedule ? cronExpr.trim() : '', title: title.trim() })
+    const msgPayload = JSON.stringify(chunks)
+    onSave({ id: initial.id, channel, message: msgPayload, cron_expr: showSchedule ? cronExpr.trim() : '', title: title.trim(), category_id: categoryId || null, sort_order: initial.sort_order || 0 })
   }
 
   const cronPresets = [
@@ -747,6 +768,15 @@ function PromptForm({ initial, channels, onSave, onCancel }) {
         </select>
       </div>
       <div className="prompt-form-row">
+        <label>Category</label>
+        <select value={categoryId} onChange={e => setCategoryId(e.target.value ? Number(e.target.value) : '')} className="prompt-form-input">
+          <option value="">Uncategorized</option>
+          {(categories || []).map(c => (
+            <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="prompt-form-row">
         <label className="prompt-schedule-toggle-label">
           <input type="checkbox" checked={showSchedule} onChange={e => { setShowSchedule(e.target.checked); if (e.target.checked && !cronExpr) setCronExpr('0 9 * * *') }} />
           Schedule (optional)
@@ -771,55 +801,42 @@ function PromptForm({ initial, channels, onSave, onCancel }) {
         {!showSchedule && <div className="prompt-ondemand-hint">On-demand only — use Run to execute</div>}
       </div>
       <div className="prompt-form-row">
-        <label>Messages <span className="prompt-msg-count">({messages.length})</span></label>
-        {messages.map((msg, idx) => (
-          <div key={idx} className={`prompt-msg-entry ${activeMsg === idx ? 'active' : ''}`}>
-            <div className="prompt-msg-entry-header">
-              <span className="prompt-msg-label">#{idx + 1}</span>
-              <span className={`prompt-msg-chars ${msg.length > MSG_CHAR_LIMIT * 0.9 ? 'warn' : ''} ${msg.length >= MSG_CHAR_LIMIT ? 'over' : ''}`}>
-                {msg.length}/{MSG_CHAR_LIMIT}
-              </span>
-              <div className="prompt-msg-entry-btns">
-                <button type="button" className="prompt-msg-move-btn" onClick={() => moveMsg(idx, -1)} disabled={idx === 0} title="Move up">&uarr;</button>
-                <button type="button" className="prompt-msg-move-btn" onClick={() => moveMsg(idx, 1)} disabled={idx === messages.length - 1} title="Move down">&darr;</button>
-                <button type="button" className="prompt-msg-remove-btn" onClick={() => removeMsg(idx)} disabled={messages.length <= 1} title="Remove">&times;</button>
-              </div>
-            </div>
-            <textarea
-              className="prompt-form-input prompt-form-textarea"
-              value={msg}
-              onChange={e => updateMsg(idx, e.target.value)}
-              onFocus={() => setActiveMsg(idx)}
-              onInput={e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
-              ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' } }}
-              placeholder={`Message ${idx + 1}...`}
-              rows={2}
-              maxLength={MSG_CHAR_LIMIT}
-            />
-            <div className="prompt-msg-tools">
-              <span className="prompt-msg-tools-label">Tools</span>
-              <button type="button" className="prompt-msg-tool-btn" onClick={() => { setActiveMsg(idx); setFeedPostMode('markdown') }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
-                Post Feed Markdown
-              </button>
-              <button type="button" className="prompt-msg-tool-btn" onClick={() => { setActiveMsg(idx); setFeedPostMode('document') }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                Post Feed Document
-              </button>
-              <button type="button" className="prompt-msg-tool-btn" onClick={() => { setActiveMsg(idx); setMarkdownToolMode('read') }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                Read Markdown
-              </button>
-              <button type="button" className="prompt-msg-tool-btn" onClick={() => { setActiveMsg(idx); setMarkdownToolMode('update') }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                Update Markdown
-              </button>
-            </div>
+        <label>Message</label>
+        <textarea
+          ref={textareaRef}
+          className="prompt-form-input prompt-form-textarea prompt-form-textarea-full"
+          value={message}
+          onChange={e => setMessage(e.target.value)}
+          onInput={e => { e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 300) + 'px' }}
+          placeholder="Write your prompt message..."
+          rows={6}
+        />
+        <div className="prompt-msg-tools">
+          <span className="prompt-msg-tools-label">Insert</span>
+          <button type="button" className="prompt-msg-tool-btn" onClick={() => setFeedPostMode('markdown')}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
+            Post Feed Markdown
+          </button>
+          <button type="button" className="prompt-msg-tool-btn" onClick={() => setFeedPostMode('document')}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Post Feed Document
+          </button>
+          <button type="button" className="prompt-msg-tool-btn" onClick={() => setMarkdownToolMode('read')}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            Read Markdown
+          </button>
+          <button type="button" className="prompt-msg-tool-btn" onClick={() => setMarkdownToolMode('update')}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Update Markdown
+          </button>
+        </div>
+        {hasContent && (
+          <div className="prompt-chunk-info">
+            Will be sent as {chunks.length} message{chunks.length !== 1 ? 's' : ''} ({message.trim().length} chars, {MSG_CHUNK_LIMIT}/msg limit)
           </div>
-        ))}
-        <button type="button" className="prompt-add-msg-btn" onClick={addMsg}>+ Add message</button>
-        {feedPostMode && <FeedPostModal mode={feedPostMode} onInsert={insertIntoActiveMsg} onClose={() => setFeedPostMode(null)} />}
-        {markdownToolMode && <MarkdownToolModal mode={markdownToolMode} onInsert={insertIntoActiveMsg} onClose={() => setMarkdownToolMode(null)} />}
+        )}
+        {feedPostMode && <FeedPostModal mode={feedPostMode} onInsert={insertText} onClose={() => setFeedPostMode(null)} />}
+        {markdownToolMode && <MarkdownToolModal mode={markdownToolMode} onInsert={insertText} onClose={() => setMarkdownToolMode(null)} />}
       </div>
       <div className="prompt-form-actions">
         <button type="submit" className="prompt-save-btn" disabled={!hasContent || !title.trim()}>
@@ -831,9 +848,10 @@ function PromptForm({ initial, channels, onSave, onCancel }) {
   )
 }
 
-function PromptItem({ s, onEdit, onClone, onDelete, onRun }) {
+function PromptItem({ s, onEdit, onClone, onDelete, onRun, onDragStart, onDragOver, onDrop }) {
   const [running, setRunning] = useState(false)
-  const msgs = parseMessages(s.message)
+  const fullText = joinMessages(s.message)
+  const chunkCount = splitIntoChunks(fullText, MSG_CHUNK_LIMIT).length
 
   const handleRun = async (e) => {
     e.stopPropagation()
@@ -844,42 +862,223 @@ function PromptItem({ s, onEdit, onClone, onDelete, onRun }) {
   const isScheduled = s.cron_expr && s.cron_expr.trim()
 
   return (
-    <div className="prompt-item">
-      <div className="prompt-item-header">
-        <span className="prompt-title">{s.title || msgs[0]?.slice(0, 60)}</span>
-        {msgs.length > 1 && <span className="prompt-msg-badge">{msgs.length} msgs</span>}
+    <div className="prompt-item" draggable onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData('prompt-id', String(s.id)); onDragStart?.(s.id) }}>
+      <div className="prompt-item-row1">
+        <span className="prompt-drag-handle">⠿</span>
+        <span className="prompt-title">{s.title || fullText.slice(0, 60)}</span>
+      </div>
+      <div className="prompt-item-row2" onMouseDown={e => e.stopPropagation()} onDragStart={e => e.preventDefault()}>
         <span className="prompt-channel">{s.channel}</span>
+        {chunkCount > 1 && <span className="prompt-msg-badge">{chunkCount} msgs</span>}
         {isScheduled ? (
           <code className="prompt-cron">{s.cron_expr}</code>
         ) : (
           <span className="prompt-ondemand-badge">On-demand</span>
         )}
-        <div className="prompt-item-inline-actions" onClick={e => e.stopPropagation()}>
-          <button className="prompt-inline-btn" onClick={() => onEdit(s)} title="Edit">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-            </svg>
-          </button>
-          <button className="prompt-inline-btn" onClick={() => onClone(s)} title="Clone">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-            </svg>
-          </button>
-          <button className="prompt-inline-btn run" onClick={handleRun} disabled={running} title="Run now">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="5 3 19 12 5 21 5 3" />
-            </svg>
-          </button>
-          <button className="prompt-inline-btn delete" onClick={() => onDelete(s.id)} title="Delete">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-              <path d="M10 11v6" /><path d="M14 11v6" />
-            </svg>
-          </button>
+      </div>
+      <div className="prompt-item-row3" onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()} onDragStart={e => e.preventDefault()}>
+        <button className="prompt-inline-btn" onClick={() => onEdit(s)} title="Edit">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+          </svg>
+          Edit
+        </button>
+        <button className="prompt-inline-btn" onClick={() => onClone(s)} title="Clone">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+          Clone
+        </button>
+        <button className="prompt-inline-btn run" onClick={handleRun} disabled={running} title="Run now">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="5 3 19 12 5 21 5 3" />
+          </svg>
+          Run
+        </button>
+        <button className="prompt-inline-btn delete" onClick={() => onDelete(s.id)} title="Delete">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+            <path d="M10 11v6" /><path d="M14 11v6" />
+          </svg>
+          Delete
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function PromptBoard({ categories, prompts, filterChannel, search, onEditPrompt, onClonePrompt, onDeletePrompt, onRunPrompt, onEditCategory, onDeleteCategory, onReorderCategories, onReorderPrompts, onAddPrompt }) {
+  const dragCatRef = useRef(null)
+  const dragPromptRef = useRef(null)
+  const dropTargetRef = useRef(null)
+
+  const filtered = prompts.filter(s =>
+    (!filterChannel || s.channel === filterChannel) &&
+    (!search || (s.title || '').toLowerCase().includes(search.toLowerCase()))
+  )
+
+  const cols = [0, 1, 2]
+  const catsByCol = {}
+  cols.forEach(c => { catsByCol[c] = categories.filter(cat => cat.col === c).sort((a, b) => a.sort_order - b.sort_order) })
+
+  const uncategorized = filtered.filter(p => !p.category_id || !categories.find(c => c.id === p.category_id))
+  const promptsByCat = {}
+  categories.forEach(c => { promptsByCat[c.id] = filtered.filter(p => p.category_id === c.id).sort((a, b) => a.sort_order - b.sort_order) })
+
+  const handleCatDragStart = (catId, e) => {
+    dragCatRef.current = catId
+    dragPromptRef.current = null
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('cat-id', String(catId))
+  }
+
+  const handleCatDrop = (targetCol, targetOrder, e) => {
+    e.preventDefault()
+    const draggedId = dragCatRef.current
+    if (draggedId == null) return
+    const allCats = [...categories]
+    const dragged = allCats.find(c => c.id === draggedId)
+    if (!dragged) return
+
+    const otherInCol = allCats.filter(c => c.col === targetCol && c.id !== draggedId).sort((a, b) => a.sort_order - b.sort_order)
+    otherInCol.splice(targetOrder, 0, { ...dragged, col: targetCol })
+    const ordering = otherInCol.map((c, i) => ({ id: c.id, col: targetCol, sort_order: i }))
+    allCats.filter(c => c.col !== targetCol && c.id !== draggedId).forEach(c => ordering.push({ id: c.id, col: c.col, sort_order: c.sort_order }))
+    onReorderCategories(ordering)
+    dragCatRef.current = null
+  }
+
+  const handlePromptDragStart = (promptId, e) => {
+    dragPromptRef.current = promptId
+    dragCatRef.current = null
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('prompt-id', String(promptId))
+  }
+
+  const handlePromptDropOnCat = (catId, targetOrder, e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const draggedId = dragPromptRef.current
+    if (draggedId == null) return
+
+    const catPrompts = prompts.filter(p => p.category_id === catId && p.id !== draggedId).sort((a, b) => a.sort_order - b.sort_order)
+    catPrompts.splice(targetOrder, 0, prompts.find(p => p.id === draggedId))
+    const ordering = catPrompts.map((p, i) => ({ id: p.id, category_id: catId, sort_order: i }))
+    prompts.filter(p => p.category_id !== catId && p.id !== draggedId).forEach(p => ordering.push({ id: p.id, category_id: p.category_id, sort_order: p.sort_order }))
+    onReorderPrompts(ordering)
+    dragPromptRef.current = null
+  }
+
+  const handlePromptDropOnUncategorized = (targetOrder, e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const draggedId = dragPromptRef.current
+    if (draggedId == null) return
+
+    const uncatPrompts = uncategorized.filter(p => p.id !== draggedId).sort((a, b) => a.sort_order - b.sort_order)
+    uncatPrompts.splice(targetOrder, 0, prompts.find(p => p.id === draggedId))
+    const ordering = uncatPrompts.map((p, i) => ({ id: p.id, category_id: null, sort_order: i }))
+    prompts.filter(p => p.category_id && categories.find(c => c.id === p.category_id) && p.id !== draggedId).forEach(p => ordering.push({ id: p.id, category_id: p.category_id, sort_order: p.sort_order }))
+    onReorderPrompts(ordering)
+    dragPromptRef.current = null
+  }
+
+  const renderCatContainer = (cat) => {
+    const catPrompts = promptsByCat[cat.id] || []
+    return (
+      <div
+        key={cat.id}
+        className="prompt-cat-container"
+        draggable
+        onDragStart={e => handleCatDragStart(cat.id, e)}
+        onDragOver={e => e.preventDefault()}
+        onDrop={e => {
+          if (dragCatRef.current != null) handleCatDrop(cat.col, cat.sort_order, e)
+        }}
+      >
+        <div className="prompt-cat-header">
+          <span className="prompt-cat-emoji">{cat.emoji}</span>
+          <span className="prompt-cat-name">{cat.name}</span>
+          <div className="prompt-cat-actions">
+            <button className="prompt-cat-action-btn" onClick={() => onEditCategory(cat)} title="Edit category">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button className="prompt-cat-action-btn delete" onClick={() => onDeleteCategory(cat.id)} title="Delete category">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+            </button>
+          </div>
+        </div>
+        <div className="prompt-cat-body" onDragOver={e => e.preventDefault()} onDrop={e => { if (dragPromptRef.current != null) handlePromptDropOnCat(cat.id, catPrompts.length, e) }}>
+          {catPrompts.length === 0 && (
+            <div className="prompt-cat-empty">
+              Drop prompts here
+            </div>
+          )}
+          {catPrompts.map((s, idx) => (
+            <div key={s.id} className="prompt-drop-zone" onDragOver={e => { e.preventDefault(); e.stopPropagation() }} onDrop={e => { e.stopPropagation(); handlePromptDropOnCat(cat.id, idx, e) }}>
+              <PromptItem
+                s={s}
+                onEdit={onEditPrompt}
+                onClone={onClonePrompt}
+                onDelete={onDeletePrompt}
+                onRun={onRunPrompt}
+                onDragStart={(id) => { dragPromptRef.current = id; dragCatRef.current = null }}
+              />
+            </div>
+          ))}
         </div>
       </div>
+    )
+  }
+
+  return (
+    <div className="prompt-board">
+      <div className="prompt-board-columns">
+        {cols.map(colIdx => (
+          <div
+            key={colIdx}
+            className="prompt-board-col"
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => {
+              if (dragCatRef.current != null) handleCatDrop(colIdx, (catsByCol[colIdx] || []).length, e)
+            }}
+          >
+            {(catsByCol[colIdx] || []).map(cat => renderCatContainer(cat))}
+          </div>
+        ))}
+      </div>
+      {uncategorized.length > 0 && (
+        <div
+          className="prompt-cat-container prompt-cat-uncategorized"
+          onDragOver={e => e.preventDefault()}
+          onDrop={e => handlePromptDropOnUncategorized(uncategorized.length, e)}
+        >
+          <div className="prompt-cat-header">
+            <span className="prompt-cat-emoji">📋</span>
+            <span className="prompt-cat-name">Uncategorized</span>
+            <span className="prompt-cat-count">{uncategorized.length}</span>
+          </div>
+          <div className="prompt-cat-body" onDragOver={e => e.preventDefault()} onDrop={e => { if (dragPromptRef.current != null) handlePromptDropOnUncategorized(uncategorized.length, e) }}>
+            {uncategorized.map((s, idx) => (
+              <div key={s.id} className="prompt-drop-zone" onDragOver={e => { e.preventDefault(); e.stopPropagation() }} onDrop={e => { e.stopPropagation(); handlePromptDropOnUncategorized(idx, e) }}>
+                <PromptItem
+                  s={s}
+                  onEdit={onEditPrompt}
+                  onClone={onClonePrompt}
+                  onDelete={onDeletePrompt}
+                  onRun={onRunPrompt}
+                  onDragStart={(id) => { dragPromptRef.current = id; dragCatRef.current = null }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {categories.length === 0 && uncategorized.length === 0 && (
+        <div className="prompt-empty">No prompts yet. Create a category and add some prompts!</div>
+      )}
     </div>
   )
 }
@@ -913,6 +1112,8 @@ function App() {
   const [promptEditing, setPromptEditing] = useState(null)
   const [promptFilterChannel, setPromptFilterChannel] = useState('')
   const [promptSearch, setPromptSearch] = useState('')
+  const [promptCategories, setPromptCategories] = useState([])
+  const [editingPromptCat, setEditingPromptCat] = useState(null)
   const [universes, setUniverses] = useState([])
   const [currentUniverseId, setCurrentUniverseId] = useState(null)
   const [sidebarTab, setSidebarTab] = useState('actions')
@@ -1060,6 +1261,38 @@ function App() {
       .then(r => r.json())
       .then(setPrompts)
       .catch(() => {})
+  }
+
+  const fetchPromptCategories = () => {
+    fetch('/api/prompt-categories')
+      .then(r => r.json())
+      .then(setPromptCategories)
+      .catch(() => {})
+  }
+
+  const savePromptCategory = async (data) => {
+    const method = data.id ? 'PUT' : 'POST'
+    const url = data.id ? `/api/prompt-categories/${data.id}` : '/api/prompt-categories'
+    await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+    fetchPromptCategories()
+    setEditingPromptCat(null)
+  }
+
+  const deletePromptCategory = async (id) => {
+    if (!confirm('Delete this category? Prompts will become uncategorized.')) return
+    await fetch(`/api/prompt-categories/${id}`, { method: 'DELETE' })
+    fetchPromptCategories()
+    fetchPrompts()
+  }
+
+  const reorderPromptCategories = async (ordering) => {
+    await fetch('/api/prompt-categories/reorder', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ordering }) })
+    fetchPromptCategories()
+  }
+
+  const reorderPrompts = async (ordering) => {
+    await fetch('/api/prompts/reorder', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ordering }) })
+    fetchPrompts()
   }
 
   const savePrompt = async (data) => {
@@ -1994,7 +2227,7 @@ function App() {
                 )}
                 <button
                   className="irc-channel-tab irc-prompt-tab"
-                  onClick={() => { setShowPromptPanel(true); fetchPrompts() }}
+                  onClick={() => { setShowPromptPanel(true); fetchPrompts(); fetchPromptCategories() }}
                   title="Prompts"
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -2193,7 +2426,7 @@ function App() {
       )}
       {showPromptPanel && (
         <div className="prompt-modal-overlay">
-          <div className="prompt-modal">
+          <div className="prompt-modal prompt-modal-board">
             <div className="prompt-panel-header">
               <h3>Prompts</h3>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -2203,13 +2436,26 @@ function App() {
                     <option key={ch} value={ch}>{ch}</option>
                   ))}
                 </select>
+                <input
+                  className="prompt-search-input prompt-search-header"
+                  value={promptSearch}
+                  onChange={e => setPromptSearch(e.target.value)}
+                  placeholder="Search..."
+                />
+                <button className="prompt-add-btn" onClick={() => setEditingPromptCat({ name: '', emoji: '📁', col: 0, sort_order: promptCategories.length })}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" />
+                  </svg>
+                  Category
+                </button>
                 <button className="prompt-add-btn" onClick={() => setPromptEditing({ channel: '#astro', message: '', cron_expr: '' })}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
                   </svg>
-                  New
+                  Prompt
                 </button>
-                <button className="quickview-close" onClick={() => { setShowPromptPanel(false); setPromptEditing(null); setPromptFilterChannel(''); setPromptSearch('') }}>
+                <button className="quickview-close" onClick={() => { setShowPromptPanel(false); setPromptEditing(null); setEditingPromptCat(null); setPromptFilterChannel(''); setPromptSearch('') }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                   </svg>
@@ -2220,29 +2466,47 @@ function App() {
               <PromptForm
                 initial={promptEditing}
                 channels={ircChannels}
+                categories={promptCategories}
                 onSave={savePrompt}
                 onCancel={() => setPromptEditing(null)}
               />
+            ) : editingPromptCat ? (
+              <form className="prompt-form" onSubmit={e => { e.preventDefault(); savePromptCategory(editingPromptCat) }}>
+                <div className="prompt-form-row">
+                  <label>Category Name</label>
+                  <input className="prompt-form-input" value={editingPromptCat.name} onChange={e => setEditingPromptCat(p => ({ ...p, name: e.target.value }))} placeholder="Category name..." maxLength={50} autoFocus />
+                </div>
+                <div className="prompt-form-row">
+                  <label>Emoji</label>
+                  <div className="prompt-cat-emoji-row emoji-trigger-lg">
+                    <EmojiPopover
+                      emoji={editingPromptCat.emoji}
+                      onSelect={(emoji) => setEditingPromptCat(p => ({ ...p, emoji }))}
+                      onClear={() => setEditingPromptCat(p => ({ ...p, emoji: '📁' }))}
+                    />
+                  </div>
+                </div>
+                <div className="prompt-form-actions">
+                  <button type="submit" className="prompt-save-btn" disabled={!editingPromptCat.name.trim()}>{editingPromptCat.id ? 'Update' : 'Create'}</button>
+                  <button type="button" className="prompt-cancel-btn" onClick={() => setEditingPromptCat(null)}>Cancel</button>
+                </div>
+              </form>
             ) : (
-              <div className="prompt-list">
-                <input
-                  className="prompt-search-input"
-                  value={promptSearch}
-                  onChange={e => setPromptSearch(e.target.value)}
-                  placeholder="Search prompts..."
-                />
-                {prompts.filter(s => (!promptFilterChannel || s.channel === promptFilterChannel) && (!promptSearch || (s.title || '').toLowerCase().includes(promptSearch.toLowerCase()))).length === 0 && (
-                  <div className="prompt-empty">No prompts{promptFilterChannel ? ` for ${promptFilterChannel}` : ''}{promptSearch ? ` matching "${promptSearch}"` : ''}</div>
-                )}
-                {prompts.filter(s => (!promptFilterChannel || s.channel === promptFilterChannel) && (!promptSearch || (s.title || '').toLowerCase().includes(promptSearch.toLowerCase()))).map(s => (
-                  <PromptItem key={s.id} s={s}
-                    onEdit={setPromptEditing}
-                    onClone={(p) => setPromptEditing({ ...p, id: undefined, title: `${p.title || ''} (copy)`.trim() })}
-                    onDelete={deletePrompt}
-                    onRun={runPromptNow}
-                  />
-                ))}
-              </div>
+              <PromptBoard
+                categories={promptCategories}
+                prompts={prompts}
+                filterChannel={promptFilterChannel}
+                search={promptSearch}
+                onEditPrompt={setPromptEditing}
+                onClonePrompt={(p) => setPromptEditing({ ...p, id: undefined, title: `${p.title || ''} (copy)`.trim() })}
+                onDeletePrompt={deletePrompt}
+                onRunPrompt={runPromptNow}
+                onEditCategory={setEditingPromptCat}
+                onDeleteCategory={deletePromptCategory}
+                onReorderCategories={reorderPromptCategories}
+                onReorderPrompts={reorderPrompts}
+                onAddPrompt={(catId) => setPromptEditing({ channel: '#astro', message: '', cron_expr: '', category_id: catId || null })}
+              />
             )}
           </div>
         </div>

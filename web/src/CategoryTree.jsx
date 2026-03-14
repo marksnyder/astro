@@ -67,7 +67,7 @@ export function CategoryFilterPicker({ categories, value, onChange }) {
 
 // ── Emoji picker popover ─────────────────────────────
 
-function EmojiPopover({ emoji, onSelect, onClear }) {
+export function EmojiPopover({ emoji, onSelect, onClear }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   const pickerRef = useRef(null)
@@ -105,6 +105,7 @@ function EmojiPopover({ emoji, onSelect, onClear }) {
   return (
     <div className="emoji-popover-wrap" ref={ref}>
       <button
+        type="button"
         className={`emoji-trigger-btn ${emoji ? 'has-emoji' : ''}`}
         onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
         title={emoji ? 'Change emoji' : 'Set emoji'}
@@ -115,7 +116,7 @@ function EmojiPopover({ emoji, onSelect, onClear }) {
         <div className="emoji-popover" onClick={(e) => e.stopPropagation()}>
           <div ref={pickerRef} />
           {emoji && (
-            <button className="emoji-clear-btn" onClick={() => { onClear(); setOpen(false) }}>
+            <button type="button" className="emoji-clear-btn" onClick={() => { onClear(); setOpen(false) }}>
               Remove emoji
             </button>
           )}

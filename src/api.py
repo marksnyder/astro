@@ -107,6 +107,13 @@ from src.markdowns import (
     mark_prompt_run,
     prompt_to_dict,
     update_prompt,
+    reorder_prompts,
+    create_prompt_category,
+    delete_prompt_category,
+    list_prompt_categories,
+    prompt_category_to_dict,
+    reorder_prompt_categories,
+    update_prompt_category,
 )
 from src.query import ask, ask_direct
 from src.store import (
@@ -1475,6 +1482,8 @@ class PromptRequest(BaseModel):
     message: str
     cron_expr: str = ""
     title: str = ""
+    category_id: int | None = None
+    sort_order: int = 0
 
 
 @app.get("/api/prompts")
@@ -1487,8 +1496,18 @@ def api_create_prompt(req: PromptRequest):
     channel = req.channel.strip()
     if not channel.startswith("#"):
         channel = "#" + channel
-    p = create_prompt(channel, req.message, req.cron_expr.strip(), title=req.title.strip())
+    p = create_prompt(channel, req.message, req.cron_expr.strip(), title=req.title.strip(), category_id=req.category_id, sort_order=req.sort_order)
     return prompt_to_dict(p)
+
+
+class PromptReorderRequest(BaseModel):
+    ordering: list[dict]
+
+
+@app.put("/api/prompts/reorder")
+def api_reorder_prompts(req: PromptReorderRequest):
+    reorder_prompts(req.ordering)
+    return {"ok": True}
 
 
 @app.put("/api/prompts/{prompt_id}")
@@ -1496,7 +1515,7 @@ def api_update_prompt(prompt_id: int, req: PromptRequest):
     channel = req.channel.strip()
     if not channel.startswith("#"):
         channel = "#" + channel
-    p = update_prompt(prompt_id, channel, req.message, req.cron_expr.strip(), title=req.title.strip())
+    p = update_prompt(prompt_id, channel, req.message, req.cron_expr.strip(), title=req.title.strip(), category_id=req.category_id, sort_order=req.sort_order)
     if not p:
         raise HTTPException(status_code=404, detail="Prompt not found")
     return prompt_to_dict(p)
@@ -1555,6 +1574,52 @@ def api_generate_prompt_title(req: SummarizeTitleRequest):
         return {"title": resp.content.strip().strip('"').strip("'")}
     except Exception:
         return {"title": ""}
+
+
+# ── Prompt Categories API ────────────────────────────────────────────────
+
+
+class PromptCategoryRequest(BaseModel):
+    name: str
+    emoji: str = "📁"
+    col: int = 0
+    sort_order: int = 0
+
+
+class PromptCategoryReorderRequest(BaseModel):
+    ordering: list[dict]
+
+
+@app.get("/api/prompt-categories")
+def api_list_prompt_categories():
+    return [prompt_category_to_dict(c) for c in list_prompt_categories()]
+
+
+@app.post("/api/prompt-categories", status_code=201)
+def api_create_prompt_category(req: PromptCategoryRequest):
+    c = create_prompt_category(req.name.strip(), req.emoji.strip(), req.col, req.sort_order)
+    return prompt_category_to_dict(c)
+
+
+@app.put("/api/prompt-categories/reorder")
+def api_reorder_prompt_categories(req: PromptCategoryReorderRequest):
+    reorder_prompt_categories(req.ordering)
+    return {"ok": True}
+
+
+@app.put("/api/prompt-categories/{cat_id}")
+def api_update_prompt_category(cat_id: int, req: PromptCategoryRequest):
+    c = update_prompt_category(cat_id, req.name.strip(), req.emoji.strip(), req.col, req.sort_order)
+    if not c:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return prompt_category_to_dict(c)
+
+
+@app.delete("/api/prompt-categories/{cat_id}")
+def api_delete_prompt_category(cat_id: int):
+    if not delete_prompt_category(cat_id):
+        raise HTTPException(status_code=404, detail="Category not found")
+    return {"ok": True}
 
 
 _ngircd_proc = None

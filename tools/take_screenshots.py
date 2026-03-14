@@ -25,52 +25,16 @@ SCREENSHOTS = [
         "actions": "llm_chat",
     },
     {
-        "file": "action-items.png",
-        "description": "Action Items — Track tasks with priorities, due dates, and categories",
-        "view": "desktop",
-        "actions": "action_items",
-    },
-    {
-        "file": "markdowns-list.png",
-        "description": "Markdowns — Rich markdown notes organized by universe and category",
-        "view": "desktop",
-        "actions": "markdowns_list",
-    },
-    {
         "file": "markdown-editor.png",
         "description": "Markdown Editor — Full-featured editor with live markdown preview",
         "view": "desktop",
         "actions": "markdown_editor",
     },
     {
-        "file": "documents-archive.png",
-        "description": "Document Archive — Upload and manage PDFs, spreadsheets, and text files",
-        "view": "desktop",
-        "actions": "archive",
-    },
-    {
-        "file": "links.png",
-        "description": "Links — Bookmark manager with categories and quick search",
-        "view": "desktop",
-        "actions": "links",
-    },
-    {
-        "file": "feeds.png",
-        "description": "Feeds — Ingest external content via API with auto-organized artifacts",
-        "view": "desktop",
-        "actions": "feeds",
-    },
-    {
         "file": "artifact-timeline.png",
         "description": "Artifact Timeline — Browse feed content with rich markdown and images",
         "view": "desktop",
         "actions": "artifact_timeline",
-    },
-    {
-        "file": "categories.png",
-        "description": "Categories — Hierarchical tree with emoji labels to organize everything",
-        "view": "desktop",
-        "actions": "categories",
     },
     {
         "file": "agent-network.png",
@@ -80,7 +44,7 @@ SCREENSHOTS = [
     },
     {
         "file": "prompts.png",
-        "description": "Prompts — Schedule recurring messages or run them on demand across Agent Network channels",
+        "description": "Prompts — Organize, categorize, schedule, and run reusable messages across Agent Network channels",
         "view": "desktop",
         "actions": "prompts",
     },
@@ -142,14 +106,8 @@ async def take_desktop_screenshot(page, shot):
 
     if action == "llm_chat":
         await dismiss_settings(page)
-        await page.locator('.mode-btn:has-text("LLM")').click()
-        await page.wait_for_timeout(300)
-        # Collapse the sidebar for a clean full-width chat view
-        collapse_btn = page.locator(".sidebar-collapse-btn")
-        sidebar = page.locator(".sidebar")
-        if await sidebar.is_visible(timeout=1000):
-            await collapse_btn.click()
-            await page.wait_for_timeout(500)
+        await page.locator('.workspace-tab:has-text("LLM Chat")').click()
+        await page.wait_for_timeout(500)
 
     elif action == "action_items":
         await click_sidebar_tab(page, "Action Items")
@@ -211,22 +169,18 @@ async def take_desktop_screenshot(page, shot):
         await page.wait_for_timeout(500)
 
     elif action == "irc":
-        await page.locator('.mode-btn:has-text("Agent Network")').click()
+        await page.locator('.workspace-tab:has-text("Agent Network")').click()
         await page.wait_for_timeout(1000)
 
     elif action == "prompts":
-        await page.locator('.mode-btn:has-text("Agent Network")').click()
+        await page.locator('.workspace-tab:has-text("Agent Network")').click()
         await page.wait_for_timeout(800)
         prompt_tab = page.locator(".irc-prompt-tab")
         if await prompt_tab.is_visible(timeout=2000):
             await prompt_tab.click()
             await page.wait_for_timeout(500)
-        add_btn = page.locator(".prompt-add-btn")
-        if await add_btn.is_visible(timeout=2000):
-            await add_btn.click()
-            await page.wait_for_timeout(500)
-        await page.locator(".prompt-form").wait_for(timeout=3000)
-        await page.wait_for_timeout(300)
+        await page.locator(".prompt-modal").wait_for(timeout=3000)
+        await page.wait_for_timeout(500)
 
     elif action == "universes":
         await page.locator(".universe-name-display").click()
@@ -241,12 +195,7 @@ async def take_desktop_screenshot(page, shot):
     print(f"  Captured: {shot['file']}")
 
     # Clean up modals / editors so the next screenshot starts clean
-    if action == "llm_chat":
-        # Re-open the sidebar for subsequent screenshots
-        collapse_btn = page.locator(".sidebar-collapse-btn")
-        await collapse_btn.click()
-        await page.wait_for_timeout(500)
-    elif action == "universes":
+    if action == "universes":
         close_btn = page.locator(".quickview-close").first
         if await close_btn.is_visible(timeout=1000):
             await close_btn.click()

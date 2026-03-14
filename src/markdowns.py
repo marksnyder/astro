@@ -1257,9 +1257,12 @@ class Prompt:
     created_at: str
     updated_at: str
     last_run_at: str | None
+    category_id: int | None = None
+    sort_order: int = 0
 
 
 def _row_to_prompt(row: sqlite3.Row) -> Prompt:
+    keys = row.keys()
     return Prompt(
         id=row["id"],
         title=row["title"],
@@ -1270,12 +1273,14 @@ def _row_to_prompt(row: sqlite3.Row) -> Prompt:
         created_at=row["created_at"],
         updated_at=row["updated_at"],
         last_run_at=row["last_run_at"],
+        category_id=row["category_id"] if "category_id" in keys else None,
+        sort_order=row["sort_order"] if "sort_order" in keys else 0,
     )
 
 
 def list_prompts() -> list[Prompt]:
     conn = _get_conn()
-    rows = conn.execute("SELECT * FROM prompts ORDER BY created_at DESC").fetchall()
+    rows = conn.execute("SELECT * FROM prompts ORDER BY sort_order, created_at DESC").fetchall()
     conn.close()
     return [_row_to_prompt(r) for r in rows]
 
@@ -1287,12 +1292,12 @@ def get_prompt(prompt_id: int) -> Prompt | None:
     return _row_to_prompt(row) if row else None
 
 
-def create_prompt(channel: str, message: str, cron_expr: str = "", title: str = "") -> Prompt:
+def create_prompt(channel: str, message: str, cron_expr: str = "", title: str = "", category_id: int | None = None, sort_order: int = 0) -> Prompt:
     now = _now()
     conn = _get_conn()
     cur = conn.execute(
-        "INSERT INTO prompts (title, channel, message, cron_expr, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?)",
-        (title, channel, message, cron_expr, now, now),
+        "INSERT INTO prompts (title, channel, message, cron_expr, enabled, created_at, updated_at, category_id, sort_order) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)",
+        (title, channel, message, cron_expr, now, now, category_id, sort_order),
     )
     conn.commit()
     mid = cur.lastrowid
@@ -1300,12 +1305,12 @@ def create_prompt(channel: str, message: str, cron_expr: str = "", title: str = 
     return get_prompt(mid)  # type: ignore[return-value]
 
 
-def update_prompt(prompt_id: int, channel: str, message: str, cron_expr: str = "", title: str = "") -> Prompt | None:
+def update_prompt(prompt_id: int, channel: str, message: str, cron_expr: str = "", title: str = "", category_id: int | None = None, sort_order: int = 0) -> Prompt | None:
     now = _now()
     conn = _get_conn()
     cur = conn.execute(
-        "UPDATE prompts SET title = ?, channel = ?, message = ?, cron_expr = ?, enabled = 1, updated_at = ? WHERE id = ?",
-        (title, channel, message, cron_expr, now, prompt_id),
+        "UPDATE prompts SET title = ?, channel = ?, message = ?, cron_expr = ?, enabled = 1, updated_at = ?, category_id = ?, sort_order = ? WHERE id = ?",
+        (title, channel, message, cron_expr, now, category_id, sort_order, prompt_id),
     )
     conn.commit()
     conn.close()
@@ -1332,3 +1337,101 @@ def mark_prompt_run(prompt_id: int) -> None:
 
 def prompt_to_dict(p: Prompt) -> dict:
     return asdict(p)
+
+
+# ── Prompt Categories CRUD ───────────────────────────────────────────────
+
+
+@dataclass
+class PromptCategory:
+    id: int | None
+    name: str
+    emoji: str
+    col: int
+    sort_order: int
+
+
+def _row_to_prompt_category(row: sqlite3.Row) -> PromptCategory:
+    return PromptCategory(
+        id=row["id"],
+        name=row["name"],
+        emoji=row["emoji"],
+        col=row["col"],
+        sort_order=row["sort_order"],
+    )
+
+
+def list_prompt_categories() -> list[PromptCategory]:
+    conn = _get_conn()
+    rows = conn.execute("SELECT * FROM prompt_categories ORDER BY col, sort_order").fetchall()
+    conn.close()
+    return [_row_to_prompt_category(r) for r in rows]
+
+
+def get_prompt_category(cat_id: int) -> PromptCategory | None:
+    conn = _get_conn()
+    row = conn.execute("SELECT * FROM prompt_categories WHERE id = ?", (cat_id,)).fetchone()
+    conn.close()
+    return _row_to_prompt_category(row) if row else None
+
+
+def create_prompt_category(name: str, emoji: str = "📁", col: int = 0, sort_order: int = 0) -> PromptCategory:
+    conn = _get_conn()
+    cur = conn.execute(
+        "INSERT INTO prompt_categories (name, emoji, col, sort_order) VALUES (?, ?, ?, ?)",
+        (name, emoji, col, sort_order),
+    )
+    conn.commit()
+    cid = cur.lastrowid
+    conn.close()
+    return get_prompt_category(cid)  # type: ignore[return-value]
+
+
+def update_prompt_category(cat_id: int, name: str, emoji: str, col: int, sort_order: int) -> PromptCategory | None:
+    conn = _get_conn()
+    cur = conn.execute(
+        "UPDATE prompt_categories SET name = ?, emoji = ?, col = ?, sort_order = ? WHERE id = ?",
+        (name, emoji, col, sort_order, cat_id),
+    )
+    conn.commit()
+    conn.close()
+    if cur.rowcount == 0:
+        return None
+    return get_prompt_category(cat_id)
+
+
+def delete_prompt_category(cat_id: int) -> bool:
+    conn = _get_conn()
+    conn.execute("UPDATE prompts SET category_id = NULL WHERE category_id = ?", (cat_id,))
+    cur = conn.execute("DELETE FROM prompt_categories WHERE id = ?", (cat_id,))
+    conn.commit()
+    conn.close()
+    return cur.rowcount > 0
+
+
+def reorder_prompt_categories(ordering: list[dict]) -> None:
+    """Accept [{"id": 1, "col": 0, "sort_order": 0}, ...] and batch-update."""
+    conn = _get_conn()
+    for item in ordering:
+        conn.execute(
+            "UPDATE prompt_categories SET col = ?, sort_order = ? WHERE id = ?",
+            (item["col"], item["sort_order"], item["id"]),
+        )
+    conn.commit()
+    conn.close()
+
+
+def reorder_prompts(ordering: list[dict]) -> None:
+    """Accept [{"id": 1, "category_id": 2, "sort_order": 0}, ...] and batch-update."""
+    conn = _get_conn()
+    for item in ordering:
+        conn.execute(
+            "UPDATE prompts SET category_id = ?, sort_order = ? WHERE id = ?",
+            (item.get("category_id"), item["sort_order"], item["id"]),
+        )
+    conn.commit()
+    conn.close()
+
+
+def prompt_category_to_dict(c: PromptCategory) -> dict:
+    return asdict(c)

@@ -4,35 +4,17 @@
 - file: llm-chat.png
   description: "LLM Chat — AI-powered assistant grounded in your documents and notes"
 
-- file: action-items.png
-  description: "Action Items — Track tasks with priorities, due dates, and categories"
-
-- file: markdowns-list.png
-  description: "Markdowns — Rich markdown notes organized by universe and category"
-
 - file: markdown-editor.png
   description: "Markdown Editor — Full-featured editor with live markdown preview"
 
-- file: documents-archive.png
-  description: "Document Archive — Upload and manage PDFs, spreadsheets, and text files"
-
-- file: links.png
-  description: "Links — Bookmark manager with categories and quick search"
-
-- file: feeds.png
-  description: "Feeds — Ingest external content via API with auto-organized artifacts"
-
 - file: artifact-timeline.png
   description: "Artifact Timeline — Browse feed content with rich markdown and images"
-
-- file: categories.png
-  description: "Categories — Hierarchical tree with emoji labels to organize everything"
 
 - file: agent-network.png
   description: "Agent Network — Built-in IRC server for coordinating AI agents"
 
 - file: prompts.png
-  description: "Prompts — Schedule recurring messages or run them on demand across Agent Network channels"
+  description: "Prompts — Organize, categorize, schedule, and run reusable messages across Agent Network channels"
 
 - file: universes.png
   description: "Universes — Separate workspaces to keep work and personal life apart"
