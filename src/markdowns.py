@@ -1223,6 +1223,29 @@ def get_unread_counts_by_category(universe_id: int | None = None) -> dict[int | 
     return {r["category_id"]: r["cnt"] for r in rows}
 
 
+def get_recent_counts_by_category(universe_id: int | None = None, days: int = 7) -> dict[int | None, int]:
+    """Return {category_id: count} of artifacts created in the last N days."""
+    conn = _get_conn()
+    if universe_id is not None:
+        rows = conn.execute(
+            "SELECT f.category_id, COUNT(*) AS cnt "
+            "FROM feed_artifacts a JOIN feeds f ON a.feed_id = f.id "
+            "WHERE a.created_at >= DATE('now', ?) AND f.universe_id = ? "
+            "GROUP BY f.category_id",
+            (f"-{days} days", universe_id),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT f.category_id, COUNT(*) AS cnt "
+            "FROM feed_artifacts a JOIN feeds f ON a.feed_id = f.id "
+            "WHERE a.created_at >= DATE('now', ?) "
+            "GROUP BY f.category_id",
+            (f"-{days} days",),
+        ).fetchall()
+    conn.close()
+    return {r["category_id"]: r["cnt"] for r in rows}
+
+
 def get_feed_artifact(artifact_id: int) -> FeedArtifact | None:
     conn = _get_conn()
     row = conn.execute("SELECT * FROM feed_artifacts WHERE id = ?", (artifact_id,)).fetchone()

@@ -73,6 +73,7 @@ from src.markdowns import (
     list_feed_artifacts_by_category,
     mark_feed_artifacts_read,
     get_unread_counts_by_category,
+    get_recent_counts_by_category,
     list_feeds,
     list_links,
     list_links_for_markdown,
@@ -1114,7 +1115,9 @@ def api_mark_artifacts_read(body: dict):
 @app.get("/api/feed-artifacts/unread-counts")
 def api_unread_counts(universe_id: Optional[int] = None):
     counts = get_unread_counts_by_category(universe_id)
-    return {"counts": {str(k) if k is not None else "null": v for k, v in counts.items()}}
+    recent = get_recent_counts_by_category(universe_id, days=7)
+    fmt = lambda d: {str(k) if k is not None else "null": v for k, v in d.items()}
+    return {"counts": fmt(counts), "recent_7d": fmt(recent)}
 
 
 @app.delete("/api/feed-artifacts/{artifact_id}")

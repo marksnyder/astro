@@ -1091,6 +1091,7 @@ function App() {
   const [useContext, setUseContext] = useState(true)
   const [chatMode, setChatMode] = useState('llm') // 'llm' or 'irc'
   const [feedUnreadCounts, setFeedUnreadCounts] = useState({})
+  const [feedRecent7d, setFeedRecent7d] = useState({})
   const [ircNick, setIrcNick] = useState('')
   const [ircMessages, setIrcMessages] = useState([])
   const [ircStatus, setIrcStatus] = useState({ connected: false, nick: '', channel: '', host: '', port: 0 })
@@ -1556,11 +1557,9 @@ function App() {
     fetch(`/api/feed-artifacts/unread-counts${params}`)
       .then(r => r.json())
       .then(data => {
-        const counts = {}
-        for (const [k, v] of Object.entries(data.counts || {})) {
-          counts[k === 'null' ? null : Number(k)] = v
-        }
-        setFeedUnreadCounts(counts)
+        const parse = (obj) => { const m = {}; for (const [k, v] of Object.entries(obj || {})) { m[k === 'null' ? null : Number(k)] = v } return m }
+        setFeedUnreadCounts(parse(data.counts))
+        setFeedRecent7d(parse(data.recent_7d))
       })
       .catch(() => {})
   }, [currentUniverseId])
@@ -2068,6 +2067,7 @@ function App() {
               onOpenFeedRequestHandled={() => setOpenFeedRequest(null)}
               onViewArtifacts={(cat) => openFeedTab(cat)}
               unreadCounts={feedUnreadCounts}
+              recent7dCounts={feedRecent7d}
             />
           )}
           {sidebarTab === 'actions' && (

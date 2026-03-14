@@ -770,6 +770,21 @@
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   transition: background 0.1s;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.mn-markdown-card .feed-list-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mn-markdown-card .mn-markdown-card-footer {
+  width: 100%;
 }
 
 .mn-markdown-card:active {
@@ -787,6 +802,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   display: flex;
+  flex: 1;
+  min-width: 0;
   align-items: center;
   gap: 5px;
 }
@@ -1244,24 +1261,37 @@
 }
 
 .feed-category-circle-btn {
-  width: 46px;
-  height: 46px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
   border: 2px solid var(--border);
   background: var(--bg-primary);
   color: var(--text-secondary);
-  font-size: 15px;
-  font-weight: 700;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   margin-left: auto;
-  margin-top: -14px;
-  margin-bottom: -14px;
+  margin-top: -16px;
+  margin-bottom: -16px;
   flex-shrink: 0;
   -webkit-tap-highlight-color: transparent;
   transition: all 0.15s;
+  gap: 0;
+  padding: 0;
+  line-height: 1;
+}
+
+.feed-category-circle-btn .feed-circle-unread {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.feed-category-circle-btn .feed-circle-recent {
+  font-size: 9px;
+  font-weight: 500;
+  opacity: 0.7;
 }
 
 .feed-category-circle-btn.has-unread {
@@ -1269,6 +1299,10 @@
   border-color: #f44336;
   color: #fff;
   box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.2);
+}
+
+.feed-category-circle-btn.has-unread .feed-circle-recent {
+  opacity: 0.85;
 }
 
 .ma-group-artifacts-btn {

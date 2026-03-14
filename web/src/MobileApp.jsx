@@ -620,6 +620,10 @@ function MobileActions({ categories, universeId }) {
 
 // ── Feeds view ───────────────────────────────────────
 
+function feedAvatar(name, size = 32) {
+  return `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(name || 'Feed')}&radius=50&fontSize=40&size=${size}`
+}
+
 function MobileSparkline({ data, width = 70, height = 18 }) {
   if (!data || data.length === 0) return null
   const max = Math.max(...data, 1)
@@ -643,6 +647,7 @@ function MobileFeeds({ categories, universeId }) {
   const titleRef = useRef(null)
   const [artifactCategory, setArtifactCategory] = useState(null)
   const [feedUnreadCounts, setFeedUnreadCounts] = useState({})
+  const [feedRecent7d, setFeedRecent7d] = useState({})
 
   const catMap = Object.fromEntries(categories.map(c => [c.id, c.name]))
   const catEmojiMap = Object.fromEntries(categories.map(c => [c.id, c.emoji]))
@@ -653,11 +658,9 @@ function MobileFeeds({ categories, universeId }) {
     fetch(`/api/feed-artifacts/unread-counts${params}`)
       .then(r => r.json())
       .then(data => {
-        const counts = {}
-        for (const [k, v] of Object.entries(data.counts || {})) {
-          counts[k === 'null' ? null : Number(k)] = v
-        }
-        setFeedUnreadCounts(counts)
+        const parse = (obj) => { const m = {}; for (const [k, v] of Object.entries(obj || {})) { m[k === 'null' ? null : Number(k)] = v } return m }
+        setFeedUnreadCounts(parse(data.counts))
+        setFeedRecent7d(parse(data.recent_7d))
       })
       .catch(() => {})
   }, [universeId])
@@ -827,11 +830,13 @@ title=Report&file=@report.pdf`}</pre>
                     onClick={() => setArtifactCategory({ id: catId, name: catName })}
                     title="View artifacts"
                   >
-                    {feedUnreadCounts[catId] || 0}
+                    <span className="feed-circle-unread">{feedUnreadCounts[catId] || 0}</span>
+                    <span className="feed-circle-recent">{feedRecent7d[catId] || 0} / 7d</span>
                   </button>
                 </div>
                 {groups[key].map(feed => (
                   <div key={feed.id} className="mn-markdown-card">
+                    <img className="feed-list-avatar" src={feedAvatar(feed.title, 28)} alt="" />
                     <div className="mn-markdown-title">{feed.title || 'Untitled'}</div>
                     <div className="mn-markdown-card-footer">
                       <MobileSparkline data={feed.trend_14d} />
@@ -950,8 +955,11 @@ function MobileArtifactTimeline({ category, onBack }) {
         {artifacts.map(art => (
           <article key={art.id} className="timeline-card">
             <div className="timeline-card-header">
-              <span className="timeline-card-feed">{art.feed_name || 'Feed'}</span>
-              <span className="timeline-card-date">{formatDate(art.created_at)}</span>
+              <img className="timeline-card-avatar" src={feedAvatar(art.feed_name, 36)} alt="" />
+              <div className="timeline-card-meta">
+                <span className="timeline-card-feed">{art.feed_name || 'Feed'}</span>
+                <span className="timeline-card-date">{formatDate(art.created_at)}</span>
+              </div>
             </div>
             <h4 className="timeline-card-title">{art.title || 'Untitled'}</h4>
             <div className="timeline-card-body">

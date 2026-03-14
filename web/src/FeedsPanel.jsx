@@ -4,6 +4,10 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
 
+function feedAvatar(name, size = 32) {
+  return `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(name || 'Feed')}&radius=50&fontSize=40&size=${size}`
+}
+
 function Sparkline({ data, width = 80, height = 20 }) {
   if (!data || data.length === 0) return null
   const max = Math.max(...data, 1)
@@ -16,7 +20,7 @@ function Sparkline({ data, width = 80, height = 20 }) {
   )
 }
 
-function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOpenFeedRequestHandled, onViewArtifacts, unreadCounts }) {
+function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOpenFeedRequestHandled, onViewArtifacts, unreadCounts, recent7dCounts }) {
   const [feeds, setFeeds] = useState([])
   const [search, setSearch] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
@@ -192,11 +196,13 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
                 onClick={() => setArtifactCategory({ id: group.categoryId ?? null, name: group.name || 'Uncategorized' })}
                 title="View artifacts for this category"
               >
-                {unreadCounts?.[group.categoryId ?? null] || 0}
+                <span className="feed-circle-unread">{unreadCounts?.[group.categoryId ?? null] || 0}</span>
+                <span className="feed-circle-recent">{recent7dCounts?.[group.categoryId ?? null] || 0} / 7d</span>
               </button>
             </div>
             {group.items.map(feed => (
               <div key={feed.id} className="link-card">
+                <img className="feed-list-avatar" src={feedAvatar(feed.title, 28)} alt="" />
                 <div className="link-card-info">
                   <div className="link-card-title">{feed.title || 'Untitled'}</div>
                   <div className="feed-trend-row">
@@ -402,8 +408,11 @@ export const ArtifactTimeline = memo(function ArtifactTimeline({ category, onClo
         {artifacts.map(art => (
           <article key={art.id} className="timeline-card">
             <div className="timeline-card-header">
-              <span className="timeline-card-feed">{art.feed_name || 'Feed'}</span>
-              <span className="timeline-card-date">{formatDate(art.created_at)}</span>
+              <img className="timeline-card-avatar" src={feedAvatar(art.feed_name, 36)} alt="" />
+              <div className="timeline-card-meta">
+                <span className="timeline-card-feed">{art.feed_name || 'Feed'}</span>
+                <span className="timeline-card-date">{formatDate(art.created_at)}</span>
+              </div>
             </div>
             <h4 className="timeline-card-title">{art.title || 'Untitled'}</h4>
             <div className="timeline-card-body">
