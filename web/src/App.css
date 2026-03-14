@@ -1182,12 +1182,20 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .prompt-form-row {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.prompt-form-row-grow {
+  flex: 1;
+  min-height: 0;
 }
 
 .prompt-form-row label {
@@ -1305,8 +1313,8 @@
 
 .prompt-form-textarea-full {
   min-height: 120px;
-  max-height: 300px;
-  resize: vertical;
+  flex: 1;
+  resize: none;
   overflow-y: auto;
 }
 

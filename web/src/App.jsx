@@ -800,14 +800,13 @@ function PromptForm({ initial, channels, categories, onSave, onCancel }) {
         )}
         {!showSchedule && <div className="prompt-ondemand-hint">On-demand only — use Run to execute</div>}
       </div>
-      <div className="prompt-form-row">
+      <div className="prompt-form-row prompt-form-row-grow">
         <label>Message</label>
         <textarea
           ref={textareaRef}
           className="prompt-form-input prompt-form-textarea prompt-form-textarea-full"
           value={message}
           onChange={e => setMessage(e.target.value)}
-          onInput={e => { e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 300) + 'px' }}
           placeholder="Write your prompt message..."
           rows={6}
         />
