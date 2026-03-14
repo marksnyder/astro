@@ -4,6 +4,18 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
 
+function Sparkline({ data, width = 80, height = 20 }) {
+  if (!data || data.length === 0) return null
+  const max = Math.max(...data, 1)
+  const step = width / (data.length - 1 || 1)
+  const points = data.map((v, i) => `${i * step},${height - (v / max) * (height - 2) - 1}`).join(' ')
+  return (
+    <svg className="feed-sparkline" width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+      <polyline points={points} fill="none" stroke="#15803d" strokeWidth="1.5" strokeDasharray="2 2" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOpenFeedRequestHandled, onViewArtifacts, unreadCounts }) {
   const [feeds, setFeeds] = useState([])
   const [search, setSearch] = useState('')
@@ -153,24 +165,16 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
           </button>
         </div>
       </div>
-      <div className="markdowns-search">
-        <input className="markdowns-search-input" placeholder="Search feeds..." value={search} onChange={e => setSearch(e.target.value)} />
-        <CategoryFilterPicker categories={categories} value={selectedCategoryId} onChange={setSelectedCategoryId} />
-      </div>
       <div className="markdowns-list">
         {feeds.length === 0 ? (
           <div className="markdowns-empty">
-            {search || selectedCategoryId ? 'No matching feeds.' : 'No feeds yet. Click + to create one.'}
+            No feeds yet. Click + to create one.
           </div>
         ) : buildGroups(feeds).map(group => (
           <div key={group.categoryId ?? '__none__'} className="ai-group">
             <div className="ai-group-header">
               <span className="ai-group-emoji">{group.categoryId ? (catEmojiMap[group.categoryId] || '🏷️') : '🏷️'}</span>
               <span className="ai-group-name">{group.name || 'Uncategorized'}</span>
-              <span className="ai-group-count">{group.items.length}</span>
-              {(unreadCounts?.[group.categoryId ?? null] || 0) > 0 && (
-                <span className="feed-unread-badge">{unreadCounts[group.categoryId ?? null]}</span>
-              )}
               {group.categoryId != null && (
                 <button
                   className={`ai-group-artifacts-btn ${pinnedCategoryIds.has(group.categoryId) ? 'pinned' : ''}`}
@@ -184,22 +188,22 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
                 </button>
               )}
               <button
-                className="ai-group-artifacts-btn"
+                className={`feed-category-circle-btn ${(unreadCounts?.[group.categoryId ?? null] || 0) > 0 ? 'has-unread' : ''}`}
                 onClick={() => setArtifactCategory({ id: group.categoryId ?? null, name: group.name || 'Uncategorized' })}
                 title="View artifacts for this category"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                  <line x1="8" y1="21" x2="16" y2="21" />
-                  <line x1="12" y1="17" x2="12" y2="21" />
-                </svg>
+                {unreadCounts?.[group.categoryId ?? null] || 0}
               </button>
             </div>
             {group.items.map(feed => (
               <div key={feed.id} className="link-card">
                 <div className="link-card-info">
                   <div className="link-card-title">{feed.title || 'Untitled'}</div>
-                  <div className="link-card-url">{feed.artifact_count} artifact{feed.artifact_count !== 1 ? 's' : ''}</div>
+                  <div className="feed-trend-row">
+                    <Sparkline data={feed.trend_14d} />
+                    <span className="feed-avg-label">{feed.avg_14d}/day</span>
+                    <span className="feed-last-post">{feed.days_since_last != null ? (feed.days_since_last === 0 ? 'today' : `${feed.days_since_last}d ago`) : '—'}</span>
+                  </div>
                 </div>
                 <button className="archive-action-btn" onClick={e => { e.stopPropagation(); startEdit(feed) }} title="Edit feed">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

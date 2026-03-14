@@ -1014,6 +1014,9 @@ class FeedResponse(BaseModel):
     created_at: str
     updated_at: str
     artifact_count: int = 0
+    trend_14d: list[int] = []
+    avg_14d: float = 0
+    days_since_last: Optional[int] = None
 
 
 class FeedArtifactResponse(BaseModel):

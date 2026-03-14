@@ -1041,9 +1041,46 @@ def get_feed_artifact_count(feed_id: int) -> int:
     return row["cnt"]
 
 
+def get_feed_artifact_trend(feed_id: int, days: int = 14) -> list[int]:
+    """Return daily artifact counts for the last N days (oldest first)."""
+    conn = _get_conn()
+    rows = conn.execute(
+        """
+        SELECT DATE(created_at) AS day, COUNT(*) AS cnt
+        FROM feed_artifacts
+        WHERE feed_id = ? AND created_at >= DATE('now', ?)
+        GROUP BY day ORDER BY day
+        """,
+        (feed_id, f"-{days} days"),
+    ).fetchall()
+    conn.close()
+    counts_by_day = {r["day"]: r["cnt"] for r in rows}
+    from datetime import date, timedelta
+    today = date.today()
+    return [counts_by_day.get((today - timedelta(days=days - 1 - i)).isoformat(), 0) for i in range(days)]
+
+
+def get_feed_days_since_last(feed_id: int) -> int | None:
+    conn = _get_conn()
+    row = conn.execute(
+        "SELECT MAX(created_at) AS last_at FROM feed_artifacts WHERE feed_id = ?",
+        (feed_id,),
+    ).fetchone()
+    conn.close()
+    if not row or not row["last_at"]:
+        return None
+    from datetime import date
+    last = date.fromisoformat(row["last_at"][:10])
+    return (date.today() - last).days
+
+
 def feed_to_dict(feed: Feed) -> dict:
     d = asdict(feed)
     d["artifact_count"] = get_feed_artifact_count(feed.id)
+    trend = get_feed_artifact_trend(feed.id)
+    d["trend_14d"] = trend
+    d["avg_14d"] = round(sum(trend) / len(trend), 1) if trend else 0
+    d["days_since_last"] = get_feed_days_since_last(feed.id)
     return d
 
 

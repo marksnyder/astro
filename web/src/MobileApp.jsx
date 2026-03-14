@@ -620,6 +620,18 @@ function MobileActions({ categories, universeId }) {
 
 // ── Feeds view ───────────────────────────────────────
 
+function MobileSparkline({ data, width = 70, height = 18 }) {
+  if (!data || data.length === 0) return null
+  const max = Math.max(...data, 1)
+  const step = width / (data.length - 1 || 1)
+  const points = data.map((v, i) => `${i * step},${height - (v / max) * (height - 2) - 1}`).join(' ')
+  return (
+    <svg className="feed-sparkline" width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+      <polyline points={points} fill="none" stroke="#15803d" strokeWidth="1.5" strokeDasharray="2 2" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 function MobileFeeds({ categories, universeId }) {
   const [feeds, setFeeds] = useState([])
   const [search, setSearch] = useState('')
@@ -630,10 +642,25 @@ function MobileFeeds({ categories, universeId }) {
   const [saving, setSaving] = useState(false)
   const titleRef = useRef(null)
   const [artifactCategory, setArtifactCategory] = useState(null)
+  const [feedUnreadCounts, setFeedUnreadCounts] = useState({})
 
   const catMap = Object.fromEntries(categories.map(c => [c.id, c.name]))
   const catEmojiMap = Object.fromEntries(categories.map(c => [c.id, c.emoji]))
   const catLabel = (id) => { const e = catEmojiMap[id]; const n = catMap[id]; return e ? `${e} ${n}` : n }
+
+  const fetchFeedUnreadCounts = useCallback(() => {
+    const params = universeId ? `?universe_id=${universeId}` : ''
+    fetch(`/api/feed-artifacts/unread-counts${params}`)
+      .then(r => r.json())
+      .then(data => {
+        const counts = {}
+        for (const [k, v] of Object.entries(data.counts || {})) {
+          counts[k === 'null' ? null : Number(k)] = v
+        }
+        setFeedUnreadCounts(counts)
+      })
+      .catch(() => {})
+  }, [universeId])
 
   const fetchFeeds = useCallback(() => {
     const params = new URLSearchParams()
@@ -646,7 +673,7 @@ function MobileFeeds({ categories, universeId }) {
       .catch(() => {})
   }, [search, filterCatId, universeId])
 
-  useEffect(() => { fetchFeeds() }, [universeId])
+  useEffect(() => { fetchFeeds(); fetchFeedUnreadCounts() }, [universeId])
   useEffect(() => {
     const t = setTimeout(fetchFeeds, 300)
     return () => clearTimeout(t)
@@ -694,7 +721,7 @@ function MobileFeeds({ categories, universeId }) {
 
   // Artifact timeline
   if (artifactCategory) {
-    return <MobileArtifactTimeline category={artifactCategory} onBack={() => { setArtifactCategory(null); fetchFeeds() }} />
+    return <MobileArtifactTimeline category={artifactCategory} onBack={() => { setArtifactCategory(null); fetchFeeds(); fetchFeedUnreadCounts() }} />
   }
 
   // Edit / New
@@ -767,18 +794,14 @@ title=Report&file=@report.pdf`}</pre>
   return (
     <div className="mn-list-view">
       <div className="mn-search-bar">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-        <input className="mn-search-input" placeholder="Search feeds..." value={search} onChange={e => setSearch(e.target.value)} />
+        <span style={{ flex: 1 }} />
         <button className="mn-new-btn" onClick={startNew} title="New feed">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
         </button>
       </div>
-      <div className="mn-filter-bar">
-        <MobileCategorySelect categories={categories} value={filterCatId} onChange={setFilterCatId} />
-      </div>
       <div className="mn-markdowns-list">
         {feeds.length === 0 ? (
-          <div className="mn-empty">{search || filterCatId ? 'No matching feeds.' : 'No feeds yet. Tap + to create one.'}</div>
+          <div className="mn-empty">No feeds yet. Tap + to create one.</div>
         ) : (() => {
           const groups = {}
           const order = []
@@ -799,16 +822,21 @@ title=Report&file=@report.pdf`}</pre>
               <div key={key} className="ma-group">
                 <div className="ma-group-header">
                   {catName}
-                  <span className="ma-group-count">{groups[key].length}</span>
-                  <button className="ma-group-artifacts-btn" onClick={() => setArtifactCategory({ id: catId, name: catName })} title="View artifacts">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                  <button
+                    className={`feed-category-circle-btn ${(feedUnreadCounts[catId] || 0) > 0 ? 'has-unread' : ''}`}
+                    onClick={() => setArtifactCategory({ id: catId, name: catName })}
+                    title="View artifacts"
+                  >
+                    {feedUnreadCounts[catId] || 0}
                   </button>
                 </div>
                 {groups[key].map(feed => (
                   <div key={feed.id} className="mn-markdown-card">
                     <div className="mn-markdown-title">{feed.title || 'Untitled'}</div>
                     <div className="mn-markdown-card-footer">
-                      <span className="mn-markdown-date">{feed.artifact_count} artifact{feed.artifact_count !== 1 ? 's' : ''}</span>
+                      <MobileSparkline data={feed.trend_14d} />
+                      <span className="feed-avg-label">{feed.avg_14d}/day</span>
+                      <span className="feed-last-post">{feed.days_since_last != null ? (feed.days_since_last === 0 ? 'today' : `${feed.days_since_last}d ago`) : '—'}</span>
                       <button className="mf-edit-btn" onClick={e => { e.stopPropagation(); startEdit(feed) }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                       </button>
