@@ -923,8 +923,6 @@ function App() {
     const match = document.cookie.match(/(?:^|;\s*)sidebarWidth=(\d+)/)
     return match ? Number(match[1]) : 320
   })
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const lastWidthRef = useRef(sidebarWidth)
   const [pinnedItems, setPinnedItems] = useState({ markdowns: [], documents: [], links: [], feed_categories: [] })
   const [quickView, setQuickView] = useState(null)
   const [editMarkdownRequest, setEditMarkdownRequest] = useState(null)
@@ -1458,16 +1456,6 @@ function App() {
     return () => clearInterval(iv)
   }, [fetchUnreadCounts])
 
-  const toggleSidebar = () => {
-    if (sidebarCollapsed) {
-      setSidebarWidth(lastWidthRef.current)
-      setSidebarCollapsed(false)
-    } else {
-      lastWidthRef.current = sidebarWidth
-      setSidebarCollapsed(true)
-    }
-  }
-
   const startResize = (e) => {
     e.preventDefault()
     resizing.current = true
@@ -1755,7 +1743,6 @@ function App() {
             Photo by <a href={chatBg.authorUrl} target="_blank" rel="noopener noreferrer">{chatBg.author}</a> on <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer">Unsplash</a>
           </div>
         )}
-        {!sidebarCollapsed && (
         <div className="sidebar" style={{ width: sidebarWidth, minWidth: sidebarWidth }}>
           <div className="sidebar-rail">
             <button className={`rail-tab ${sidebarTab === 'actions' ? 'active' : ''}`} onClick={() => setSidebarTab('actions')} title="Action Items">
@@ -1871,17 +1858,8 @@ function App() {
           )}
           </div>
         </div>
-        )}
-        <div className={`sidebar-resize-handle ${sidebarCollapsed ? 'collapsed' : ''}`}>
-          <button className="sidebar-collapse-btn" onClick={toggleSidebar} title={sidebarCollapsed ? 'Show panel' : 'Hide panel'}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              {sidebarCollapsed
-                ? <polyline points="9 18 15 12 9 6" />
-                : <polyline points="15 18 9 12 15 6" />
-              }
-            </svg>
-          </button>
-          {!sidebarCollapsed && <div className="resize-drag-area" onMouseDown={startResize} />}
+        <div className="sidebar-resize-handle">
+          <div className="resize-drag-area" onMouseDown={startResize} />
         </div>
 
         <div className="main-panel">
