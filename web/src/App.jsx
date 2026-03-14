@@ -46,43 +46,42 @@ function ircTimestamp(ts) {
   return `${mon} ${day} ${h % 12 || 12}:${m}${ampm}`
 }
 
-const GUID_RE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi
-
-function renderTextWithGuids(text) {
-  if (!text) return text
-  const parts = []
-  let last = 0
-  for (const m of text.matchAll(GUID_RE)) {
-    if (m.index > last) parts.push(text.slice(last, m.index))
-    parts.push(
-      <span key={m.index} className="guid-chip" title={m[0]}>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="3" />
-          <path d="M7 7h.01M12 7h.01M17 7h.01M7 12h.01M12 12h.01M17 12h.01M7 17h.01M12 17h.01M17 17h.01" />
-        </svg>
-      </span>
-    )
-    last = m.index + m[0].length
-  }
-  if (parts.length === 0) return text
-  if (last < text.length) parts.push(text.slice(last))
-  return parts
+function dicebearAvatar(seed, size = 28) {
+  return `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(seed)}&radius=50&fontSize=40&size=${size}`
 }
 
-function IrcMessage({ msg }) {
-  if (msg.kind === 'join' || msg.kind === 'part' || msg.kind === 'quit') {
-    return (
-      <div className="irc-event">
-        <span className="irc-event-nick">{msg.sender}</span> {msg.text}
-      </div>
-    )
+function groupIrcMessages(messages) {
+  const groups = []
+  for (const msg of messages) {
+    if (msg.kind === 'join' || msg.kind === 'part' || msg.kind === 'quit') {
+      groups.push({ type: 'event', msg })
+      continue
+    }
+    const last = groups[groups.length - 1]
+    if (last && last.type === 'group' && last.sender === msg.sender && last.self === msg.self) {
+      last.messages.push(msg)
+    } else {
+      groups.push({ type: 'group', sender: msg.sender, self: msg.self, timestamp: msg.timestamp, messages: [msg] })
+    }
   }
-  const isSelf = msg.self
+  return groups
+}
+
+function IrcMessageGroup({ group }) {
   return (
-    <div className={`irc-msg ${isSelf ? 'irc-self' : ''}`}>
-      <span className="irc-ts">{ircTimestamp(msg.timestamp)}</span>
-      <span className="irc-nick">{msg.sender}</span>
-      <span className="irc-text">{renderTextWithGuids(msg.text)}</span>
+    <div className={`irc-msg-group ${group.self ? 'irc-self' : ''}`}>
+      <img className="irc-avatar" src={dicebearAvatar(group.sender)} alt={group.sender} title={group.sender} />
+      <div className="irc-msg-body">
+        <div className="irc-msg-header">
+          <span className="irc-nick">{group.sender}</span>
+          <span className="irc-ts">{ircTimestamp(group.timestamp)}</span>
+        </div>
+        {group.messages.map((msg) => (
+          <div key={msg.id} className="irc-text markdown-body">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -2031,14 +2030,11 @@ function App() {
                   </button>
                   {ircUsers.length > 0 && (
                     <div className="irc-users-bar">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                        <circle cx="9" cy="7" r="4" />
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                      </svg>
                       {ircUsers.map((nick) => (
-                        <span key={nick} className={`irc-user-chip ${nick.toLowerCase() === ircStatus.nick?.toLowerCase() ? 'irc-user-self' : ''}`}>{nick}</span>
+                        <span key={nick} className={`irc-user-chip ${nick.toLowerCase() === ircStatus.nick?.toLowerCase() ? 'irc-user-self' : ''}`}>
+                          <img className="irc-user-avatar" src={dicebearAvatar(nick, 18)} alt={nick} />
+                          {nick}
+                        </span>
                       ))}
                     </div>
                   )}
@@ -2055,9 +2051,15 @@ function App() {
                       {ircLoadingHistory && (
                         <div className="irc-history-loading">Loading history...</div>
                       )}
-                      {ircMessages.filter(msg => msg.kind !== 'join' && msg.kind !== 'part' && msg.kind !== 'quit').map((msg) => (
-                        <IrcMessage key={msg.id} msg={msg} />
-                      ))}
+                      {groupIrcMessages(ircMessages.filter(msg => msg.kind !== 'join' && msg.kind !== 'part' && msg.kind !== 'quit')).map((group, i) =>
+                        group.type === 'event' ? (
+                          <div key={group.msg.id} className="irc-event">
+                            <span className="irc-event-nick">{group.msg.sender}</span> {group.msg.text}
+                          </div>
+                        ) : (
+                          <IrcMessageGroup key={group.messages[0].id} group={group} />
+                        )
+                      )}
                       <div ref={messagesEndRef} />
                     </div>
                   )}
