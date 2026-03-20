@@ -645,7 +645,7 @@ function MobileFeeds({ categories, universeId }) {
   const [categoryId, setCategoryId] = useState(null)
   const [saving, setSaving] = useState(false)
   const titleRef = useRef(null)
-  const [artifactCategory, setArtifactCategory] = useState(null)
+  const [postCategory, setPostCategory] = useState(null)
   const [feedUnreadCounts, setFeedUnreadCounts] = useState({})
   const [feedRecent7d, setFeedRecent7d] = useState({})
 
@@ -655,7 +655,7 @@ function MobileFeeds({ categories, universeId }) {
 
   const fetchFeedUnreadCounts = useCallback(() => {
     const params = universeId ? `?universe_id=${universeId}` : ''
-    fetch(`/api/feed-artifacts/unread-counts${params}`)
+    fetch(`/api/feed-posts/unread-counts${params}`)
       .then(r => r.json())
       .then(data => {
         const parse = (obj) => { const m = {}; for (const [k, v] of Object.entries(obj || {})) { m[k === 'null' ? null : Number(k)] = v } return m }
@@ -714,7 +714,7 @@ function MobileFeeds({ categories, universeId }) {
   }
 
   const remove = async (feed) => {
-    if (!confirm(`Delete "${feed.title}" and all its artifacts?`)) return
+    if (!confirm(`Delete "${feed.title}" and all its posts?`)) return
     await fetch(`/api/feeds/${feed.id}`, { method: 'DELETE' })
     setEditing(null)
     fetchFeeds()
@@ -722,9 +722,9 @@ function MobileFeeds({ categories, universeId }) {
 
   const baseUrl = `${window.location.origin}/api/feeds`
 
-  // Artifact timeline
-  if (artifactCategory) {
-    return <MobileArtifactTimeline category={artifactCategory} onBack={() => { setArtifactCategory(null); fetchFeeds(); fetchFeedUnreadCounts() }} />
+  // Post timeline
+  if (postCategory) {
+    return <MobilePostTimeline category={postCategory} onBack={() => { setPostCategory(null); fetchFeeds(); fetchFeedUnreadCounts() }} />
   }
 
   // Edit / New
@@ -771,7 +771,7 @@ function MobileFeeds({ categories, universeId }) {
 Content-Type: multipart/form-data
 X-Feed-Key: ${editing.api_key}
 
-title=My Artifact&markdown=<p>Hello</p>`}</pre>
+title=My Post&markdown=<p>Hello</p>`}</pre>
 
               <div className="mf-api-section-title" style={{ marginTop: 8 }}>Send File</div>
               <pre className="mf-api-pre">{`POST ${baseUrl}/${editing.id}/ingest
@@ -783,7 +783,7 @@ title=Report&file=@report.pdf`}</pre>
               <div className="mf-api-section-title" style={{ marginTop: 8 }}>Response</div>
               <pre className="mf-api-pre">{`{
   "ok": true,
-  "artifact_id": 42,
+  "post_id": 42,
   "content_type": "markdown" | "file"
 }`}</pre>
             </div>
@@ -827,8 +827,8 @@ title=Report&file=@report.pdf`}</pre>
                   {catName}
                   <button
                     className={`feed-category-circle-btn ${(feedUnreadCounts[catId] || 0) > 0 ? 'has-unread' : ''}`}
-                    onClick={() => setArtifactCategory({ id: catId, name: catName })}
-                    title="View artifacts"
+                    onClick={() => setPostCategory({ id: catId, name: catName })}
+                    title="View posts"
                   >
                     <span className="feed-circle-unread">{feedUnreadCounts[catId] || 0}</span>
                     <span className="feed-circle-recent">{feedRecent7d[catId] || 0} / 7d</span>
@@ -857,8 +857,8 @@ title=Report&file=@report.pdf`}</pre>
   )
 }
 
-function MobileArtifactTimeline({ category, onBack }) {
-  const [artifacts, setArtifacts] = useState([])
+function MobilePostTimeline({ category, onBack }) {
+  const [posts, setPosts] = useState([])
   const [total, setTotal] = useState(0)
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -871,10 +871,10 @@ function MobileArtifactTimeline({ category, onBack }) {
     setLoading(true)
     const params = new URLSearchParams({ page: String(page), page_size: '5' })
     if (category.id !== null) params.set('category_id', category.id)
-    fetch(`/api/feed-artifacts/by-category?${params}`)
+    fetch(`/api/feed-posts/by-category?${params}`)
       .then(r => r.json())
       .then(data => {
-        setArtifacts(prev => append ? [...prev, ...data.artifacts] : data.artifacts)
+        setPosts(prev => append ? [...prev, ...data.posts] : data.posts)
         setTotal(data.total)
         setHasMore(data.has_more)
         pageRef.current = page
@@ -893,12 +893,12 @@ function MobileArtifactTimeline({ category, onBack }) {
     }
   }
 
-  const removeFromList = (id) => { setArtifacts(prev => prev.filter(a => a.id !== id)); setTotal(prev => prev - 1) }
+  const removeFromList = (id) => { setPosts(prev => prev.filter(a => a.id !== id)); setTotal(prev => prev - 1) }
 
-  const deleteArtifact = async (id) => {
-    if (!confirm('Delete this artifact?')) return
+  const deletePost = async (id) => {
+    if (!confirm('Delete this post?')) return
     setBusy(prev => ({ ...prev, [id]: 'deleting' }))
-    await fetch(`/api/feed-artifacts/${id}`, { method: 'DELETE' })
+    await fetch(`/api/feed-posts/${id}`, { method: 'DELETE' })
     setBusy(prev => { const n = { ...prev }; delete n[id]; return n })
     removeFromList(id)
   }
@@ -906,7 +906,7 @@ function MobileArtifactTimeline({ category, onBack }) {
   const addAsMarkdown = async (id) => {
     setBusy(prev => ({ ...prev, [id]: 'markdown' }))
     try {
-      const res = await fetch(`/api/feed-artifacts/${id}/to-markdown`, { method: 'POST' })
+      const res = await fetch(`/api/feed-posts/${id}/to-markdown`, { method: 'POST' })
       if (res.ok) {
         setBusy(prev => { const n = { ...prev }; delete n[id]; return n })
         setSaved(prev => ({ ...prev, [id]: true }))
@@ -921,7 +921,7 @@ function MobileArtifactTimeline({ category, onBack }) {
   const addAsDocument = async (id) => {
     setBusy(prev => ({ ...prev, [id]: 'doc' }))
     try {
-      const res = await fetch(`/api/feed-artifacts/${id}/to-document`, { method: 'POST' })
+      const res = await fetch(`/api/feed-posts/${id}/to-document`, { method: 'POST' })
       if (res.ok) { removeFromList(id); return }
       const err = await res.json(); alert(err.detail || 'Failed')
     } catch { alert('Failed') }
@@ -949,54 +949,54 @@ function MobileArtifactTimeline({ category, onBack }) {
         <span className="mf-total-badge">{total}</span>
       </div>
       <div className="timeline-feed mobile" ref={scrollRef} onScroll={handleScroll}>
-        {artifacts.length === 0 && !loading && (
-          <div className="timeline-empty">No artifacts yet.</div>
+        {posts.length === 0 && !loading && (
+          <div className="timeline-empty">No posts yet.</div>
         )}
-        {artifacts.map(art => (
-          <article key={art.id} className="timeline-card">
+        {posts.map(post => (
+          <article key={post.id} className="timeline-card">
             <div className="timeline-card-header">
-              <img className="timeline-card-avatar" src={feedAvatar(art.feed_name, 36)} alt="" />
+              <img className="timeline-card-avatar" src={feedAvatar(post.feed_name, 36)} alt="" />
               <div className="timeline-card-meta">
-                <span className="timeline-card-feed">{art.feed_name || 'Feed'}</span>
-                <span className="timeline-card-date">{formatDate(art.created_at)}</span>
+                <span className="timeline-card-feed">{post.feed_name || 'Feed'}</span>
+                <span className="timeline-card-date">{formatDate(post.created_at)}</span>
               </div>
             </div>
-            <h4 className="timeline-card-title">{art.title || 'Untitled'}</h4>
+            <h4 className="timeline-card-title">{post.title || 'Untitled'}</h4>
             <div className="timeline-card-body">
-              {art.content_type === 'markdown' ? (
+              {post.content_type === 'markdown' ? (
                 <div className="markdown-body">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}>{art.markdown || ''}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}>{post.markdown || ''}</ReactMarkdown>
                 </div>
               ) : (
                 <div className="timeline-card-file">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                  <span className="timeline-card-filename">{art.original_filename}</span>
-                  {art.file_path && <a className="timeline-card-download" href={`/api/feed-files/${art.file_path}`} target="_blank" rel="noopener noreferrer">Download</a>}
+                  <span className="timeline-card-filename">{post.original_filename}</span>
+                  {post.file_path && <a className="timeline-card-download" href={`/api/feed-files/${post.file_path}`} target="_blank" rel="noopener noreferrer">Download</a>}
                 </div>
               )}
             </div>
             <div className="timeline-card-actions">
-              {art.content_type === 'markdown' && (
-                <button className={`timeline-action-btn ${saved[art.id] ? 'saved' : ''}`} onClick={() => addAsMarkdown(art.id)} disabled={!!busy[art.id] || !!saved[art.id]}>
+              {post.content_type === 'markdown' && (
+                <button className={`timeline-action-btn ${saved[post.id] ? 'saved' : ''}`} onClick={() => addAsMarkdown(post.id)} disabled={!!busy[post.id] || !!saved[post.id]}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                  {busy[art.id] === 'markdown' ? 'Saving...' : saved[art.id] ? 'Saved!' : 'Markdown'}
+                  {busy[post.id] === 'markdown' ? 'Saving...' : saved[post.id] ? 'Saved!' : 'Markdown'}
                 </button>
               )}
-              {art.content_type === 'file' && (
-                <button className="timeline-action-btn" onClick={() => addAsDocument(art.id)} disabled={!!busy[art.id]}>
+              {post.content_type === 'file' && (
+                <button className="timeline-action-btn" onClick={() => addAsDocument(post.id)} disabled={!!busy[post.id]}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/></svg>
-                  {busy[art.id] === 'doc' ? 'Saving...' : 'Document'}
+                  {busy[post.id] === 'doc' ? 'Saving...' : 'Document'}
                 </button>
               )}
-              <button className="timeline-action-btn delete" onClick={() => deleteArtifact(art.id)} disabled={!!busy[art.id]}>
+              <button className="timeline-action-btn delete" onClick={() => deletePost(post.id)} disabled={!!busy[post.id]}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                {busy[art.id] === 'deleting' ? '...' : 'Delete'}
+                {busy[post.id] === 'deleting' ? '...' : 'Delete'}
               </button>
             </div>
           </article>
         ))}
         {loading && <div className="timeline-loading">Loading...</div>}
-        {!loading && !hasMore && artifacts.length > 0 && <div className="timeline-end">No more artifacts</div>}
+        {!loading && !hasMore && posts.length > 0 && <div className="timeline-end">No more posts</div>}
       </div>
     </div>
   )

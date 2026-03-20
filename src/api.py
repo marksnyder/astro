@@ -31,8 +31,8 @@ from src.markdowns import (
     create_action_item,
     create_category,
     create_feed,
-    create_feed_artifact_file,
-    create_feed_artifact_markdown,
+    create_feed_post_file,
+    create_feed_post_markdown,
     list_pinned_feeds,
     list_pinned_categories,
     create_link,
@@ -44,12 +44,12 @@ from src.markdowns import (
     delete_category,
     delete_document_meta,
     delete_feed,
-    delete_feed_artifact,
+    delete_feed_post,
     delete_link,
     delete_markdown,
     delete_markdown_image,
     delete_universe,
-    feed_artifact_to_dict,
+    feed_post_to_dict,
     feed_to_dict,
     get_action_item,
     get_all_document_categories,
@@ -57,7 +57,7 @@ from src.markdowns import (
     get_document_paths_for_category,
     get_document_pinned,
     get_feed,
-    get_feed_artifact,
+    get_feed_post,
     set_feed_pinned,
     set_category_pinned,
     get_link,
@@ -69,9 +69,9 @@ from src.markdowns import (
     get_universe_markdown_ids,
     list_action_item_links,
     list_action_items,
-    list_feed_artifacts,
-    list_feed_artifacts_by_category,
-    mark_feed_artifacts_read,
+    list_feed_posts,
+    list_feed_posts_by_category,
+    mark_feed_posts_read,
     get_unread_counts_by_category,
     get_recent_counts_by_category,
     list_feeds,
@@ -115,6 +115,11 @@ from src.markdowns import (
     prompt_category_to_dict,
     reorder_prompt_categories,
     update_prompt_category,
+    list_post_comments,
+    create_post_comment,
+    update_post_comment,
+    delete_post_comment,
+    post_comment_to_dict,
 )
 from src.query import ask, ask_direct
 from src.store import (
@@ -1014,13 +1019,13 @@ class FeedResponse(BaseModel):
     pinned: bool = False
     created_at: str
     updated_at: str
-    artifact_count: int = 0
+    post_count: int = 0
     trend_14d: list[int] = []
     avg_14d: float = 0
     days_since_last: Optional[int] = None
 
 
-class FeedArtifactResponse(BaseModel):
+class FeedPostResponse(BaseModel):
     id: int
     feed_id: int
     title: str
@@ -1029,6 +1034,24 @@ class FeedArtifactResponse(BaseModel):
     file_path: Optional[str]
     original_filename: Optional[str]
     created_at: str
+
+
+class PostCommentRequest(BaseModel):
+    author: str = "astro"
+    content: str
+
+
+class PostCommentUpdateRequest(BaseModel):
+    content: str
+
+
+class PostCommentResponse(BaseModel):
+    id: int
+    post_id: int
+    author: str
+    content: str
+    created_at: str
+    updated_at: str
 
 
 @app.get("/api/feeds", response_model=list[FeedResponse])
@@ -1072,17 +1095,17 @@ def api_pin_feed(feed_id: int, pinned: bool = True):
     return {"ok": True}
 
 
-# ── Feed artifacts ────────────────────────────────────────────────────────
+# ── Feed posts ────────────────────────────────────────────────────────
 
 
-@app.get("/api/feeds/{feed_id}/artifacts")
-def api_list_feed_artifacts(feed_id: int, q: str = "", page: int = 1, page_size: int = 100):
+@app.get("/api/feeds/{feed_id}/posts")
+def api_list_feed_posts(feed_id: int, q: str = "", page: int = 1, page_size: int = 100):
     if not get_feed(feed_id):
         raise HTTPException(status_code=404, detail="Feed not found")
     page_size = min(page_size, 100)
-    artifacts, total = list_feed_artifacts(feed_id, q, page=page, page_size=page_size)
+    posts, total = list_feed_posts(feed_id, q, page=page, page_size=page_size)
     return {
-        "artifacts": [feed_artifact_to_dict(a) for a in artifacts],
+        "posts": [feed_post_to_dict(p) for p in posts],
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -1090,12 +1113,12 @@ def api_list_feed_artifacts(feed_id: int, q: str = "", page: int = 1, page_size:
     }
 
 
-@app.get("/api/feed-artifacts/by-category")
-def api_list_feed_artifacts_by_category(category_id: int = None, q: str = "", page: int = 1, page_size: int = 5):
+@app.get("/api/feed-posts/by-category")
+def api_list_feed_posts_by_category(category_id: int = None, q: str = "", page: int = 1, page_size: int = 5):
     page_size = min(page_size, 50)
-    artifacts, total = list_feed_artifacts_by_category(category_id, q, page=page, page_size=page_size)
+    posts, total = list_feed_posts_by_category(category_id, q, page=page, page_size=page_size)
     return {
-        "artifacts": artifacts,
+        "posts": posts,
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -1103,16 +1126,16 @@ def api_list_feed_artifacts_by_category(category_id: int = None, q: str = "", pa
     }
 
 
-@app.post("/api/feed-artifacts/mark-read")
-def api_mark_artifacts_read(body: dict):
+@app.post("/api/feed-posts/mark-read")
+def api_mark_posts_read(body: dict):
     ids = body.get("ids", [])
     if not isinstance(ids, list):
         raise HTTPException(status_code=400, detail="ids must be a list")
-    updated = mark_feed_artifacts_read(ids)
+    updated = mark_feed_posts_read(ids)
     return {"ok": True, "updated": updated}
 
 
-@app.get("/api/feed-artifacts/unread-counts")
+@app.get("/api/feed-posts/unread-counts")
 def api_unread_counts(universe_id: Optional[int] = None):
     counts = get_unread_counts_by_category(universe_id)
     recent = get_recent_counts_by_category(universe_id, days=7)
@@ -1120,28 +1143,28 @@ def api_unread_counts(universe_id: Optional[int] = None):
     return {"counts": fmt(counts), "recent_7d": fmt(recent)}
 
 
-@app.delete("/api/feed-artifacts/{artifact_id}")
-def api_delete_feed_artifact(artifact_id: int):
-    if not delete_feed_artifact(artifact_id):
-        raise HTTPException(status_code=404, detail="Artifact not found")
+@app.delete("/api/feed-posts/{post_id}")
+def api_delete_feed_post(post_id: int):
+    if not delete_feed_post(post_id):
+        raise HTTPException(status_code=404, detail="Post not found")
     return {"ok": True}
 
 
-@app.post("/api/feed-artifacts/{artifact_id}/to-markdown")
-def api_artifact_to_markdown(artifact_id: int):
-    """Convert a markdown artifact into a markdown, preserving links and images as Markdown."""
+@app.post("/api/feed-posts/{post_id}/to-markdown")
+def api_post_to_markdown(post_id: int):
+    """Convert a markdown feed post into a markdown note, preserving links and images as Markdown."""
     from markdownify import markdownify as md
 
-    art = get_feed_artifact(artifact_id)
-    if not art:
-        raise HTTPException(status_code=404, detail="Artifact not found")
-    if art.content_type != "markdown":
-        raise HTTPException(status_code=400, detail="Only markdown artifacts can be converted to markdowns")
-    feed = get_feed(art.feed_id)
+    post = get_feed_post(post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    if post.content_type != "markdown":
+        raise HTTPException(status_code=400, detail="Only markdown posts can be converted to markdowns")
+    feed = get_feed(post.feed_id)
     uid = feed.universe_id if feed else 1
     cat_id = feed.category_id if feed else None
-    markdown_body = md(art.markdown or "", heading_style="ATX", bullets="-").strip()
-    markdown = create_markdown(art.title, markdown_body, category_id=cat_id, universe_id=uid)
+    markdown_body = md(post.markdown or "", heading_style="ATX", bullets="-").strip()
+    markdown = create_markdown(post.title, markdown_body, category_id=cat_id, universe_id=uid)
     try:
         upsert_markdown(markdown.id, f"{markdown.title}\n\n{markdown.body}", markdown.title, universe_id=uid)
     except Exception as e:
@@ -1149,22 +1172,22 @@ def api_artifact_to_markdown(artifact_id: int):
     return {"ok": True, "markdown_id": markdown.id}
 
 
-@app.post("/api/feed-artifacts/{artifact_id}/to-document")
-def api_artifact_to_document(artifact_id: int):
-    """Copy a file artifact into the document archive and ingest it."""
-    art = get_feed_artifact(artifact_id)
-    if not art:
-        raise HTTPException(status_code=404, detail="Artifact not found")
-    if art.content_type != "file":
-        raise HTTPException(status_code=400, detail="Only file artifacts can be converted to documents")
-    if not art.file_path:
-        raise HTTPException(status_code=400, detail="Artifact has no file")
-    src_path = FEED_FILES_DIR / art.file_path
+@app.post("/api/feed-posts/{post_id}/to-document")
+def api_post_to_document(post_id: int):
+    """Copy a file post into the document archive and ingest it."""
+    post = get_feed_post(post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    if post.content_type != "file":
+        raise HTTPException(status_code=400, detail="Only file posts can be converted to documents")
+    if not post.file_path:
+        raise HTTPException(status_code=400, detail="Post has no file")
+    src_path = FEED_FILES_DIR / post.file_path
     if not src_path.is_file():
-        raise HTTPException(status_code=404, detail="Artifact file missing from disk")
-    feed = get_feed(art.feed_id)
+        raise HTTPException(status_code=404, detail="Post file missing from disk")
+    feed = get_feed(post.feed_id)
     uid = feed.universe_id if feed else 1
-    filename = art.original_filename or art.file_path
+    filename = post.original_filename or post.file_path
     ext = Path(filename).suffix.lower()
     if ext not in SUPPORTED_EXTENSIONS:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
@@ -1186,11 +1209,41 @@ def api_artifact_to_document(artifact_id: int):
             chunks = chunk_documents(documents)
             add_documents(chunks, universe_id=uid)
     except Exception as e:
-        print(f"[Astro] WARNING: Failed to ingest artifact document: {e}")
+        print(f"[Astro] WARNING: Failed to ingest post file as document: {e}")
     rel = dest.relative_to(DOCUMENTS_DIR)
     set_document_universe(str(rel), uid)
-    delete_feed_artifact(artifact_id)
+    delete_feed_post(post_id)
     return {"ok": True, "path": str(rel)}
+
+
+# ── Post comments ─────────────────────────────────────────────────────────
+
+
+@app.get("/api/feed-posts/{post_id}/comments", response_model=list[PostCommentResponse])
+def api_list_post_comments(post_id: int):
+    return [post_comment_to_dict(c) for c in list_post_comments(post_id)]
+
+
+@app.post("/api/feed-posts/{post_id}/comments", response_model=PostCommentResponse, status_code=201)
+def api_create_post_comment(post_id: int, req: PostCommentRequest):
+    if not get_feed_post(post_id):
+        raise HTTPException(status_code=404, detail="Post not found")
+    return post_comment_to_dict(create_post_comment(post_id, req.author.strip() or "astro", req.content.strip()))
+
+
+@app.put("/api/post-comments/{comment_id}", response_model=PostCommentResponse)
+def api_update_post_comment(comment_id: int, req: PostCommentUpdateRequest):
+    c = update_post_comment(comment_id, req.content.strip())
+    if not c:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    return post_comment_to_dict(c)
+
+
+@app.delete("/api/post-comments/{comment_id}")
+def api_delete_post_comment(comment_id: int):
+    if not delete_post_comment(comment_id):
+        raise HTTPException(status_code=404, detail="Comment not found")
+    return {"ok": True}
 
 
 # ── Feed external ingest endpoint ─────────────────────────────────────────
@@ -1213,7 +1266,7 @@ async def api_feed_ingest(
     file: Optional[UploadFile] = None,
     x_feed_key: Optional[str] = fastapi.Header(None),
 ):
-    """External endpoint for pushing artifacts into a feed.
+    """External endpoint for pushing posts into a feed.
 
     Authenticate with the X-Feed-Key header matching the feed's api_key.
 
@@ -1243,15 +1296,15 @@ async def api_feed_ingest(
         raise HTTPException(status_code=403, detail="Invalid API key")
 
     if not title.strip():
-        title = "Untitled artifact"
+        title = "Untitled post"
 
     if file and file.filename:
         data = await file.read()
-        art = create_feed_artifact_file(feed_id, title.strip(), file.filename, data)
-        return {"ok": True, "artifact_id": art.id, "content_type": "file"}
+        post = create_feed_post_file(feed_id, title.strip(), file.filename, data)
+        return {"ok": True, "post_id": post.id, "content_type": "file"}
     elif markdown is not None:
-        art = create_feed_artifact_markdown(feed_id, title.strip(), _ensure_markdown(markdown))
-        return {"ok": True, "artifact_id": art.id, "content_type": "markdown"}
+        post = create_feed_post_markdown(feed_id, title.strip(), _ensure_markdown(markdown))
+        return {"ok": True, "post_id": post.id, "content_type": "markdown"}
     else:
         raise HTTPException(status_code=400, detail="Provide either 'markdown' or 'file'")
 

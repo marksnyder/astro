@@ -3,10 +3,202 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
 
+// ── Markdown Insert Tool Modal ────────────────────────
+
+function MarkdownInsertModal({ tool, onInsert, onClose }) {
+  const [items, setItems] = useState([])
+  const [search, setSearch] = useState('')
+  const [inserted, setInserted] = useState(null)
+  const [universes, setUniverses] = useState([])
+  const [selectedUniverse, setSelectedUniverse] = useState('')
+
+  useEffect(() => {
+    if (tool === 'feedMarkdown' || tool === 'feedDocument' || tool === 'readPosts' || tool === 'commentPost') {
+      fetch('/api/feeds').then(r => r.json()).then(setItems).catch(() => {})
+    } else if (tool === 'readMarkdown' || tool === 'updateMarkdown') {
+      fetch('/api/markdowns').then(r => r.json()).then(setItems).catch(() => {})
+    } else if (tool === 'editActionItem') {
+      fetch('/api/action-items?show_completed=true').then(r => r.json()).then(setItems).catch(() => {})
+    } else if (tool === 'downloadDoc') {
+      fetch('/api/documents').then(r => r.json()).then(setItems).catch(() => {})
+    }
+    if (tool === 'listActionItems' || tool === 'searchDocs' || tool === 'addActionItem') {
+      fetch('/api/universes').then(r => r.json()).then(data => {
+        setUniverses(data)
+        if (tool === 'addActionItem' && data.length > 0) setSelectedUniverse(String(data[0].id))
+      }).catch(() => {})
+    }
+  }, [tool])
+
+  const baseUrl = window.location.origin
+  const filtered = items.filter(i => {
+    if (!search) return true
+    const name = i.title || i.name || ''
+    return name.toLowerCase().includes(search.toLowerCase())
+  })
+
+  const titles = {
+    feedMarkdown: 'Post Feed Markdown', feedDocument: 'Post Feed Document',
+    readMarkdown: 'Read Markdown', updateMarkdown: 'Update Markdown',
+    addActionItem: 'Add Action Item', editActionItem: 'Edit Action Item',
+    listActionItems: 'List Action Items', searchDocs: 'Search Documents',
+    downloadDoc: 'Download Document', readPosts: 'Read Feed Posts', commentPost: 'Comment on Post',
+  }
+
+  if (tool === 'addActionItem') {
+    const handleInsertAdd = () => {
+      const uParam = selectedUniverse ? `?universe_id=${selectedUniverse}` : ''
+      const uLabel = universes.find(u => String(u.id) === selectedUniverse)
+      const text = '```\n' + [
+        `POST ${baseUrl}/api/action-items${uParam}`,
+        `Content-Type: application/json`,
+        ``,
+        ...(uLabel ? [`Universe: ${uLabel.name}`] : []),
+        `Payload: {"title":"<title>","hot":false,"due_date":null,"category_id":null}`,
+        `Response: {"id":<id>,"title":"...","hot":false,"completed":false}`,
+      ].join('\n') + '\n```'
+      onInsert(text); onClose()
+    }
+    return (
+      <div className="feed-key-modal-overlay">
+        <div className="feed-key-modal">
+          <div className="feed-key-modal-header"><h3>{titles[tool]}</h3><button type="button" className="feed-key-modal-close" onClick={onClose}>&times;</button></div>
+          <p className="feed-post-modal-desc">Insert a POST template to create a new action item.</p>
+          <div style={{ padding: '0 16px' }}>
+            <label style={{ fontSize: '0.82rem', color: '#aaa', marginBottom: 4, display: 'block' }}>Universe</label>
+            <select className="prompt-form-input" value={selectedUniverse} onChange={e => setSelectedUniverse(e.target.value)}>
+              {universes.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+          </div>
+          <div style={{ padding: '12px 16px 16px' }}><button className="prompt-save-btn" onClick={handleInsertAdd}>Insert Template</button></div>
+        </div>
+      </div>
+    )
+  }
+
+  if (tool === 'listActionItems' || tool === 'searchDocs') {
+    const handleInsert = () => {
+      let text
+      if (tool === 'listActionItems') {
+        const params = selectedUniverse ? `?universe_id=${selectedUniverse}` : ''
+        text = '```\n' + `GET ${baseUrl}/api/action-items${params}\n\nResponse: [{"id":<id>,"title":"...","hot":false,"completed":false}]` + '\n```'
+      } else {
+        const params = selectedUniverse ? `?universe_id=${selectedUniverse}&q=<search_term>` : '?q=<search_term>'
+        text = '```\n' + `GET ${baseUrl}/api/documents${params}\n\nResponse: [{"name":"...","path":"...","extension":"...","size":...}]` + '\n```'
+      }
+      onInsert(text)
+      onClose()
+    }
+    return (
+      <div className="feed-key-modal-overlay">
+        <div className="feed-key-modal">
+          <div className="feed-key-modal-header"><h3>{titles[tool]}</h3><button type="button" className="feed-key-modal-close" onClick={onClose}>&times;</button></div>
+          <p className="feed-post-modal-desc">{tool === 'listActionItems' ? 'Insert a template to list action items.' : 'Insert a template to search documents.'} Optionally filter by universe.</p>
+          <div style={{ padding: '0 16px' }}>
+            <label style={{ fontSize: '0.82rem', color: '#aaa', marginBottom: 4, display: 'block' }}>Universe</label>
+            <select className="prompt-form-input" value={selectedUniverse} onChange={e => setSelectedUniverse(e.target.value)}>
+              <option value="">All universes</option>
+              {universes.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+          </div>
+          <div style={{ padding: '12px 16px 16px' }}><button className="prompt-save-btn" onClick={handleInsert}>Insert Template</button></div>
+        </div>
+      </div>
+    )
+  }
+
+  if (tool === 'readPosts') {
+    return (
+      <div className="feed-key-modal-overlay">
+        <div className="feed-key-modal">
+          <div className="feed-key-modal-header"><h3>{titles[tool]}</h3><button type="button" className="feed-key-modal-close" onClick={onClose}>&times;</button></div>
+          <p className="feed-post-modal-desc">Select a feed to read posts from.</p>
+          <input className="prompt-form-input feed-key-modal-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search feeds..." autoFocus />
+          <div className="feed-key-modal-list">
+            {filtered.length === 0 && <div className="feed-key-lookup-empty">No feeds found</div>}
+            {filtered.map(f => (
+              <div key={f.id} className="feed-key-lookup-item" onClick={() => {
+                const text = '```\n' + `GET ${baseUrl}/api/feeds/${f.id}/posts\n\nFeed: ${f.title} (ID: ${f.id})\nResponse: {"posts":[{"id":<id>,"title":"...","content_type":"markdown","markdown":"...","feed_name":"..."}],"total":<n>}` + '\n```'
+                onInsert(text); onClose()
+              }} style={{ cursor: 'pointer' }}>
+                <span className="feed-key-lookup-title">{f.title || 'Untitled'}</span>
+                <code className="feed-key-lookup-key">#{f.id}</code>
+                {inserted === (f.id) && <span className="feed-key-inserted">Inserted</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const handleSelect = (item) => {
+    let text
+    if (tool === 'feedMarkdown') {
+      text = '```\n' + `POST ${baseUrl}/api/feeds/${item.id}/ingest\nContent-Type: multipart/form-data\nX-Feed-Key: ${item.api_key}\n\nPayload: title=<title>&markdown=<markdown_content>\nResponse: {"ok":true,"post_id":<id>,"content_type":"markdown"}` + '\n```'
+    } else if (tool === 'feedDocument') {
+      text = '```\n' + `POST ${baseUrl}/api/feeds/${item.id}/ingest\nContent-Type: multipart/form-data\nX-Feed-Key: ${item.api_key}\n\nPayload: title=<title>&file=@<filepath>\nResponse: {"ok":true,"post_id":<id>,"content_type":"file"}` + '\n```'
+    } else if (tool === 'readMarkdown') {
+      text = '```\n' + `GET ${baseUrl}/api/markdowns/${item.id}\n\nResponse: {"id":${item.id},"title":"${item.title}","body":"...","category_id":${item.category_id ?? 'null'},"pinned":${item.pinned}}` + '\n```'
+    } else if (tool === 'updateMarkdown') {
+      text = '```\n' + `PUT ${baseUrl}/api/markdowns/${item.id}\nContent-Type: application/json\n\nPayload: {"title":"${item.title}","body":"<new_body>","category_id":${item.category_id ?? 'null'}}\nResponse: {"id":${item.id},"title":"...","body":"..."}` + '\n```'
+    } else if (tool === 'editActionItem') {
+      text = '```\n' + `PUT ${baseUrl}/api/action-items/${item.id}\nContent-Type: application/json\n\nPayload: {"title":"${item.title}","hot":${item.hot},"completed":${item.completed},"due_date":${item.due_date ? `"${item.due_date}"` : 'null'},"category_id":${item.category_id ?? 'null'}}\nResponse: {"id":${item.id},"title":"...","hot":...,"completed":...}` + '\n```'
+    } else if (tool === 'downloadDoc') {
+      text = '```\n' + `GET ${baseUrl}/api/documents/download?path=${encodeURIComponent(item.path)}\n\nDownloads: ${item.name} (${item.extension})` + '\n```'
+    } else if (tool === 'commentPost') {
+      text = '```\n' + `POST ${baseUrl}/api/feed-posts/<post_id>/comments\nContent-Type: application/json\n\nPayload: {"author":"astro","content":"<comment_text>"}\nResponse: {"id":<id>,"post_id":<post_id>,"author":"astro","content":"..."}\n\nFeed: ${item.title} (ID: ${item.id})\nTo get post IDs, first list posts for this feed's category.` + '\n```'
+    }
+    onInsert(text)
+    setInserted(item.id || item.path)
+    setTimeout(() => setInserted(null), 1500)
+  }
+
+  const needsSearch = ['feedMarkdown', 'feedDocument', 'readMarkdown', 'updateMarkdown', 'editActionItem', 'downloadDoc', 'commentPost'].includes(tool)
+  const itemLabel = (item) => {
+    if (tool === 'downloadDoc') return item.name
+    return item.title || 'Untitled'
+  }
+  const itemKey = (item) => {
+    if (tool === 'downloadDoc') return item.path
+    return item.id
+  }
+  const itemSub = (item) => {
+    if (tool === 'feedMarkdown' || tool === 'feedDocument') return item.api_key
+    if (tool === 'readMarkdown' || tool === 'updateMarkdown') return `#${item.id}`
+    if (tool === 'editActionItem') return `#${item.id}`
+    if (tool === 'downloadDoc') return item.extension
+    if (tool === 'commentPost') return `${item.post_count || 0} posts`
+    return ''
+  }
+
+  return (
+    <div className="feed-key-modal-overlay">
+      <div className="feed-key-modal">
+        <div className="feed-key-modal-header"><h3>{titles[tool]}</h3><button type="button" className="feed-key-modal-close" onClick={onClose}>&times;</button></div>
+        <p className="feed-post-modal-desc">Select an item to insert a template.</p>
+        {needsSearch && <input className="prompt-form-input feed-key-modal-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." autoFocus />}
+        <div className="feed-key-modal-list">
+          {filtered.length === 0 && <div className="feed-key-lookup-empty">No items found</div>}
+          {filtered.map(item => (
+            <div key={itemKey(item)} className="feed-key-lookup-item" onClick={() => handleSelect(item)} style={{ cursor: 'pointer' }}>
+              <span className="feed-key-lookup-title">{itemLabel(item)}</span>
+              <code className="feed-key-lookup-key">{itemSub(item)}</code>
+              {inserted === itemKey(item) && <span className="feed-key-inserted">Inserted</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Markdown Editor ───────────────────────────────────
 
 function MarkdownEditor({ value, onChange, placeholder }) {
   const ref = useRef(null)
+  const [showInsertMenu, setShowInsertMenu] = useState(false)
+  const [activeInsertTool, setActiveInsertTool] = useState(null)
 
   const insert = (before, after = '') => {
     const ta = ref.current
@@ -123,6 +315,30 @@ function MarkdownEditor({ value, onChange, placeholder }) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
           </button>
         </div>
+        <div className="md-toolbar-sep" />
+        <div className="md-toolbar-group" style={{ position: 'relative' }}>
+          <button className="md-toolbar-btn md-insert-btn" onMouseDown={e => e.preventDefault()} onClick={() => setShowInsertMenu(!showInsertMenu)} title="Insert tool snippet">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          </button>
+          {showInsertMenu && (
+            <div className="md-insert-menu">
+              <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActiveInsertTool('feedMarkdown') }}>Post Feed Markdown</div>
+              <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActiveInsertTool('feedDocument') }}>Post Feed Document</div>
+              <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActiveInsertTool('readMarkdown') }}>Read Markdown</div>
+              <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActiveInsertTool('updateMarkdown') }}>Update Markdown</div>
+              <div className="md-insert-menu-sep" />
+              <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActiveInsertTool('addActionItem') }}>Add Action Item</div>
+              <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActiveInsertTool('editActionItem') }}>Edit Action Item</div>
+              <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActiveInsertTool('listActionItems') }}>List Action Items</div>
+              <div className="md-insert-menu-sep" />
+              <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActiveInsertTool('searchDocs') }}>Search Documents</div>
+              <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActiveInsertTool('downloadDoc') }}>Download Document</div>
+              <div className="md-insert-menu-sep" />
+              <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActiveInsertTool('readPosts') }}>Read Posts</div>
+              <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActiveInsertTool('commentPost') }}>Comment on Post</div>
+            </div>
+          )}
+        </div>
       </div>
       <textarea
         ref={ref}
@@ -133,6 +349,7 @@ function MarkdownEditor({ value, onChange, placeholder }) {
         placeholder={placeholder}
         spellCheck
       />
+      {activeInsertTool && <MarkdownInsertModal tool={activeInsertTool} onInsert={(text) => { insertBlock(text); setActiveInsertTool(null) }} onClose={() => setActiveInsertTool(null)} />}
     </div>
   )
 }

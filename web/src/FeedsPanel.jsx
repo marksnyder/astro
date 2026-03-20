@@ -20,7 +20,7 @@ function Sparkline({ data, width = 80, height = 20 }) {
   )
 }
 
-function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOpenFeedRequestHandled, onViewArtifacts, unreadCounts, recent7dCounts }) {
+function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOpenFeedRequestHandled, onViewPosts, unreadCounts, recent7dCounts }) {
   const [feeds, setFeeds] = useState([])
   const [search, setSearch] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
@@ -29,7 +29,7 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
   const [categoryId, setCategoryId] = useState(null)
   const [saving, setSaving] = useState(false)
   const titleRef = useRef(null)
-  const [artifactCategory, setArtifactCategory] = useState(null) // { id, name } or { id: null, name: 'Uncategorized' }
+  const [postCategory, setPostCategory] = useState(null) // { id, name } or { id: null, name: 'Uncategorized' }
 
   const catMap = Object.fromEntries(categories.map(c => [c.id, c.name]))
   const catEmojiMap = Object.fromEntries(categories.map(c => [c.id, c.emoji || null]))
@@ -55,17 +55,17 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
     if (openFeedRequest) {
       const cat = openFeedRequest.category_id
       const catObj = { id: cat ?? null, name: cat ? (catMap[cat] || 'Unknown') : 'Uncategorized' }
-      onViewArtifacts?.(catObj)
+      onViewPosts?.(catObj)
       onOpenFeedRequestHandled?.()
     }
   }, [openFeedRequest])
 
   useEffect(() => {
-    if (artifactCategory) {
-      onViewArtifacts?.(artifactCategory)
-      setArtifactCategory(null)
+    if (postCategory) {
+      onViewPosts?.(postCategory)
+      setPostCategory(null)
     }
-  }, [artifactCategory])
+  }, [postCategory])
 
   const startNew = () => {
     setEditing('new')
@@ -108,7 +108,7 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
 
   const remove = async (e, feedId) => {
     e.stopPropagation()
-    if (!confirm('Delete this feed and all its artifacts?')) return
+    if (!confirm('Delete this feed and all its posts?')) return
     await fetch(`/api/feeds/${feedId}`, { method: 'DELETE' })
     if (editing && editing !== 'new' && editing.id === feedId) setEditing(null)
     fetchFeeds()
@@ -181,7 +181,7 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
               <span className="ai-group-name">{group.name || 'Uncategorized'}</span>
               {group.categoryId != null && (
                 <button
-                  className={`ai-group-artifacts-btn ${pinnedCategoryIds.has(group.categoryId) ? 'pinned' : ''}`}
+                  className={`ai-group-posts-btn ${pinnedCategoryIds.has(group.categoryId) ? 'pinned' : ''}`}
                   onClick={e => toggleCategoryPin(e, group.categoryId)}
                   title={pinnedCategoryIds.has(group.categoryId) ? 'Unpin category' : 'Pin category to header'}
                 >
@@ -193,8 +193,8 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
               )}
               <button
                 className={`feed-category-circle-btn ${(unreadCounts?.[group.categoryId ?? null] || 0) > 0 ? 'has-unread' : ''}`}
-                onClick={() => setArtifactCategory({ id: group.categoryId ?? null, name: group.name || 'Uncategorized' })}
-                title="View artifacts for this category"
+                onClick={() => setPostCategory({ id: group.categoryId ?? null, name: group.name || 'Uncategorized' })}
+                title="View posts for this category"
               >
                 <span className="feed-circle-unread">{unreadCounts?.[group.categoryId ?? null] || 0}</span>
                 <span className="feed-circle-recent">{recent7dCounts?.[group.categoryId ?? null] || 0} / 7d</span>
@@ -268,7 +268,7 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
 Content-Type: multipart/form-data
 X-Feed-Key: ${editing.api_key}
 
-title=My Artifact&markdown=<p>Hello</p>`}</pre>
+title=My Post&markdown=<p>Hello</p>`}</pre>
 
                   <div className="feed-api-section-title" style={{ marginTop: 8 }}>Send File</div>
                   <pre className="feed-api-pre">{`POST ${baseUrl}/${editing.id}/ingest
@@ -280,7 +280,7 @@ title=Report&file=@report.pdf`}</pre>
                   <div className="feed-api-section-title" style={{ marginTop: 8 }}>Response</div>
                   <pre className="feed-api-pre">{`{
   "ok": true,
-  "artifact_id": 42,
+  "post_id": 42,
   "content_type": "markdown" | "file"
 }`}</pre>
                 </div>
@@ -303,8 +303,8 @@ title=Report&file=@report.pdf`}</pre>
 }
 
 
-export const ArtifactTimeline = memo(function ArtifactTimeline({ category, onClose, onUnreadChange }) {
-  const [artifacts, setArtifacts] = useState([])
+export const PostTimeline = memo(function PostTimeline({ category, onClose, onUnreadChange }) {
+  const [posts, setPosts] = useState([])
   const [total, setTotal] = useState(0)
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -312,11 +312,17 @@ export const ArtifactTimeline = memo(function ArtifactTimeline({ category, onClo
   const [saved, setSaved] = useState({})
   const scrollRef = useRef(null)
   const pageRef = useRef(1)
+  const [expandedComments, setExpandedComments] = useState({})
+  const [comments, setComments] = useState({})
+  const [newComment, setNewComment] = useState({})
+  const [editingComment, setEditingComment] = useState(null)
+  const [editContent, setEditContent] = useState('')
+  const [initiallyUnread, setInitiallyUnread] = useState(() => new Set())
 
-  const markRead = (arts) => {
-    const unreadIds = arts.filter(a => !a.read).map(a => a.id)
+  const markRead = (items) => {
+    const unreadIds = items.filter(a => !a.read).map(a => a.id)
     if (unreadIds.length === 0) return
-    fetch('/api/feed-artifacts/mark-read', {
+    fetch('/api/feed-posts/mark-read', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ids: unreadIds }),
@@ -327,11 +333,24 @@ export const ArtifactTimeline = memo(function ArtifactTimeline({ category, onClo
     setLoading(true)
     const params = new URLSearchParams({ page: String(page), page_size: '5' })
     if (category.id !== null) params.set('category_id', category.id)
-    fetch(`/api/feed-artifacts/by-category?${params}`)
+    fetch(`/api/feed-posts/by-category?${params}`)
       .then(r => r.json())
       .then(data => {
-        markRead(data.artifacts)
-        setArtifacts(prev => append ? [...prev, ...data.artifacts] : data.artifacts)
+        const raw = data.posts
+        const newUnread = raw.filter(p => !p.read).map(p => p.id)
+        if (newUnread.length > 0) {
+          setInitiallyUnread(prev => new Set([...prev, ...newUnread]))
+        }
+        markRead(raw)
+        const pagePosts = append
+          ? raw
+          : [...raw].sort((a, b) => {
+              const aUnread = !a.read ? 1 : 0
+              const bUnread = !b.read ? 1 : 0
+              if (aUnread !== bUnread) return bUnread - aUnread
+              return new Date(b.created_at) - new Date(a.created_at)
+            })
+        setPosts(prev => append ? [...prev, ...pagePosts] : pagePosts)
         setTotal(data.total)
         setHasMore(data.has_more)
         pageRef.current = page
@@ -340,7 +359,11 @@ export const ArtifactTimeline = memo(function ArtifactTimeline({ category, onClo
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { pageRef.current = 1; fetchPage(1) }, [category.id])
+  useEffect(() => {
+    pageRef.current = 1
+    setInitiallyUnread(new Set())
+    fetchPage(1)
+  }, [category.id])
 
   const handleScroll = () => {
     const el = scrollRef.current
@@ -350,12 +373,12 @@ export const ArtifactTimeline = memo(function ArtifactTimeline({ category, onClo
     }
   }
 
-  const removeFromList = (id) => setArtifacts(prev => prev.filter(a => a.id !== id))
+  const removeFromList = (id) => setPosts(prev => prev.filter(a => a.id !== id))
 
-  const deleteArtifact = async (id) => {
-    if (!confirm('Delete this artifact?')) return
+  const deletePost = async (id) => {
+    if (!confirm('Delete this post?')) return
     setBusy(prev => ({ ...prev, [id]: 'deleting' }))
-    await fetch(`/api/feed-artifacts/${id}`, { method: 'DELETE' })
+    await fetch(`/api/feed-posts/${id}`, { method: 'DELETE' })
     setBusy(prev => { const n = { ...prev }; delete n[id]; return n })
     removeFromList(id)
     setTotal(prev => prev - 1)
@@ -364,7 +387,7 @@ export const ArtifactTimeline = memo(function ArtifactTimeline({ category, onClo
   const addAsMarkdown = async (id) => {
     setBusy(prev => ({ ...prev, [id]: 'markdown' }))
     try {
-      const res = await fetch(`/api/feed-artifacts/${id}/to-markdown`, { method: 'POST' })
+      const res = await fetch(`/api/feed-posts/${id}/to-markdown`, { method: 'POST' })
       if (res.ok) {
         setBusy(prev => { const n = { ...prev }; delete n[id]; return n })
         setSaved(prev => ({ ...prev, [id]: true }))
@@ -379,7 +402,7 @@ export const ArtifactTimeline = memo(function ArtifactTimeline({ category, onClo
   const addAsDocument = async (id) => {
     setBusy(prev => ({ ...prev, [id]: 'doc' }))
     try {
-      const res = await fetch(`/api/feed-artifacts/${id}/to-document`, { method: 'POST' })
+      const res = await fetch(`/api/feed-posts/${id}/to-document`, { method: 'POST' })
       if (res.ok) { removeFromList(id); setTotal(prev => prev - 1); return }
       const err = await res.json(); alert(err.detail || 'Failed')
     } catch { alert('Failed') }
@@ -399,57 +422,157 @@ export const ArtifactTimeline = memo(function ArtifactTimeline({ category, onClo
     } catch { return iso }
   }
 
+  const toggleComments = (postId) => {
+    setExpandedComments(prev => {
+      const next = { ...prev, [postId]: !prev[postId] }
+      if (next[postId] && !comments[postId]) fetchComments(postId)
+      return next
+    })
+  }
+
+  const fetchComments = (postId) => {
+    fetch(`/api/feed-posts/${postId}/comments`)
+      .then(r => r.json())
+      .then(data => setComments(prev => ({ ...prev, [postId]: data })))
+      .catch(() => {})
+  }
+
+  const addComment = async (postId) => {
+    const text = (newComment[postId] || '').trim()
+    if (!text) return
+    await fetch(`/api/feed-posts/${postId}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ author: 'astro', content: text }),
+    })
+    setNewComment(prev => ({ ...prev, [postId]: '' }))
+    fetchComments(postId)
+  }
+
+  const saveEditComment = async (commentId, postId) => {
+    if (!editContent.trim()) return
+    await fetch(`/api/post-comments/${commentId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: editContent.trim() }),
+    })
+    setEditingComment(null)
+    fetchComments(postId)
+  }
+
+  const deleteComment = async (commentId, postId) => {
+    if (!confirm('Delete this comment?')) return
+    await fetch(`/api/post-comments/${commentId}`, { method: 'DELETE' })
+    fetchComments(postId)
+  }
+
   return (
     <div className="timeline-inline" ref={scrollRef} onScroll={handleScroll}>
       <div className="timeline-feed">
-        {artifacts.length === 0 && !loading && (
-          <div className="timeline-empty">No artifacts yet.</div>
+        {posts.length === 0 && !loading && (
+          <div className="timeline-empty">No posts yet.</div>
         )}
-        {artifacts.map(art => (
-          <article key={art.id} className="timeline-card">
+        {posts.map(post => (
+          <article key={post.id} className={`timeline-card ${initiallyUnread.has(post.id) ? 'timeline-card-unread' : ''}`}>
             <div className="timeline-card-header">
-              <img className="timeline-card-avatar" src={feedAvatar(art.feed_name, 36)} alt="" />
+              <img className="timeline-card-avatar" src={feedAvatar(post.feed_name, 36)} alt="" />
               <div className="timeline-card-meta">
-                <span className="timeline-card-feed">{art.feed_name || 'Feed'}</span>
-                <span className="timeline-card-date">{formatDate(art.created_at)}</span>
+                <span className="timeline-card-feed">{post.feed_name || 'Feed'}</span>
+                <span className="timeline-card-date">{formatDate(post.created_at)}</span>
+                {initiallyUnread.has(post.id) && <span className="timeline-unread-dot" />}
               </div>
             </div>
-            <h4 className="timeline-card-title">{art.title || 'Untitled'}</h4>
+            <h4 className="timeline-card-title">{post.title || 'Untitled'}</h4>
             <div className="timeline-card-body">
-              {art.content_type === 'markdown' ? (
+              {post.content_type === 'markdown' ? (
                 <div className="markdown-body">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}>{art.markdown || ''}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}>{post.markdown || ''}</ReactMarkdown>
                 </div>
               ) : (
                 <div className="timeline-card-file">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                  <span className="timeline-card-filename">{art.original_filename}</span>
-                  {art.file_path && <a className="timeline-card-download" href={`/api/feed-files/${art.file_path}`} target="_blank" rel="noopener noreferrer">Download</a>}
+                  <span className="timeline-card-filename">{post.original_filename}</span>
+                  {post.file_path && <a className="timeline-card-download" href={`/api/feed-files/${post.file_path}`} target="_blank" rel="noopener noreferrer">Download</a>}
                 </div>
               )}
             </div>
             <div className="timeline-card-actions">
-              {art.content_type === 'markdown' && (
-                <button className={`timeline-action-btn ${saved[art.id] ? 'saved' : ''}`} onClick={() => addAsMarkdown(art.id)} disabled={!!busy[art.id] || !!saved[art.id]} title="Save as markdown">
+              {post.content_type === 'markdown' && (
+                <button className={`timeline-action-btn ${saved[post.id] ? 'saved' : ''}`} onClick={() => addAsMarkdown(post.id)} disabled={!!busy[post.id] || !!saved[post.id]} title="Save as markdown">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                  {busy[art.id] === 'markdown' ? 'Saving...' : saved[art.id] ? 'Saved as Markdown!' : 'Save as Markdown'}
+                  {busy[post.id] === 'markdown' ? 'Saving...' : saved[post.id] ? 'Saved as Markdown!' : 'Save as Markdown'}
                 </button>
               )}
-              {art.content_type === 'file' && (
-                <button className="timeline-action-btn" onClick={() => addAsDocument(art.id)} disabled={!!busy[art.id]} title="Save as document">
+              {post.content_type === 'file' && (
+                <button className="timeline-action-btn" onClick={() => addAsDocument(post.id)} disabled={!!busy[post.id]} title="Save as document">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/></svg>
-                  {busy[art.id] === 'doc' ? 'Saving...' : 'Save as Document'}
+                  {busy[post.id] === 'doc' ? 'Saving...' : 'Save as Document'}
                 </button>
               )}
-              <button className="timeline-action-btn delete" onClick={() => deleteArtifact(art.id)} disabled={!!busy[art.id]} title="Delete">
+              <button className="timeline-action-btn delete" onClick={() => deletePost(post.id)} disabled={!!busy[post.id]} title="Delete">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                {busy[art.id] === 'deleting' ? 'Deleting...' : 'Delete'}
+                {busy[post.id] === 'deleting' ? 'Deleting...' : 'Delete'}
               </button>
+            </div>
+            <div className="timeline-card-comments-section">
+              <button className="timeline-comments-toggle" onClick={() => toggleComments(post.id)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                {(comments[post.id] || []).length > 0
+                  ? `${(comments[post.id] || []).length} comment${(comments[post.id] || []).length !== 1 ? 's' : ''}`
+                  : 'Comments'}
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 4, transform: expandedComments[post.id] ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              {expandedComments[post.id] && (
+                <div className="timeline-comments-list">
+                  {(comments[post.id] || []).map(c => (
+                    <div key={c.id} className="timeline-comment">
+                      {editingComment === c.id ? (
+                        <div className="timeline-comment-edit">
+                          <textarea className="timeline-comment-edit-input" value={editContent} onChange={e => setEditContent(e.target.value)} rows={2} />
+                          <div className="timeline-comment-edit-actions">
+                            <button className="timeline-action-btn" onClick={() => saveEditComment(c.id, post.id)}>Save</button>
+                            <button className="timeline-action-btn" onClick={() => setEditingComment(null)}>Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="timeline-comment-header">
+                            <span className="timeline-comment-author">{c.author}</span>
+                            <span className="timeline-comment-date">{formatDate(c.created_at)}</span>
+                            <button className="timeline-comment-action" onClick={() => { setEditingComment(c.id); setEditContent(c.content) }} title="Edit">
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            </button>
+                            <button className="timeline-comment-action delete" onClick={() => deleteComment(c.id, post.id)} title="Delete">
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                            </button>
+                          </div>
+                          <div className="timeline-comment-body">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}>{c.content}</ReactMarkdown>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                  <div className="timeline-comment-add">
+                    <textarea
+                      className="timeline-comment-input"
+                      value={newComment[post.id] || ''}
+                      onChange={e => setNewComment(prev => ({ ...prev, [post.id]: e.target.value }))}
+                      placeholder="Add a comment..."
+                      rows={2}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addComment(post.id) } }}
+                    />
+                    <button className="timeline-action-btn" onClick={() => addComment(post.id)} disabled={!(newComment[post.id] || '').trim()}>
+                      Comment
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </article>
         ))}
         {loading && <div className="timeline-loading">Loading...</div>}
-        {!loading && !hasMore && artifacts.length > 0 && <div className="timeline-end">No more artifacts</div>}
+        {!loading && !hasMore && posts.length > 0 && <div className="timeline-end">No more posts</div>}
       </div>
     </div>
   )

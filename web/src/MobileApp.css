@@ -1305,7 +1305,7 @@
   opacity: 0.85;
 }
 
-.ma-group-artifacts-btn {
+.ma-group-posts-btn {
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -1320,7 +1320,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.ma-group-artifacts-btn:active {
+.ma-group-posts-btn:active {
   border-color: var(--accent);
   color: var(--accent);
 }

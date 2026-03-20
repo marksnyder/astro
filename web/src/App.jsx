@@ -4,7 +4,7 @@ import MarkdownsPanel, { MarkdownEditorView } from './MarkdownsPanel'
 import ArchivePanel from './ArchivePanel'
 import LinksPanel from './LinksPanel'
 import ActionItemsPanel from './ActionItemsPanel'
-import FeedsPanel, { ArtifactTimeline } from './FeedsPanel'
+import FeedsPanel, { PostTimeline } from './FeedsPanel'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import CategoryTree, { CategoryPicker, EmojiPopover } from './CategoryTree'
@@ -67,6 +67,35 @@ function groupIrcMessages(messages) {
   return groups
 }
 
+function replaceGuidsInText(text) {
+  if (!text) return text
+  return text.replace(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi, '`guid:$1`')
+}
+
+const ircMarkdownComponents = {
+  code: ({ children, className, ...props }) => {
+    const raw = String(children).replace(/\n$/, '')
+    const isFencedBlock =
+      (className && String(className).startsWith('language-')) || raw.includes('\n')
+    if (isFencedBlock) return <code className={className} {...props}>{children}</code>
+    if (raw.startsWith('guid:')) {
+      const guid = raw.slice(5)
+      return (
+        <span className="irc-guid-chip" title={guid}>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <circle cx="12" cy="16" r="1" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+          <span className="irc-guid-short">{guid.slice(0, 8)}</span>
+        </span>
+      )
+    }
+    return <code className={className} {...props}>{children}</code>
+  },
+  a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
+}
+
 function IrcMessageGroup({ group }) {
   return (
     <div className={`irc-msg-group ${group.self ? 'irc-self' : ''}`}>
@@ -78,7 +107,9 @@ function IrcMessageGroup({ group }) {
         </div>
         {group.messages.map((msg) => (
           <div key={msg.id} className="irc-text markdown-body">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={ircMarkdownComponents}>
+              {replaceGuidsInText(msg.text)}
+            </ReactMarkdown>
           </div>
         ))}
         {group.messages.length > 1 && group.messages[group.messages.length - 1].timestamp !== group.timestamp && (
@@ -578,23 +609,23 @@ function FeedPostModal({ mode, onInsert, onClose }) {
     const url = `${baseUrl}/${f.id}/ingest`
     let text
     if (isMarkdown) {
-      text = [
+      text = '```\n' + [
         `POST ${url}`,
         `Content-Type: multipart/form-data`,
         `X-Feed-Key: ${f.api_key}`,
         ``,
         `Payload: title=<title>&markdown=<markdown_content>`,
-        `Response: {"ok":true,"artifact_id":<id>,"content_type":"markdown"}`,
-      ].join('\n')
+        `Response: {"ok":true,"post_id":<id>,"content_type":"markdown"}`,
+      ].join('\n') + '\n```'
     } else {
-      text = [
+      text = '```\n' + [
         `POST ${url}`,
         `Content-Type: multipart/form-data`,
         `X-Feed-Key: ${f.api_key}`,
         ``,
         `Payload: title=<title>&file=@<filepath>`,
-        `Response: {"ok":true,"artifact_id":<id>,"content_type":"file"}`,
-      ].join('\n')
+        `Response: {"ok":true,"post_id":<id>,"content_type":"file"}`,
+      ].join('\n') + '\n```'
     }
     onInsert(text)
     setInserted(f.id)
@@ -651,19 +682,19 @@ function MarkdownToolModal({ mode, onInsert, onClose }) {
   const handleSelect = (n) => {
     let text
     if (isRead) {
-      text = [
+      text = '```\n' + [
         `GET ${baseUrl}/${n.id}`,
         ``,
         `Response: {"id":${n.id},"title":"${n.title}","body":"...","category_id":${n.category_id ?? 'null'},"pinned":${n.pinned}}`,
-      ].join('\n')
+      ].join('\n') + '\n```'
     } else {
-      text = [
+      text = '```\n' + [
         `PUT ${baseUrl}/${n.id}`,
         `Content-Type: application/json`,
         ``,
         `Payload: {"title":"${n.title}","body":"<new_body>","category_id":${n.category_id ?? 'null'}}`,
         `Response: {"id":${n.id},"title":"...","body":"...","category_id":${n.category_id ?? 'null'},"pinned":${n.pinned}}`,
-      ].join('\n')
+      ].join('\n') + '\n```'
     }
     onInsert(text)
     setInserted(n.id)
@@ -704,6 +735,339 @@ function MarkdownToolModal({ mode, onInsert, onClose }) {
   )
 }
 
+function ActionItemToolModal({ mode, onInsert, onClose }) {
+  const [items, setItems] = useState([])
+  const [search, setSearch] = useState('')
+  const [inserted, setInserted] = useState(null)
+  const [universes, setUniverses] = useState([])
+  const [selectedUniverse, setSelectedUniverse] = useState('')
+
+  useEffect(() => {
+    if (mode === 'edit') {
+      fetch('/api/action-items?show_completed=true').then(r => r.json()).then(setItems).catch(() => {})
+    }
+    if (mode === 'add') {
+      fetch('/api/universes').then(r => r.json()).then(data => {
+        setUniverses(data)
+        if (data.length > 0) setSelectedUniverse(String(data[0].id))
+      }).catch(() => {})
+    }
+  }, [mode])
+
+  const baseUrl = `${window.location.origin}/api/action-items`
+
+  const handleAddInsert = () => {
+    const uParam = selectedUniverse ? `?universe_id=${selectedUniverse}` : ''
+    const uLabel = universes.find(u => String(u.id) === selectedUniverse)
+    const text = '```\n' + [
+      `POST ${baseUrl}${uParam}`,
+      `Content-Type: application/json`,
+      ``,
+      ...(uLabel ? [`Universe: ${uLabel.name}`] : []),
+      `Payload: {"title":"<title>","hot":false,"due_date":null,"category_id":null}`,
+      `Response: {"id":<id>,"title":"...","hot":false,"completed":false}`,
+    ].join('\n') + '\n```'
+    onInsert(text)
+    onClose()
+  }
+
+  const handleSelect = (item) => {
+    const text = '```\n' + [
+      `PUT ${baseUrl}/${item.id}`,
+      `Content-Type: application/json`,
+      ``,
+      `Payload: {"title":"${item.title}","hot":${item.hot},"completed":${item.completed},"due_date":${item.due_date ? `"${item.due_date}"` : 'null'},"category_id":${item.category_id ?? 'null'}}`,
+      `Response: {"id":${item.id},"title":"...","hot":...,"completed":...}`,
+    ].join('\n') + '\n```'
+    onInsert(text)
+    setInserted(item.id)
+    setTimeout(() => setInserted(null), 1500)
+  }
+
+  const filtered = items.filter(i => !search || i.title?.toLowerCase().includes(search.toLowerCase()))
+
+  if (mode === 'add') {
+    return (
+      <div className="feed-key-modal-overlay">
+        <div className="feed-key-modal">
+          <div className="feed-key-modal-header">
+            <h3>Add Action Item</h3>
+            <button type="button" className="feed-key-modal-close" onClick={onClose}>&times;</button>
+          </div>
+          <p className="feed-post-modal-desc">Insert a POST template to create a new action item.</p>
+          <div style={{ padding: '0 16px' }}>
+            <label style={{ fontSize: '0.82rem', color: '#aaa', marginBottom: 4, display: 'block' }}>Universe</label>
+            <select className="prompt-form-input" value={selectedUniverse} onChange={e => setSelectedUniverse(e.target.value)}>
+              {universes.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+          </div>
+          <div style={{ padding: '12px 16px 16px' }}>
+            <button className="prompt-save-btn" onClick={handleAddInsert}>Insert Template</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="feed-key-modal-overlay">
+      <div className="feed-key-modal">
+        <div className="feed-key-modal-header">
+          <h3>Edit Action Item</h3>
+          <button type="button" className="feed-key-modal-close" onClick={onClose}>&times;</button>
+        </div>
+        <p className="feed-post-modal-desc">Select an action item to insert a PUT update template.</p>
+        <input className="prompt-form-input feed-key-modal-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search action items..." autoFocus />
+        <div className="feed-key-modal-list">
+          {filtered.length === 0 && <div className="feed-key-lookup-empty">No action items found</div>}
+          {filtered.map(i => (
+            <div key={i.id} className="feed-key-lookup-item" onClick={() => handleSelect(i)} style={{ cursor: 'pointer' }}>
+              <span className="feed-key-lookup-title">{i.completed ? '✓ ' : ''}{i.hot ? '🔥 ' : ''}{i.title}</span>
+              <code className="feed-key-lookup-key">#{i.id}</code>
+              {inserted === i.id && <span className="feed-key-inserted">Inserted</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ListActionItemsToolModal({ onInsert, onClose }) {
+  const [universes, setUniverses] = useState([])
+  const [selectedUniverse, setSelectedUniverse] = useState('')
+
+  useEffect(() => {
+    fetch('/api/universes').then(r => r.json()).then(setUniverses).catch(() => {})
+  }, [])
+
+  const baseUrl = `${window.location.origin}/api/action-items`
+
+  const handleInsert = () => {
+    const params = selectedUniverse ? `?universe_id=${selectedUniverse}` : ''
+    const text = '```\n' + [
+      `GET ${baseUrl}${params}`,
+      ``,
+      `Response: [{"id":<id>,"title":"...","hot":false,"completed":false,"due_date":null,"category_id":null}]`,
+    ].join('\n') + '\n```'
+    onInsert(text)
+    onClose()
+  }
+
+  return (
+    <div className="feed-key-modal-overlay">
+      <div className="feed-key-modal">
+        <div className="feed-key-modal-header">
+          <h3>List Action Items</h3>
+          <button type="button" className="feed-key-modal-close" onClick={onClose}>&times;</button>
+        </div>
+        <p className="feed-post-modal-desc">Insert a GET template to list action items. Optionally filter by universe.</p>
+        <div style={{ padding: '0 16px' }}>
+          <label style={{ fontSize: '0.82rem', color: '#aaa', marginBottom: 4, display: 'block' }}>Universe</label>
+          <select className="prompt-form-input" value={selectedUniverse} onChange={e => setSelectedUniverse(e.target.value)}>
+            <option value="">All universes</option>
+            {universes.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
+        </div>
+        <div style={{ padding: '12px 16px 16px' }}>
+          <button className="prompt-save-btn" onClick={handleInsert}>Insert Template</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SearchDocumentsToolModal({ onInsert, onClose }) {
+  const [universes, setUniverses] = useState([])
+  const [selectedUniverse, setSelectedUniverse] = useState('')
+
+  useEffect(() => {
+    fetch('/api/universes').then(r => r.json()).then(setUniverses).catch(() => {})
+  }, [])
+
+  const baseUrl = `${window.location.origin}/api/documents`
+
+  const handleInsert = () => {
+    const params = selectedUniverse ? `?universe_id=${selectedUniverse}&q=<search_term>` : '?q=<search_term>'
+    const text = '```\n' + [
+      `GET ${baseUrl}${params}`,
+      ``,
+      `Response: [{"name":"...","path":"...","extension":"...","size":...}]`,
+    ].join('\n') + '\n```'
+    onInsert(text)
+    onClose()
+  }
+
+  return (
+    <div className="feed-key-modal-overlay">
+      <div className="feed-key-modal">
+        <div className="feed-key-modal-header">
+          <h3>Search Documents</h3>
+          <button type="button" className="feed-key-modal-close" onClick={onClose}>&times;</button>
+        </div>
+        <p className="feed-post-modal-desc">Insert a GET template to search documents. Optionally filter by universe.</p>
+        <div style={{ padding: '0 16px' }}>
+          <label style={{ fontSize: '0.82rem', color: '#aaa', marginBottom: 4, display: 'block' }}>Universe</label>
+          <select className="prompt-form-input" value={selectedUniverse} onChange={e => setSelectedUniverse(e.target.value)}>
+            <option value="">All universes</option>
+            {universes.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
+        </div>
+        <div style={{ padding: '12px 16px 16px' }}>
+          <button className="prompt-save-btn" onClick={handleInsert}>Insert Template</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DownloadDocumentToolModal({ onInsert, onClose }) {
+  const [docs, setDocs] = useState([])
+  const [search, setSearch] = useState('')
+  const [inserted, setInserted] = useState(null)
+
+  useEffect(() => {
+    fetch('/api/documents').then(r => r.json()).then(setDocs).catch(() => {})
+  }, [])
+
+  const baseUrl = `${window.location.origin}/api/documents`
+  const filtered = docs.filter(d => !search || d.name?.toLowerCase().includes(search.toLowerCase()))
+
+  const handleSelect = (doc) => {
+    const text = '```\n' + [
+      `GET ${baseUrl}/download?path=${encodeURIComponent(doc.path)}`,
+      ``,
+      `Downloads: ${doc.name} (${doc.extension})`,
+    ].join('\n') + '\n```'
+    onInsert(text)
+    setInserted(doc.path)
+    setTimeout(() => setInserted(null), 1500)
+  }
+
+  return (
+    <div className="feed-key-modal-overlay">
+      <div className="feed-key-modal">
+        <div className="feed-key-modal-header">
+          <h3>Download Document</h3>
+          <button type="button" className="feed-key-modal-close" onClick={onClose}>&times;</button>
+        </div>
+        <p className="feed-post-modal-desc">Select a document to insert a download template.</p>
+        <input className="prompt-form-input feed-key-modal-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search documents..." autoFocus />
+        <div className="feed-key-modal-list">
+          {filtered.length === 0 && <div className="feed-key-lookup-empty">No documents found</div>}
+          {filtered.map(d => (
+            <div key={d.path} className="feed-key-lookup-item" onClick={() => handleSelect(d)} style={{ cursor: 'pointer' }}>
+              <span className="feed-key-lookup-title">{d.name}</span>
+              <code className="feed-key-lookup-key">{d.extension}</code>
+              {inserted === d.path && <span className="feed-key-inserted">Inserted</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ReadPostsToolModal({ onInsert, onClose }) {
+  const [feeds, setFeeds] = useState([])
+  const [search, setSearch] = useState('')
+  const [inserted, setInserted] = useState(null)
+
+  useEffect(() => {
+    fetch('/api/feeds').then(r => r.json()).then(setFeeds).catch(() => {})
+  }, [])
+
+  const baseUrl = window.location.origin
+  const filtered = feeds.filter(f => !search || f.title?.toLowerCase().includes(search.toLowerCase()))
+
+  const handleSelect = (f) => {
+    const text = '```\n' + [
+      `GET ${baseUrl}/api/feeds/${f.id}/posts`,
+      ``,
+      `Feed: ${f.title} (ID: ${f.id})`,
+      `Response: {"posts":[{"id":<id>,"title":"...","content_type":"markdown","markdown":"...","feed_name":"..."}],"total":<n>}`,
+    ].join('\n') + '\n```'
+    onInsert(text)
+    setInserted(f.id)
+    setTimeout(() => setInserted(null), 1500)
+  }
+
+  return (
+    <div className="feed-key-modal-overlay">
+      <div className="feed-key-modal">
+        <div className="feed-key-modal-header">
+          <h3>Read Feed Posts</h3>
+          <button type="button" className="feed-key-modal-close" onClick={onClose}>&times;</button>
+        </div>
+        <p className="feed-post-modal-desc">Select a feed to insert a GET template for reading its posts.</p>
+        <input className="prompt-form-input feed-key-modal-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search feeds..." autoFocus />
+        <div className="feed-key-modal-list">
+          {filtered.length === 0 && <div className="feed-key-lookup-empty">No feeds found</div>}
+          {filtered.map(f => (
+            <div key={f.id} className="feed-key-lookup-item" onClick={() => handleSelect(f)} style={{ cursor: 'pointer' }}>
+              <span className="feed-key-lookup-title">{f.title || 'Untitled'}</span>
+              <code className="feed-key-lookup-key">#{f.id}</code>
+              {inserted === f.id && <span className="feed-key-inserted">Inserted</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CommentOnPostToolModal({ onInsert, onClose }) {
+  const [feeds, setFeeds] = useState([])
+  const [search, setSearch] = useState('')
+  const [inserted, setInserted] = useState(null)
+
+  useEffect(() => {
+    fetch('/api/feeds').then(r => r.json()).then(setFeeds).catch(() => {})
+  }, [])
+
+  const baseUrl = `${window.location.origin}/api/feed-posts`
+  const filtered = feeds.filter(f => !search || f.title?.toLowerCase().includes(search.toLowerCase()))
+
+  const handleSelect = (f) => {
+    const text = '```\n' + [
+      `POST ${baseUrl}/<post_id>/comments`,
+      `Content-Type: application/json`,
+      ``,
+      `Payload: {"author":"astro","content":"<comment_text>"}`,
+      `Response: {"id":<id>,"post_id":<post_id>,"author":"astro","content":"..."}`,
+      ``,
+      `Feed: ${f.title} (ID: ${f.id})`,
+      `To get post IDs, first list posts for this feed's category.`,
+    ].join('\n') + '\n```'
+    onInsert(text)
+    setInserted(f.id)
+    setTimeout(() => setInserted(null), 1500)
+  }
+
+  return (
+    <div className="feed-key-modal-overlay">
+      <div className="feed-key-modal">
+        <div className="feed-key-modal-header">
+          <h3>Comment on Post</h3>
+          <button type="button" className="feed-key-modal-close" onClick={onClose}>&times;</button>
+        </div>
+        <p className="feed-post-modal-desc">Select a feed to insert a comment template. You'll need to provide the post ID.</p>
+        <input className="prompt-form-input feed-key-modal-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search feeds..." autoFocus />
+        <div className="feed-key-modal-list">
+          {filtered.length === 0 && <div className="feed-key-lookup-empty">No feeds found</div>}
+          {filtered.map(f => (
+            <div key={f.id} className="feed-key-lookup-item" onClick={() => handleSelect(f)} style={{ cursor: 'pointer' }}>
+              <span className="feed-key-lookup-title">{f.title}</span>
+              <code className="feed-key-lookup-key">{f.post_count || 0} posts</code>
+              {inserted === f.id && <span className="feed-key-inserted">Inserted</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function PromptForm({ initial, channels, categories, onSave, onCancel }) {
   const [title, setTitle] = useState(initial.title || '')
   const [channel, setChannel] = useState(initial.channel || '#astro')
@@ -713,6 +1077,14 @@ function PromptForm({ initial, channels, categories, onSave, onCancel }) {
   const [categoryId, setCategoryId] = useState(initial.category_id ?? '')
   const [feedPostMode, setFeedPostMode] = useState(null)
   const [markdownToolMode, setMarkdownToolMode] = useState(null)
+  const [actionItemMode, setActionItemMode] = useState(null)
+  const [showListActionItems, setShowListActionItems] = useState(false)
+  const [showSearchDocs, setShowSearchDocs] = useState(false)
+  const [showDownloadDoc, setShowDownloadDoc] = useState(false)
+  const [showReadPosts, setShowReadPosts] = useState(false)
+  const [showCommentPost, setShowCommentPost] = useState(false)
+  const [showInsertMenu, setShowInsertMenu] = useState(false)
+  const [previewMode, setPreviewMode] = useState(Boolean(initial.id))
   const textareaRef = useRef(null)
 
   const insertText = (text) => {
@@ -724,6 +1096,61 @@ function PromptForm({ initial, channels, categories, onSave, onCancel }) {
       setTimeout(() => { ta.focus(); const pos = start + text.length; ta.setSelectionRange(pos, pos) }, 0)
     } else {
       setMessage(prev => prev + text)
+    }
+  }
+
+  const mdInsert = (before, after = '') => {
+    const ta = textareaRef.current
+    if (!ta) return
+    const start = ta.selectionStart
+    const end = ta.selectionEnd
+    const selected = message.slice(start, end)
+    const replacement = before + (selected || 'text') + after
+    const newVal = message.slice(0, start) + replacement + message.slice(end)
+    setMessage(newVal)
+    setTimeout(() => {
+      ta.focus()
+      const cursorPos = selected ? start + replacement.length : start + before.length
+      ta.setSelectionRange(cursorPos, cursorPos + (selected ? 0 : 4))
+    }, 0)
+  }
+
+  const mdInsertLine = (prefix) => {
+    const ta = textareaRef.current
+    if (!ta) return
+    const start = ta.selectionStart
+    const lineStart = message.lastIndexOf('\n', start - 1) + 1
+    const newVal = message.slice(0, lineStart) + prefix + message.slice(lineStart)
+    setMessage(newVal)
+    setTimeout(() => {
+      ta.focus()
+      ta.setSelectionRange(lineStart + prefix.length, lineStart + prefix.length)
+    }, 0)
+  }
+
+  const mdInsertBlock = (block) => {
+    const ta = textareaRef.current
+    if (!ta) return
+    const start = ta.selectionStart
+    const needsNewline = start > 0 && message[start - 1] !== '\n' ? '\n' : ''
+    const newVal = message.slice(0, start) + needsNewline + block + '\n' + message.slice(start)
+    setMessage(newVal)
+    setTimeout(() => {
+      ta.focus()
+      const pos = start + needsNewline.length + block.length + 1
+      ta.setSelectionRange(pos, pos)
+    }, 0)
+  }
+
+  const handleMdTab = (e) => {
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      const ta = textareaRef.current
+      const start = ta.selectionStart
+      const end = ta.selectionEnd
+      const newVal = message.slice(0, start) + '  ' + message.slice(end)
+      setMessage(newVal)
+      setTimeout(() => { ta.setSelectionRange(start + 2, start + 2) }, 0)
     }
   }
 
@@ -801,34 +1228,115 @@ function PromptForm({ initial, channels, categories, onSave, onCancel }) {
         {!showSchedule && <div className="prompt-ondemand-hint">On-demand only — use Run to execute</div>}
       </div>
       <div className="prompt-form-row prompt-form-row-grow">
-        <label>Message</label>
-        <textarea
-          ref={textareaRef}
-          className="prompt-form-input prompt-form-textarea prompt-form-textarea-full"
-          value={message}
-          onChange={e => setMessage(e.target.value)}
-          placeholder="Write your prompt message..."
-          rows={6}
-        />
-        <div className="prompt-msg-tools">
-          <span className="prompt-msg-tools-label">Insert</span>
-          <button type="button" className="prompt-msg-tool-btn" onClick={() => setFeedPostMode('markdown')}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
-            Post Feed Markdown
-          </button>
-          <button type="button" className="prompt-msg-tool-btn" onClick={() => setFeedPostMode('document')}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            Post Feed Document
-          </button>
-          <button type="button" className="prompt-msg-tool-btn" onClick={() => setMarkdownToolMode('read')}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            Read Markdown
-          </button>
-          <button type="button" className="prompt-msg-tool-btn" onClick={() => setMarkdownToolMode('update')}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            Update Markdown
-          </button>
+        <div className="prompt-msg-label-row">
+          <label>Message</label>
+          <div className="prompt-preview-toggle">
+            <button type="button" className={`prompt-preview-toggle-btn ${previewMode ? 'active' : ''}`} onClick={() => setPreviewMode(true)}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              Preview
+            </button>
+            <button type="button" className={`prompt-preview-toggle-btn ${!previewMode ? 'active' : ''}`} onClick={() => setPreviewMode(false)}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Edit
+            </button>
+          </div>
         </div>
+        {previewMode ? (
+          <div className="markdown-preview markdown-body prompt-preview-body">
+            {message.trim() ? (
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}>{message}</ReactMarkdown>
+            ) : (
+              <span className="prompt-preview-empty">No message content yet.</span>
+            )}
+          </div>
+        ) : (
+          <div className="md-editor-wrapper prompt-editor-wrapper">
+            <div className="md-toolbar">
+              <div className="md-toolbar-group">
+                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsertLine('# ')} title="Heading 1">H1</button>
+                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsertLine('## ')} title="Heading 2">H2</button>
+                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsertLine('### ')} title="Heading 3">H3</button>
+              </div>
+              <div className="md-toolbar-sep" />
+              <div className="md-toolbar-group">
+                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsert('**', '**')} title="Bold"><strong>B</strong></button>
+                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsert('*', '*')} title="Italic"><em>I</em></button>
+                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsert('~~', '~~')} title="Strikethrough"><s>S</s></button>
+              </div>
+              <div className="md-toolbar-sep" />
+              <div className="md-toolbar-group">
+                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsert('`', '`')} title="Inline code">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                </button>
+                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsertBlock('```\n\n```')} title="Code block">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="9 8 5 12 9 16"/><polyline points="15 8 19 12 15 16"/></svg>
+                </button>
+              </div>
+              <div className="md-toolbar-sep" />
+              <div className="md-toolbar-group">
+                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsertLine('- ')} title="Bullet list">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3" cy="6" r="1.5" fill="currentColor"/><circle cx="3" cy="12" r="1.5" fill="currentColor"/><circle cx="3" cy="18" r="1.5" fill="currentColor"/></svg>
+                </button>
+                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsertLine('1. ')} title="Numbered list">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><text x="1" y="8" fontSize="7" fill="currentColor" stroke="none" fontFamily="sans-serif">1</text><text x="1" y="14" fontSize="7" fill="currentColor" stroke="none" fontFamily="sans-serif">2</text><text x="1" y="20" fontSize="7" fill="currentColor" stroke="none" fontFamily="sans-serif">3</text></svg>
+                </button>
+                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsertLine('- [ ] ')} title="Task list">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="6" height="6" rx="1"/><line x1="12" y1="8" x2="21" y2="8"/><rect x="3" y="14" width="6" height="6" rx="1"/><line x1="12" y1="17" x2="21" y2="17"/></svg>
+                </button>
+              </div>
+              <div className="md-toolbar-sep" />
+              <div className="md-toolbar-group">
+                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsertLine('> ')} title="Blockquote">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="3" y1="4" x2="3" y2="20"/><line x1="8" y1="8" x2="21" y2="8"/><line x1="8" y1="16" x2="21" y2="16"/></svg>
+                </button>
+                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsert('[', '](url)')} title="Link">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                </button>
+                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsertBlock('---')} title="Horizontal rule">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="2" y1="12" x2="22" y2="12"/></svg>
+                </button>
+                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsertBlock('| Header | Header |\n| ------ | ------ |\n| Cell   | Cell   |')} title="Table">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+                </button>
+              </div>
+              <div className="md-toolbar-sep" />
+              <div className="md-toolbar-group" style={{ position: 'relative' }}>
+                <button type="button" className="md-toolbar-btn md-insert-btn" onMouseDown={e => e.preventDefault()} onClick={() => setShowInsertMenu(!showInsertMenu)} title="Insert tool snippet">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                  <span style={{ marginLeft: 2, fontSize: '11px' }}>Tools</span>
+                </button>
+                {showInsertMenu && (
+                  <div className="md-insert-menu">
+                    <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setFeedPostMode('markdown') }}>Post Feed Markdown</div>
+                    <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setFeedPostMode('document') }}>Post Feed Document</div>
+                    <div className="md-insert-menu-sep" />
+                    <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setMarkdownToolMode('read') }}>Read Markdown</div>
+                    <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setMarkdownToolMode('update') }}>Update Markdown</div>
+                    <div className="md-insert-menu-sep" />
+                    <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActionItemMode('add') }}>Add Action Item</div>
+                    <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActionItemMode('edit') }}>Edit Action Item</div>
+                    <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setShowListActionItems(true) }}>List Action Items</div>
+                    <div className="md-insert-menu-sep" />
+                    <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setShowSearchDocs(true) }}>Search Documents</div>
+                    <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setShowDownloadDoc(true) }}>Download Document</div>
+                    <div className="md-insert-menu-sep" />
+                    <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setShowReadPosts(true) }}>Read Posts</div>
+                    <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setShowCommentPost(true) }}>Comment on Post</div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <textarea
+              ref={textareaRef}
+              className="md-textarea"
+              value={message}
+              onChange={e => setMessage(e.target.value)}
+              onKeyDown={handleMdTab}
+              placeholder="Write your prompt message..."
+              spellCheck
+            />
+          </div>
+        )}
         {hasContent && (
           <div className="prompt-chunk-info">
             Will be sent as {chunks.length} message{chunks.length !== 1 ? 's' : ''} ({message.trim().length} chars, {MSG_CHUNK_LIMIT}/msg limit)
@@ -836,6 +1344,12 @@ function PromptForm({ initial, channels, categories, onSave, onCancel }) {
         )}
         {feedPostMode && <FeedPostModal mode={feedPostMode} onInsert={insertText} onClose={() => setFeedPostMode(null)} />}
         {markdownToolMode && <MarkdownToolModal mode={markdownToolMode} onInsert={insertText} onClose={() => setMarkdownToolMode(null)} />}
+        {actionItemMode && <ActionItemToolModal mode={actionItemMode} onInsert={insertText} onClose={() => setActionItemMode(null)} />}
+        {showListActionItems && <ListActionItemsToolModal onInsert={insertText} onClose={() => setShowListActionItems(false)} />}
+        {showSearchDocs && <SearchDocumentsToolModal onInsert={insertText} onClose={() => setShowSearchDocs(false)} />}
+        {showDownloadDoc && <DownloadDocumentToolModal onInsert={insertText} onClose={() => setShowDownloadDoc(false)} />}
+        {showReadPosts && <ReadPostsToolModal onInsert={insertText} onClose={() => setShowReadPosts(false)} />}
+        {showCommentPost && <CommentOnPostToolModal onInsert={insertText} onClose={() => setShowCommentPost(false)} />}
       </div>
       <div className="prompt-form-actions">
         <button type="submit" className="prompt-save-btn" disabled={!hasContent || !title.trim()}>
@@ -1107,6 +1621,8 @@ function App() {
   const [showHiddenChannels, setShowHiddenChannels] = useState(false)
   const [unreadCounts, setUnreadCounts] = useState({})
   const lastSeenTsRef = useRef({})
+  const ircNickRef = useRef(ircNick)
+  useEffect(() => { ircNickRef.current = ircNick }, [ircNick])
   const [showPromptPanel, setShowPromptPanel] = useState(false)
   const [prompts, setPrompts] = useState([])
   const [promptEditing, setPromptEditing] = useState(null)
@@ -1480,6 +1996,11 @@ function App() {
           if (data.type === 'msg') {
             if (data.timestamp && data.timestamp <= ircHistoryTsRef.current) return
             setIrcMessages(prev => [...prev, data])
+            if (data.timestamp) {
+              ircHistoryTsRef.current = Math.max(ircHistoryTsRef.current, data.timestamp)
+              const ch = ircNickRef.current || '#astro'
+              lastSeenTsRef.current[ch] = Math.max(lastSeenTsRef.current[ch] || 0, data.timestamp)
+            }
           } else if (data.type === 'status') {
             setIrcStatus({ connected: data.connected, nick: data.nick, channel: data.channel, host: data.host || '', port: data.port || 0 })
           }
@@ -1554,7 +2075,7 @@ function App() {
 
   const fetchUnreadCounts = useCallback(() => {
     const params = currentUniverseId ? `?universe_id=${currentUniverseId}` : ''
-    fetch(`/api/feed-artifacts/unread-counts${params}`)
+    fetch(`/api/feed-posts/unread-counts${params}`)
       .then(r => r.json())
       .then(data => {
         const parse = (obj) => { const m = {}; for (const [k, v] of Object.entries(obj || {})) { m[k === 'null' ? null : Number(k)] = v } return m }
@@ -1888,7 +2409,7 @@ function App() {
               </button>
             ))}
             {(pinnedItems.feed_categories || []).map((c) => (
-              <button key={`fc-${c.id}`} className="pinned-chip pinned-feed" onClick={() => openFeedTab({ id: c.id, name: c.name })} title={`Artifacts for ${c.name}`}>
+              <button key={`fc-${c.id}`} className="pinned-chip pinned-feed" onClick={() => openFeedTab({ id: c.id, name: c.name })} title={`Posts for ${c.name}`}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4 11a9 9 0 0 1 9 9" />
                   <path d="M4 4a16 16 0 0 1 16 16" />
@@ -2065,7 +2586,7 @@ function App() {
               onPinChange={fetchPinned}
               openFeedRequest={openFeedRequest}
               onOpenFeedRequestHandled={() => setOpenFeedRequest(null)}
-              onViewArtifacts={(cat) => openFeedTab(cat)}
+              onViewPosts={(cat) => openFeedTab(cat)}
               unreadCounts={feedUnreadCounts}
               recent7dCounts={feedRecent7d}
             />
@@ -2158,7 +2679,7 @@ function App() {
               }}
             />
           ) : activeTab.type === 'feed' && activeTab.data ? (
-            <ArtifactTimeline
+            <PostTimeline
               key={activeTab.id}
               category={activeTab.data}
               onClose={() => { closeTab(activeTab.id); fetchUnreadCounts() }}

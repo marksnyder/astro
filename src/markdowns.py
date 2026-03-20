@@ -99,7 +99,7 @@ class Feed:
 
 
 @dataclass
-class FeedArtifact:
+class FeedPost:
     id: int | None
     feed_id: int
     title: str
@@ -1018,7 +1018,7 @@ def update_feed(feed_id: int, title: str, category_id: int | None = None) -> Fee
 
 def delete_feed(feed_id: int) -> bool:
     conn = _get_conn()
-    # Get file artifacts to clean up
+    # Get file-backed posts to remove from disk
     rows = conn.execute(
         "SELECT file_path FROM feed_artifacts WHERE feed_id = ? AND content_type = 'file' AND file_path IS NOT NULL",
         (feed_id,),
@@ -1034,15 +1034,15 @@ def delete_feed(feed_id: int) -> bool:
     return cur.rowcount > 0
 
 
-def get_feed_artifact_count(feed_id: int) -> int:
+def get_feed_post_count(feed_id: int) -> int:
     conn = _get_conn()
     row = conn.execute("SELECT COUNT(*) AS cnt FROM feed_artifacts WHERE feed_id = ?", (feed_id,)).fetchone()
     conn.close()
     return row["cnt"]
 
 
-def get_feed_artifact_trend(feed_id: int, days: int = 14) -> list[int]:
-    """Return daily artifact counts for the last N days (oldest first)."""
+def get_feed_post_trend(feed_id: int, days: int = 14) -> list[int]:
+    """Return daily post counts for the last N days (oldest first)."""
     conn = _get_conn()
     rows = conn.execute(
         """
@@ -1076,8 +1076,8 @@ def get_feed_days_since_last(feed_id: int) -> int | None:
 
 def feed_to_dict(feed: Feed) -> dict:
     d = asdict(feed)
-    d["artifact_count"] = get_feed_artifact_count(feed.id)
-    trend = get_feed_artifact_trend(feed.id)
+    d["post_count"] = get_feed_post_count(feed.id)
+    trend = get_feed_post_trend(feed.id)
     d["trend_14d"] = trend
     d["avg_14d"] = round(sum(trend) / len(trend), 1) if trend else 0
     d["days_since_last"] = get_feed_days_since_last(feed.id)
@@ -1102,11 +1102,11 @@ def list_pinned_feeds(universe_id: int | None = None) -> list[Feed]:
     return [_row_to_feed(r) for r in rows]
 
 
-# ── Feed artifacts CRUD ──────────────────────────────────────────────────
+# ── Feed posts CRUD ──────────────────────────────────────────────────
 
 
-def _row_to_artifact(row: sqlite3.Row) -> FeedArtifact:
-    return FeedArtifact(
+def _row_to_post(row: sqlite3.Row) -> FeedPost:
+    return FeedPost(
         id=row["id"],
         feed_id=row["feed_id"],
         title=row["title"],
@@ -1119,13 +1119,13 @@ def _row_to_artifact(row: sqlite3.Row) -> FeedArtifact:
     )
 
 
-def list_feed_artifacts(
+def list_feed_posts(
     feed_id: int,
     query: str = "",
     page: int = 1,
     page_size: int = 100,
-) -> tuple[list[FeedArtifact], int]:
-    """Return (artifacts, total_count) for a feed, paginated."""
+) -> tuple[list[FeedPost], int]:
+    """Return (posts, total_count) for a feed, paginated."""
     conn = _get_conn()
     conditions = ["feed_id = ?"]
     params: list = [feed_id]
@@ -1140,16 +1140,16 @@ def list_feed_artifacts(
         params + [page_size, offset],
     ).fetchall()
     conn.close()
-    return [_row_to_artifact(r) for r in rows], total
+    return [_row_to_post(r) for r in rows], total
 
 
-def list_feed_artifacts_by_category(
+def list_feed_posts_by_category(
     category_id: int | None,
     query: str = "",
     page: int = 1,
     page_size: int = 100,
 ) -> tuple[list[dict], int]:
-    """Return (artifacts_with_feed_name, total_count) for all feeds in a category, paginated."""
+    """Return (posts_with_feed_name, total_count) for all feeds in a category, paginated."""
     conn = _get_conn()
     if category_id is not None:
         feed_cond = "a.feed_id IN (SELECT id FROM feeds WHERE category_id = ?)"
@@ -1177,22 +1177,22 @@ def list_feed_artifacts_by_category(
     for r in rows:
         d = dict(r)
         feed_name = d.pop("feed_name", None)
-        art = _row_to_artifact(r)
-        art_dict = asdict(art)
-        art_dict["feed_name"] = feed_name or "Unknown"
-        results.append(art_dict)
+        post = _row_to_post(r)
+        post_dict = asdict(post)
+        post_dict["feed_name"] = feed_name or "Unknown"
+        results.append(post_dict)
     return results, total
 
 
-def mark_feed_artifacts_read(artifact_ids: list[int]) -> int:
-    """Mark a batch of feed artifacts as read. Returns the number of rows updated."""
-    if not artifact_ids:
+def mark_feed_posts_read(post_ids: list[int]) -> int:
+    """Mark a batch of feed posts as read. Returns the number of rows updated."""
+    if not post_ids:
         return 0
     conn = _get_conn()
-    placeholders = ",".join("?" for _ in artifact_ids)
+    placeholders = ",".join("?" for _ in post_ids)
     cur = conn.execute(
         f"UPDATE feed_artifacts SET read = 1 WHERE id IN ({placeholders}) AND read = 0",
-        artifact_ids,
+        post_ids,
     )
     conn.commit()
     count = cur.rowcount
@@ -1201,7 +1201,7 @@ def mark_feed_artifacts_read(artifact_ids: list[int]) -> int:
 
 
 def get_unread_counts_by_category(universe_id: int | None = None) -> dict[int | None, int]:
-    """Return {category_id: unread_count} for all feed categories with unread artifacts.
+    """Return {category_id: unread_count} for all feed categories with unread posts.
     category_id=None represents uncategorized feeds."""
     conn = _get_conn()
     if universe_id is not None:
@@ -1224,7 +1224,7 @@ def get_unread_counts_by_category(universe_id: int | None = None) -> dict[int | 
 
 
 def get_recent_counts_by_category(universe_id: int | None = None, days: int = 7) -> dict[int | None, int]:
-    """Return {category_id: count} of artifacts created in the last N days."""
+    """Return {category_id: count} of posts created in the last N days."""
     conn = _get_conn()
     if universe_id is not None:
         rows = conn.execute(
@@ -1246,14 +1246,14 @@ def get_recent_counts_by_category(universe_id: int | None = None, days: int = 7)
     return {r["category_id"]: r["cnt"] for r in rows}
 
 
-def get_feed_artifact(artifact_id: int) -> FeedArtifact | None:
+def get_feed_post(post_id: int) -> FeedPost | None:
     conn = _get_conn()
-    row = conn.execute("SELECT * FROM feed_artifacts WHERE id = ?", (artifact_id,)).fetchone()
+    row = conn.execute("SELECT * FROM feed_artifacts WHERE id = ?", (post_id,)).fetchone()
     conn.close()
-    return _row_to_artifact(row) if row else None
+    return _row_to_post(row) if row else None
 
 
-def create_feed_artifact_markdown(feed_id: int, title: str, markdown: str) -> FeedArtifact:
+def create_feed_post_markdown(feed_id: int, title: str, markdown: str) -> FeedPost:
     now = _now()
     conn = _get_conn()
     cur = conn.execute(
@@ -1263,10 +1263,10 @@ def create_feed_artifact_markdown(feed_id: int, title: str, markdown: str) -> Fe
     conn.commit()
     aid = cur.lastrowid
     conn.close()
-    return get_feed_artifact(aid)  # type: ignore[return-value]
+    return get_feed_post(aid)  # type: ignore[return-value]
 
 
-def create_feed_artifact_file(feed_id: int, title: str, original_filename: str, data: bytes) -> FeedArtifact:
+def create_feed_post_file(feed_id: int, title: str, original_filename: str, data: bytes) -> FeedPost:
     FEED_FILES_DIR.mkdir(parents=True, exist_ok=True)
     ext = Path(original_filename).suffix.lower()
     stored = f"{uuid.uuid4().hex}{ext}"
@@ -1280,12 +1280,12 @@ def create_feed_artifact_file(feed_id: int, title: str, original_filename: str, 
     conn.commit()
     aid = cur.lastrowid
     conn.close()
-    return get_feed_artifact(aid)  # type: ignore[return-value]
+    return get_feed_post(aid)  # type: ignore[return-value]
 
 
-def delete_feed_artifact(artifact_id: int) -> bool:
+def delete_feed_post(post_id: int) -> bool:
     conn = _get_conn()
-    row = conn.execute("SELECT content_type, file_path FROM feed_artifacts WHERE id = ?", (artifact_id,)).fetchone()
+    row = conn.execute("SELECT content_type, file_path FROM feed_artifacts WHERE id = ?", (post_id,)).fetchone()
     if not row:
         conn.close()
         return False
@@ -1293,14 +1293,89 @@ def delete_feed_artifact(artifact_id: int) -> bool:
         fp = FEED_FILES_DIR / row["file_path"]
         if fp.is_file():
             fp.unlink()
-    conn.execute("DELETE FROM feed_artifacts WHERE id = ?", (artifact_id,))
+    conn.execute("DELETE FROM feed_artifacts WHERE id = ?", (post_id,))
     conn.commit()
     conn.close()
     return True
 
 
-def feed_artifact_to_dict(art: FeedArtifact) -> dict:
-    return asdict(art)
+def feed_post_to_dict(post: FeedPost) -> dict:
+    return asdict(post)
+
+
+# ── Post comments CRUD ───────────────────────────────────────────────────
+
+
+@dataclass
+class PostComment:
+    id: int | None
+    post_id: int
+    author: str
+    content: str
+    created_at: str
+    updated_at: str
+
+
+def _row_to_post_comment(row: sqlite3.Row) -> PostComment:
+    return PostComment(
+        id=row["id"],
+        post_id=row["post_id"],
+        author=row["author"],
+        content=row["content"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )
+
+
+def list_post_comments(post_id: int) -> list[PostComment]:
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT * FROM post_comments WHERE post_id = ? ORDER BY created_at ASC",
+        (post_id,),
+    ).fetchall()
+    conn.close()
+    return [_row_to_post_comment(r) for r in rows]
+
+
+def create_post_comment(post_id: int, author: str, content: str) -> PostComment:
+    now = _now()
+    conn = _get_conn()
+    cur = conn.execute(
+        "INSERT INTO post_comments (post_id, author, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+        (post_id, author, content, now, now),
+    )
+    conn.commit()
+    cid = cur.lastrowid
+    conn.close()
+    return PostComment(id=cid, post_id=post_id, author=author, content=content, created_at=now, updated_at=now)
+
+
+def update_post_comment(comment_id: int, content: str) -> PostComment | None:
+    now = _now()
+    conn = _get_conn()
+    cur = conn.execute(
+        "UPDATE post_comments SET content = ?, updated_at = ? WHERE id = ?",
+        (content, now, comment_id),
+    )
+    conn.commit()
+    if cur.rowcount == 0:
+        conn.close()
+        return None
+    row = conn.execute("SELECT * FROM post_comments WHERE id = ?", (comment_id,)).fetchone()
+    conn.close()
+    return _row_to_post_comment(row)
+
+
+def delete_post_comment(comment_id: int) -> bool:
+    conn = _get_conn()
+    cur = conn.execute("DELETE FROM post_comments WHERE id = ?", (comment_id,))
+    conn.commit()
+    conn.close()
+    return cur.rowcount > 0
+
+
+def post_comment_to_dict(c: PostComment) -> dict:
+    return asdict(c)
 
 
 # ── Prompts CRUD ──────────────────────────────────────────────────────────

@@ -1,19 +1,21 @@
 ---
 layout: page
 title: Features
-subtitle: Everything Astro brings to your workflow
+subtitle: What your AI operating system includes
 ---
+
+These capabilities work together so you can manage information, agents, prompts, tasks, and feeds in one place. The sections below walk through each area in detail.
 
 ## AI Chat with Retrieval (RAG)
 
-Astro includes a conversational AI interface powered by OpenAI (with additional providers planned).
+Astro includes a conversational AI interface powered by OpenAI (with additional providers planned). The same retrieval pipeline also feeds your agents: grounded context from your Universe becomes shared memory for chat and automation alike.
 
 - Chat-based interaction
 - Toggle Retrieval on/off per message
 - Answers grounded in your markdowns, documents, and action items
 - Persistent knowledgebase that grows with use
 
-When Retrieval is enabled, Astro pulls relevant context from your stored knowledge before generating a response — making conversations contextual and meaningful.
+When Retrieval is enabled, Astro pulls relevant context from your stored knowledge before generating a response — making conversations contextual and meaningful, and keeping agent-facing knowledge consistent with what you see in the UI.
 
 ---
 
@@ -138,7 +140,7 @@ Astro includes a mobile-friendly version at `/mobile`, built for access on the g
 
 ## AI Agent Network
 
-Astro includes a built-in IRC server, enabling communication with AI agents across platforms.
+Agent Network is a core part of Astro’s AI operating system: a built-in IRC server that lets you orchestrate agents across platforms from one place.
 
 Use Astro as a central hub to:
 
@@ -146,13 +148,13 @@ Use Astro as a central hub to:
 - Communicate across systems
 - Integrate with external AI platforms
 
-Astro becomes a shared control center between you and your agents.
+Astro becomes the shared control plane between you and your agents — routing messages, handoffs, and status without scattering tools across services.
 
 ---
 
 ## Prompts
 
-Define reusable message templates that send to Agent Network channels, organized in a visual board.
+Prompts are how you orchestrate and schedule agent workflows: reusable message templates that send to Agent Network channels, organized in a visual board.
 
 - **Prompt categories** — create custom categories with emoji labels to group related prompts
 - **3-column board layout** — organize category containers across three columns with drag-and-drop
@@ -162,13 +164,13 @@ Define reusable message templates that send to Agent Network channels, organized
 - **Cron scheduling** — set a cron expression for recurring, automatic delivery
 - **On-demand execution** — run any prompt instantly from the desktop or mobile UI
 
-Prompts turn Astro into an orchestration layer: schedule status checks, kick off agent workflows, or broadcast instructions to your network on a timer — all organized in a visual board you can customize.
+Together with cron and on-demand runs, prompts are your scheduling and orchestration surface: status checks, recurring agent runs, or one-shot instructions — all organized in a visual board you can customize.
 
 ---
 
 ## Feeds
 
-Ingest data from external services into Astro through authenticated API endpoints.
+Agents and services push data into Astro through authenticated API endpoints — ingesting artifacts into your Universe so automated output lands alongside everything else you manage.
 
 ### How it works
 
@@ -187,4 +189,4 @@ Ingest data from external services into Astro through authenticated API endpoint
 - **Category organization** — feeds are organized alongside other content types
 - **Unread counts** — see new artifacts at a glance
 
-Use feeds to pipe CI reports, monitoring alerts, automated summaries, agent output, or any external content into your workspace.
+Use feeds to pipe CI reports, monitoring alerts, automated summaries, agent output, or any external content into the system; agents and pipelines can publish without a separate inbox or datastore.
