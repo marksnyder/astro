@@ -4,17 +4,15 @@ import shutil
 from pathlib import Path
 
 from langchain_chroma import Chroma
+from langchain_community.embeddings import FastEmbedEmbeddings
 from langchain_core.documents import Document
-from langchain_openai import OpenAIEmbeddings
-
-from src.markdowns import get_openai_api_key
 
 PERSIST_DIR = Path(__file__).resolve().parent.parent / "data" / "chroma"
 COLLECTION = "astro"
 
 
-def _embeddings() -> OpenAIEmbeddings:
-    return OpenAIEmbeddings(model="text-embedding-3-small", api_key=get_openai_api_key())
+def _embeddings() -> FastEmbedEmbeddings:
+    return FastEmbedEmbeddings(model_name="BAAI/bge-small-en-v1.5")
 
 
 def get_vectorstore() -> Chroma:

@@ -16,6 +16,27 @@ function AstroLogo({ className }) {
   return <img src={LOGO_URL} alt="Astro" className={`astro-logo ${className || ''}`} />
 }
 
+function UnsavedChangesModal({ onSave, onDiscard, onCancel }) {
+  return (
+    <div className="feed-key-modal-overlay" style={{ zIndex: 10000 }}>
+      <div className="feed-key-modal" style={{ maxWidth: 420 }}>
+        <div className="feed-key-modal-header">
+          <h3>Unsaved Changes</h3>
+          <button type="button" className="feed-key-modal-close" onClick={onCancel}>&times;</button>
+        </div>
+        <p style={{ padding: '8px 16px 16px', color: '#bbb', fontSize: '0.9rem', margin: 0 }}>
+          You have unsaved changes. Would you like to save them before leaving?
+        </p>
+        <div style={{ display: 'flex', gap: 8, padding: '0 16px 16px', justifyContent: 'flex-end' }}>
+          <button className="markdown-save-continue-btn" onClick={onDiscard} style={{ opacity: 0.8 }}>Don&apos;t Save</button>
+          <button className="markdown-save-continue-btn" onClick={onCancel}>Cancel</button>
+          <button className="markdown-save-btn" onClick={onSave}>Save</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ChatMessage({ role, content, model }) {
   return (
     <div className={`message ${role}`}>
@@ -120,19 +141,21 @@ function IrcMessageGroup({ group }) {
   )
 }
 
-const MODELS = [
-  { id: 'gpt-5.2', label: 'GPT-5.2' },
-  { id: 'gpt-5.1', label: 'GPT-5.1' },
-  { id: 'gpt-5', label: 'GPT-5' },
-  { id: 'gpt-5-mini', label: 'GPT-5 Mini' },
-  { id: 'gpt-5-nano', label: 'GPT-5 Nano' },
-  { id: 'o4-mini', label: 'o4 Mini' },
-  { id: 'o3', label: 'o3' },
-  { id: 'gpt-4.1', label: 'GPT-4.1' },
-  { id: 'gpt-4.1-mini', label: 'GPT-4.1 Mini' },
-  { id: 'gpt-4o', label: 'GPT-4o' },
-  { id: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-]
+const FALLBACK_PROVIDERS = {
+  anthropic: { name: 'Anthropic', models: [{ id: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' }], default_model: 'claude-sonnet-4-20250514' },
+}
+
+const PROVIDER_KEY_SETTINGS = {
+  anthropic: 'anthropic_api_key',
+  openai: 'openai_api_key',
+  google: 'google_api_key',
+}
+
+const PROVIDER_KEY_PLACEHOLDERS = {
+  anthropic: 'sk-ant-...',
+  openai: 'sk-...',
+  google: 'AI...',
+}
 
 function QuickView({ item, onClose }) {
   if (!item) return null
@@ -351,36 +374,43 @@ function UniverseManager({ universes, currentId, onSwitch, onClose, onRefresh })
 }
 
 function SettingsDialog({ onClose, onRestored }) {
-  const [status, setStatus] = useState(null) // { type: 'success'|'error'|'info', text: string }
+  const [status, setStatus] = useState(null)
   const [busy, setBusy] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
   const [reindexing, setReindexing] = useState(false)
-  const [apiKey, setApiKey] = useState('')
-  const [apiKeyLoaded, setApiKeyLoaded] = useState(false)
-  const [apiKeySaving, setApiKeySaving] = useState(false)
-  const [apiKeyStatus, setApiKeyStatus] = useState(null)
+  const [apiKeys, setApiKeys] = useState({})
+  const [apiKeysLoaded, setApiKeysLoaded] = useState(false)
+  const [savingKey, setSavingKey] = useState(null)
+  const [keyStatuses, setKeyStatuses] = useState({})
+
   useEffect(() => {
-    fetch('/api/settings/openai_api_key')
-      .then(r => r.json())
-      .then(d => { setApiKey(d.value || ''); setApiKeyLoaded(true) })
-      .catch(() => setApiKeyLoaded(true))
+    Promise.all(
+      Object.entries(PROVIDER_KEY_SETTINGS).map(([prov, setting]) =>
+        fetch(`/api/settings/${setting}`).then(r => r.json()).then(d => [prov, d.value || '']).catch(() => [prov, ''])
+      )
+    ).then(entries => {
+      setApiKeys(Object.fromEntries(entries))
+      setApiKeysLoaded(true)
+    })
   }, [])
 
-  const handleSaveApiKey = async () => {
-    setApiKeySaving(true)
-    setApiKeyStatus(null)
+  const handleSaveApiKey = async (provider) => {
+    const setting = PROVIDER_KEY_SETTINGS[provider]
+    if (!setting) return
+    setSavingKey(provider)
+    setKeyStatuses(prev => ({ ...prev, [provider]: null }))
     try {
-      const res = await fetch('/api/settings/openai_api_key', {
+      const res = await fetch(`/api/settings/${setting}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: apiKey.trim() }),
+        body: JSON.stringify({ value: (apiKeys[provider] || '').trim() }),
       })
       if (!res.ok) throw new Error('Failed to save')
-      setApiKeyStatus({ type: 'success', text: 'API key saved.' })
+      setKeyStatuses(prev => ({ ...prev, [provider]: { type: 'success', text: 'API key saved.' } }))
     } catch (e) {
-      setApiKeyStatus({ type: 'error', text: `Failed to save: ${e.message}` })
+      setKeyStatuses(prev => ({ ...prev, [provider]: { type: 'error', text: `Failed to save: ${e.message}` } }))
     } finally {
-      setApiKeySaving(false)
+      setSavingKey(null)
     }
   }
 
@@ -460,23 +490,28 @@ function SettingsDialog({ onClose, onRestored }) {
         <h2>Settings</h2>
 
         <div className="br-section">
-          <h3>OpenAI API Key</h3>
-          <p>Required for chat and embeddings. Stored in the database.</p>
-          <div className="br-restore-row">
-            <input
-              type="password"
-              className="br-api-key-input"
-              placeholder={apiKeyLoaded ? 'sk-...' : 'Loading...'}
-              value={apiKey}
-              onChange={e => setApiKey(e.target.value)}
-              disabled={!apiKeyLoaded || apiKeySaving}
-              autoComplete="off"
-            />
-            <button className="br-action-btn" onClick={handleSaveApiKey} disabled={!apiKeyLoaded || apiKeySaving}>
-              {apiKeySaving ? 'Saving...' : 'Save'}
-            </button>
-          </div>
-          {apiKeyStatus && <div className={`br-status ${apiKeyStatus.type}`}>{apiKeyStatus.text}</div>}
+          <h3>LLM Provider API Keys</h3>
+          <p>Configure API keys for each provider you want to use.</p>
+          {Object.entries(PROVIDER_KEY_SETTINGS).map(([prov, setting]) => (
+            <div key={prov} style={{ marginBottom: 12 }}>
+              <div style={{ fontWeight: 600, marginBottom: 4, textTransform: 'capitalize' }}>{prov}</div>
+              <div className="br-restore-row">
+                <input
+                  type="password"
+                  className="br-api-key-input"
+                  placeholder={apiKeysLoaded ? (PROVIDER_KEY_PLACEHOLDERS[prov] || 'API key...') : 'Loading...'}
+                  value={apiKeys[prov] || ''}
+                  onChange={e => setApiKeys(prev => ({ ...prev, [prov]: e.target.value }))}
+                  disabled={!apiKeysLoaded || savingKey === prov}
+                  autoComplete="off"
+                />
+                <button className="br-action-btn" onClick={() => handleSaveApiKey(prov)} disabled={!apiKeysLoaded || savingKey === prov}>
+                  {savingKey === prov ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+              {keyStatuses[prov] && <div className={`br-status ${keyStatuses[prov].type}`}>{keyStatuses[prov].text}</div>}
+            </div>
+          ))}
         </div>
 
         <div className="br-divider" />
@@ -1601,7 +1636,9 @@ function App() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState(null)
-  const [model, setModel] = useState('gpt-5-mini')
+  const [providers, setProviders] = useState(FALLBACK_PROVIDERS)
+  const [provider, setProvider] = useState('anthropic')
+  const [model, setModel] = useState('claude-sonnet-4-20250514')
   const [useContext, setUseContext] = useState(true)
   const [chatMode, setChatMode] = useState('llm') // 'llm' or 'irc'
   const [feedUnreadCounts, setFeedUnreadCounts] = useState({})
@@ -1650,6 +1687,11 @@ function App() {
     { id: 'irc', type: 'irc', title: 'Agent Network', closable: false },
   ])
   const [activeTabId, setActiveTabId] = useState('llm')
+  const activeTabIdRef = useRef('llm')
+  activeTabIdRef.current = activeTabId
+  const tabDirtyRef = useRef({})
+  const markdownSaveRef = useRef(null)
+  const [unsavedDialog, setUnsavedDialog] = useState(null)
   const [markdownPreviewMode, setMarkdownPreviewMode] = useState(false)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -1696,6 +1738,24 @@ function App() {
   }, [])
 
   useEffect(() => {
+    fetch('/api/providers').then(r => r.json()).then(data => {
+      setProviders(data)
+      fetch('/api/settings/llm_provider').then(r => r.json()).then(d => {
+        if (d.value && data[d.value]) {
+          setProvider(d.value)
+          fetch('/api/settings/selected_model').then(r => r.json()).then(md => {
+            if (md.value && data[d.value].models.some(m => m.id === md.value)) setModel(md.value)
+            else setModel(data[d.value].default_model)
+          }).catch(() => setModel(data[d.value].default_model))
+        } else {
+          fetch('/api/settings/selected_model').then(r => r.json()).then(md => {
+            if (md.value) setModel(md.value)
+          }).catch(() => {})
+        }
+      }).catch(() => {
+        fetch('/api/settings/selected_model').then(r => r.json()).then(md => { if (md.value) setModel(md.value) }).catch(() => {})
+      })
+    }).catch(() => {})
     fetch('/api/settings/selected_model')
       .then(r => r.json())
       .then(d => { if (d.value) setModel(d.value) })
@@ -2087,7 +2147,7 @@ function App() {
 
   const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0]
 
-  const switchToTab = useCallback((tabId) => {
+  const doSwitchToTab = useCallback((tabId) => {
     setActiveTabId(tabId)
     if (tabId === 'irc') {
       setChatMode('irc')
@@ -2097,6 +2157,61 @@ function App() {
       setChatMode('llm')
       fetch('/api/settings/chat_mode', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: 'llm' }) }).catch(() => {})
     }
+  }, [])
+
+  const doCloseTab = useCallback((tabId) => {
+    delete tabDirtyRef.current[tabId]
+    setTabs(prev => prev.filter(t => t.id !== tabId))
+    setActiveTabId(prev => prev === tabId ? 'llm' : prev)
+  }, [])
+
+  const switchToTab = useCallback((tabId) => {
+    const currentId = activeTabIdRef.current
+    if (tabId === currentId) return
+    if (tabDirtyRef.current[currentId]) {
+      setUnsavedDialog({ type: 'switch', targetTabId: tabId })
+      return
+    }
+    doSwitchToTab(tabId)
+  }, [doSwitchToTab])
+
+  const closeTab = useCallback((tabId) => {
+    if (tabDirtyRef.current[tabId]) {
+      setUnsavedDialog({ type: 'close', tabId })
+      return
+    }
+    doCloseTab(tabId)
+  }, [doCloseTab])
+
+  const handleUnsavedSave = useCallback(async () => {
+    const action = unsavedDialog
+    if (!action) return
+    if (markdownSaveRef.current) {
+      await markdownSaveRef.current(false)
+    }
+    setUnsavedDialog(null)
+    if (action.type === 'switch') doSwitchToTab(action.targetTabId)
+    else if (action.type === 'close') doCloseTab(action.tabId)
+  }, [unsavedDialog, doSwitchToTab, doCloseTab])
+
+  const handleUnsavedDiscard = useCallback(() => {
+    const action = unsavedDialog
+    if (!action) return
+    if (action.type === 'switch') {
+      tabDirtyRef.current[activeTabIdRef.current] = false
+      doSwitchToTab(action.targetTabId)
+    } else if (action.type === 'close') {
+      doCloseTab(action.tabId)
+    }
+    setUnsavedDialog(null)
+  }, [unsavedDialog, doSwitchToTab, doCloseTab])
+
+  const handleUnsavedCancel = useCallback(() => {
+    setUnsavedDialog(null)
+  }, [])
+
+  const handleMarkdownDirtyChange = useCallback((dirty) => {
+    tabDirtyRef.current[activeTabIdRef.current] = dirty
   }, [])
 
   const openMarkdownTab = useCallback((markdown) => {
@@ -2109,7 +2224,12 @@ function App() {
       }
       return [...prev, { id: tabId, type: 'markdown', title: markdown.title || 'Untitled', closable: true, data: markdown }]
     })
-    setActiveTabId(tabId)
+    const currentId = activeTabIdRef.current
+    if (tabId !== currentId && tabDirtyRef.current[currentId]) {
+      setUnsavedDialog({ type: 'switch', targetTabId: tabId })
+    } else {
+      setActiveTabId(tabId)
+    }
   }, [])
 
   const openFeedTab = useCallback((category) => {
@@ -2118,12 +2238,12 @@ function App() {
       if (prev.find(t => t.id === tabId)) return prev
       return [...prev, { id: tabId, type: 'feed', title: category.name || 'Feed', closable: true, data: category }]
     })
-    setActiveTabId(tabId)
-  }, [])
-
-  const closeTab = useCallback((tabId) => {
-    setTabs(prev => prev.filter(t => t.id !== tabId))
-    setActiveTabId(prev => prev === tabId ? 'llm' : prev)
+    const currentId = activeTabIdRef.current
+    if (tabId !== currentId && tabDirtyRef.current[currentId]) {
+      setUnsavedDialog({ type: 'switch', targetTabId: tabId })
+    } else {
+      setActiveTabId(tabId)
+    }
   }, [])
 
   const updateTabsOverflow = useCallback(() => {
@@ -2272,6 +2392,7 @@ function App() {
       const payload = {
         question,
         model,
+        provider,
         use_context: useContext,
         history,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -2319,10 +2440,14 @@ function App() {
   const [showUniverseManager, setShowUniverseManager] = useState(false)
 
   useEffect(() => {
-    fetch('/api/settings/openai_api_key')
-      .then(r => r.json())
-      .then(d => { if (!d.value || !d.value.trim()) setShowSettings(true) })
-      .catch(() => setShowSettings(true))
+    fetch('/api/settings/llm_provider').then(r => r.json()).then(ps => {
+      const prov = ps.value || 'anthropic'
+      const keySetting = PROVIDER_KEY_SETTINGS[prov] || PROVIDER_KEY_SETTINGS.anthropic
+      fetch(`/api/settings/${keySetting}`)
+        .then(r => r.json())
+        .then(d => { if (!d.value || !d.value.trim()) setShowSettings(true) })
+        .catch(() => setShowSettings(true))
+    }).catch(() => setShowSettings(true))
   }, [])
 
   const IRC_MSG_LIMIT = 400
@@ -2428,6 +2553,23 @@ function App() {
             <>
               <select
                 className="model-select"
+                value={provider}
+                onChange={(e) => {
+                  const newProv = e.target.value
+                  setProvider(newProv)
+                  const def = providers[newProv]?.default_model || ''
+                  setModel(def)
+                  fetch('/api/settings/llm_provider', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: newProv }) }).catch(() => {})
+                  fetch('/api/settings/selected_model', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: def }) }).catch(() => {})
+                }}
+                disabled={loading}
+              >
+                {Object.entries(providers).map(([id, p]) => (
+                  <option key={id} value={id}>{p.name}</option>
+                ))}
+              </select>
+              <select
+                className="model-select"
                 value={model}
                 onChange={(e) => {
                   setModel(e.target.value)
@@ -2439,7 +2581,7 @@ function App() {
                 }}
                 disabled={loading}
               >
-                {MODELS.map((m) => (
+                {(providers[provider]?.models || []).map((m) => (
                   <option key={m.id} value={m.id}>{m.label}</option>
                 ))}
               </select>
@@ -2665,17 +2807,19 @@ function App() {
               markdown={activeTab.data}
               categories={categories}
               previewMode={markdownPreviewMode}
-              onClose={() => closeTab(activeTab.id)}
-              onSaved={(created, closed) => {
+              saveRef={markdownSaveRef}
+              onDirtyChange={handleMarkdownDirtyChange}
+              onClose={() => doCloseTab(activeTab.id)}
+              onSaved={(saved, closed) => {
                 setMarkdownRefreshKey(k => k + 1)
                 fetchPinned()
-                if (created && !closed) {
+                if (saved && !closed) {
                   setTabs(prev => prev.map(t => t.id === activeTab.id
-                    ? { ...t, data: created, title: created.title || 'Untitled' }
+                    ? { ...t, data: saved, title: saved.title || 'Untitled' }
                     : t
                   ))
                 }
-                if (closed) closeTab(activeTab.id)
+                if (closed) doCloseTab(activeTab.id)
               }}
             />
           ) : activeTab.type === 'feed' && activeTab.data ? (
@@ -3070,6 +3214,13 @@ function App() {
             </div>
           </div>
         </div>
+      )}
+      {unsavedDialog && (
+        <UnsavedChangesModal
+          onSave={handleUnsavedSave}
+          onDiscard={handleUnsavedDiscard}
+          onCancel={handleUnsavedCancel}
+        />
       )}
     </div>
   )

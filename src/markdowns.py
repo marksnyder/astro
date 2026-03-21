@@ -9,15 +9,35 @@ from pathlib import Path
 
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "astro.db"
 
-OPENAI_KEY_SETTING = "openai_api_key"
+PROVIDER_KEY_SETTINGS = {
+    "anthropic": "anthropic_api_key",
+    "openai": "openai_api_key",
+    "google": "google_api_key",
+}
+
+PROVIDER_ENV_VARS = {
+    "anthropic": "ANTHROPIC_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "google": "GOOGLE_API_KEY",
+}
 
 
-def get_openai_api_key() -> str:
-    """Return the OpenAI API key from DB settings, falling back to env var."""
-    key = get_setting(OPENAI_KEY_SETTING)
-    if key.strip():
-        return key.strip()
-    return os.getenv("OPENAI_API_KEY", "")
+def get_provider_api_key(provider: str) -> str:
+    """Return the API key for the given provider, from DB settings or env var."""
+    setting_key = PROVIDER_KEY_SETTINGS.get(provider, "")
+    if setting_key:
+        key = get_setting(setting_key)
+        if key.strip():
+            return key.strip()
+    env_var = PROVIDER_ENV_VARS.get(provider, "")
+    if env_var:
+        return os.getenv(env_var, "")
+    return ""
+
+
+def get_anthropic_api_key() -> str:
+    """Return the Anthropic API key (convenience wrapper)."""
+    return get_provider_api_key("anthropic")
 
 
 # ── Data classes ──────────────────────────────────────────────────────────

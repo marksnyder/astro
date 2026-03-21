@@ -720,12 +720,13 @@ function MarkdownActionItems({ markdownId, categories }) {
 
 // ── Markdowns panel ───────────────────────────────────────
 
-export function MarkdownEditorView({ markdown, categories, onClose, onSaved, previewMode }) {
+export function MarkdownEditorView({ markdown, categories, onClose, onSaved, previewMode, onDirtyChange, saveRef }) {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [categoryId, setCategoryId] = useState(null)
   const [saving, setSaving] = useState(false)
   const titleRef = useRef(null)
+  const origRef = useRef({ title: '', body: '', categoryId: null })
   const isNew = !!markdown?._new
 
   const htmlToMarkdownText = (html) => {
@@ -740,45 +741,56 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
   }
 
   useEffect(() => {
+    let t, b, c
     if (isNew) {
-      setTitle('')
-      setBody('')
-      setCategoryId(null)
+      t = ''; b = ''; c = null
     } else {
-      setTitle(markdown.title || '')
-      setBody(htmlToMarkdownText(markdown.body))
-      setCategoryId(markdown.category_id)
+      t = markdown.title || ''
+      b = htmlToMarkdownText(markdown.body)
+      c = markdown.category_id
     }
+    setTitle(t); setBody(b); setCategoryId(c)
+    origRef.current = { title: t, body: b, categoryId: c }
     if (isNew) setTimeout(() => titleRef.current?.focus(), 50)
   }, [markdown])
+
+  const isDirty = title !== origRef.current.title || body !== origRef.current.body || categoryId !== origRef.current.categoryId
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty)
+  }, [isDirty, onDirtyChange])
 
   const save = async (close = true) => {
     if (!title.trim() && !body.trim()) return
     setSaving(true)
     try {
       const payload = { title, body, category_id: categoryId }
+      let saved = null
       if (isNew) {
         const res = await fetch(`/api/markdowns?universe_id=${markdown.universeId || 1}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         })
-        if (!close) {
-          const created = await res.json()
-          onSaved?.(created, false)
-          return
-        }
+        saved = await res.json()
       } else {
         await fetch(`/api/markdowns/${markdown.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         })
+        saved = { ...markdown, title, body, category_id: categoryId }
       }
-      onSaved?.(null, close)
+      origRef.current = { title, body, categoryId }
+      onDirtyChange?.(false)
+      onSaved?.(saved, close)
       if (close) onClose?.()
     } finally { setSaving(false) }
   }
+
+  useEffect(() => {
+    if (saveRef) saveRef.current = save
+  })
 
   const currentId = isNew ? null : markdown.id
 
