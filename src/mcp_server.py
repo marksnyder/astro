@@ -21,6 +21,7 @@ from src.markdowns import (
     get_all_document_meta,
     get_link,
     get_markdown,
+    get_setting,
     link_to_dict,
     list_action_items,
     list_categories,
@@ -28,7 +29,10 @@ from src.markdowns import (
     list_feeds,
     list_links,
     list_markdowns,
+    list_universes,
     markdown_to_dict,
+    set_setting,
+    universe_to_dict,
     update_action_item,
     update_category,
     update_link,
@@ -43,27 +47,63 @@ from src.store import (
     upsert_markdown,
 )
 
+MCP_UNIVERSE_SETTING = "mcp_default_universe"
+
+
+def _default_universe() -> int:
+    """Return the configured default universe ID, falling back to 1."""
+    val = get_setting(MCP_UNIVERSE_SETTING, "1")
+    try:
+        return int(val)
+    except ValueError:
+        return 1
+
 mcp = FastMCP(
     name="Astro",
     instructions=(
         "Astro is a personal knowledge base and productivity app. "
         "Use these tools to search the user's notes, action items, "
         "bookmarks, and feeds. The vector store enables semantic search "
-        "across all indexed content."
+        "across all indexed content. Content is organized into Universes "
+        "(isolated workspaces). Most tools accept an optional universe_id; "
+        "if omitted, the configured default universe is used. Call "
+        "list_universes to see available universes and set_default_universe "
+        "to change the default."
     ),
 )
+
+
+# ── Universes ─────────────────────────────────────────────────────────────
+
+
+@mcp.tool
+def list_all_universes() -> dict:
+    """List all available universes (isolated workspaces) and show which
+    one is the current default for MCP tools."""
+    default = _default_universe()
+    universes = [universe_to_dict(u) for u in list_universes()]
+    return {"default_universe_id": default, "universes": universes}
+
+
+@mcp.tool
+def set_default_universe(universe_id: int) -> dict:
+    """Set the default universe for all subsequent MCP tool calls.
+    This persists across sessions."""
+    set_setting(MCP_UNIVERSE_SETTING, str(universe_id))
+    return {"default_universe_id": universe_id}
 
 
 # ── Search ────────────────────────────────────────────────────────────────
 
 
 @mcp.tool
-def search(query: str, k: int = 4, universe_id: int = 1) -> list[dict]:
+def search(query: str, k: int = 4, universe_id: int | None = None) -> list[dict]:
     """Semantic search over the user's knowledge base using the vector store.
     Returns the top-k most relevant text chunks for a given natural-language query.
     Useful for finding notes, action items, and documents related to a topic."""
+    uid = universe_id if universe_id is not None else _default_universe()
     k = max(1, min(k, 20))
-    retriever = get_retriever(k=k, universe_id=universe_id)
+    retriever = get_retriever(k=k, universe_id=uid)
     docs = retriever.invoke(query)
     return [
         {
@@ -80,11 +120,12 @@ def search(query: str, k: int = 4, universe_id: int = 1) -> list[dict]:
 
 @mcp.tool
 def search_markdowns(
-    query: str = "", category_id: int | None = None, universe_id: int = 1
+    query: str = "", category_id: int | None = None, universe_id: int | None = None
 ) -> list[dict]:
     """List or search the user's markdown notes. Returns id, title, body,
     category, and timestamps. Use the query parameter for text filtering."""
-    return [markdown_to_dict(m) for m in list_markdowns(query, category_id, universe_id)]
+    uid = universe_id if universe_id is not None else _default_universe()
+    return [markdown_to_dict(m) for m in list_markdowns(query, category_id, uid)]
 
 
 @mcp.tool
@@ -98,10 +139,11 @@ def read_markdown(markdown_id: int) -> dict | str:
 
 @mcp.tool
 def write_markdown(
-    title: str, body: str, category_id: int | None = None, universe_id: int = 1
+    title: str, body: str, category_id: int | None = None, universe_id: int | None = None
 ) -> dict:
     """Create a new markdown note. Returns the created note."""
-    md = create_markdown(title, body, category_id, universe_id)
+    uid = universe_id if universe_id is not None else _default_universe()
+    md = create_markdown(title, body, category_id, uid)
     return markdown_to_dict(md)
 
 
@@ -131,11 +173,12 @@ def delete_markdown_note(markdown_id: int) -> str:
 
 @mcp.tool
 def search_action_items(
-    query: str = "", show_completed: bool = False, universe_id: int = 1
+    query: str = "", show_completed: bool = False, universe_id: int | None = None
 ) -> list[dict]:
     """List or search the user's action items (tasks / to-dos).
     By default only open items are returned."""
-    return [action_item_to_dict(a) for a in list_action_items(query, show_completed, universe_id)]
+    uid = universe_id if universe_id is not None else _default_universe()
+    return [action_item_to_dict(a) for a in list_action_items(query, show_completed, uid)]
 
 
 @mcp.tool
@@ -153,11 +196,12 @@ def write_action_item(
     hot: bool = False,
     due_date: str | None = None,
     category_id: int | None = None,
-    universe_id: int = 1,
+    universe_id: int | None = None,
 ) -> dict:
     """Create a new action item (task). Set hot=True for urgent items.
     due_date should be ISO format (YYYY-MM-DD)."""
-    item = create_action_item(title, hot, due_date, category_id, universe_id)
+    uid = universe_id if universe_id is not None else _default_universe()
+    item = create_action_item(title, hot, due_date, category_id, uid)
     return action_item_to_dict(item)
 
 
@@ -195,22 +239,24 @@ def delete_action_item_tool(item_id: int) -> str:
 
 
 @mcp.tool
-def list_all_categories(universe_id: int = 1) -> list[dict]:
+def list_all_categories(universe_id: int | None = None) -> list[dict]:
     """List all categories in the knowledge base. Categories organize
     markdowns, action items, links, and feeds."""
-    return [category_to_dict(c) for c in list_categories(universe_id)]
+    uid = universe_id if universe_id is not None else _default_universe()
+    return [category_to_dict(c) for c in list_categories(uid)]
 
 
 @mcp.tool
 def write_category(
     name: str,
     parent_id: int | None = None,
-    universe_id: int = 1,
+    universe_id: int | None = None,
     emoji: str | None = None,
 ) -> dict:
     """Create a new category. Optionally set a parent_id for nesting
     and an emoji for visual identification."""
-    cat = create_category(name, parent_id, universe_id, emoji)
+    uid = universe_id if universe_id is not None else _default_universe()
+    cat = create_category(name, parent_id, uid, emoji)
     return category_to_dict(cat)
 
 
@@ -238,18 +284,20 @@ def delete_category_tool(category_id: int) -> str:
 
 @mcp.tool
 def search_links(
-    query: str = "", category_id: int | None = None, universe_id: int = 1
+    query: str = "", category_id: int | None = None, universe_id: int | None = None
 ) -> list[dict]:
     """List or search the user's saved bookmarks/links."""
-    return [link_to_dict(lnk) for lnk in list_links(query, category_id, universe_id)]
+    uid = universe_id if universe_id is not None else _default_universe()
+    return [link_to_dict(lnk) for lnk in list_links(query, category_id, uid)]
 
 
 @mcp.tool
 def write_link(
-    title: str, url: str, category_id: int | None = None, universe_id: int = 1
+    title: str, url: str, category_id: int | None = None, universe_id: int | None = None
 ) -> dict:
     """Save a new bookmark/link."""
-    lnk = create_link(title, url, category_id, universe_id)
+    uid = universe_id if universe_id is not None else _default_universe()
+    lnk = create_link(title, url, category_id, uid)
     return link_to_dict(lnk)
 
 
@@ -276,14 +324,15 @@ def delete_link_tool(link_id: int) -> str:
 
 
 @mcp.tool
-def list_documents(universe_id: int = 1) -> list[dict]:
+def list_documents(universe_id: int | None = None) -> list[dict]:
     """List all uploaded documents (PDF, DOCX, XLSX, etc.) with their
     metadata. Documents are indexed in the vector store for search."""
+    uid = universe_id if universe_id is not None else _default_universe()
     from pathlib import Path
     docs_dir = Path(__file__).resolve().parent.parent / "documents"
     if not docs_dir.exists():
         return []
-    meta_map = get_all_document_meta(universe_id=universe_id)
+    meta_map = get_all_document_meta(universe_id=uid)
     supported = {".pdf", ".docx", ".doc", ".xlsx", ".xls", ".pptx", ".txt", ".md", ".csv"}
     results = []
     for f in docs_dir.rglob("*"):
@@ -306,10 +355,11 @@ def list_documents(universe_id: int = 1) -> list[dict]:
 
 @mcp.tool
 def search_feeds(
-    query: str = "", category_id: int | None = None, universe_id: int = 1
+    query: str = "", category_id: int | None = None, universe_id: int | None = None
 ) -> list[dict]:
     """List or search RSS/Atom feeds the user subscribes to."""
-    return [feed_to_dict(f) for f in list_feeds(query, category_id, universe_id)]
+    uid = universe_id if universe_id is not None else _default_universe()
+    return [feed_to_dict(f) for f in list_feeds(query, category_id, uid)]
 
 
 @mcp.tool
