@@ -425,8 +425,7 @@ $summarizeBtn.addEventListener('click', async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         question: `Summarize the following web page content concisely. Include key points and main takeaways. The page title is "${currentTabTitle}" and the URL is ${currentTabUrl}.\n\n---\n\n${trimmed}`,
-        model: 'claude-sonnet-4-20250514',
-        provider: 'anthropic',
+        model: 'gpt-5-mini',
         use_context: false,
         history: [],
       }),

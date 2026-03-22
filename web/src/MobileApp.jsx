@@ -60,9 +60,19 @@ function MobileIrcMessageGroup({ group }) {
   )
 }
 
-const FALLBACK_PROVIDERS = {
-  anthropic: { name: 'Anthropic', models: [{ id: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' }], default_model: 'claude-sonnet-4-20250514' },
-}
+const MODELS = [
+  { id: 'gpt-5.2', label: 'GPT-5.2' },
+  { id: 'gpt-5.1', label: 'GPT-5.1' },
+  { id: 'gpt-5', label: 'GPT-5' },
+  { id: 'gpt-5-mini', label: 'GPT-5 Mini' },
+  { id: 'gpt-5-nano', label: 'GPT-5 Nano' },
+  { id: 'o4-mini', label: 'o4 Mini' },
+  { id: 'o3', label: 'o3' },
+  { id: 'gpt-4.1', label: 'GPT-4.1' },
+  { id: 'gpt-4.1-mini', label: 'GPT-4.1 Mini' },
+  { id: 'gpt-4o', label: 'GPT-4o' },
+  { id: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+]
 
 // ── Shared mobile category picker ─────────────────────
 
@@ -999,9 +1009,7 @@ function MobileApp() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [providers, setProviders] = useState(FALLBACK_PROVIDERS)
-  const [provider, setProvider] = useState('anthropic')
-  const [model, setModel] = useState('claude-sonnet-4-20250514')
+  const [model, setModel] = useState('gpt-5-mini')
   const [useContext, setUseContext] = useState(true)
   const [chatMode, setChatMode] = useState('llm')
   const [ircNick, setIrcNick] = useState('')
@@ -1057,22 +1065,7 @@ function MobileApp() {
 
   useEffect(() => {
     fetch('/api/stats').then(r => r.json()).then(setStats).catch(() => {})
-    fetch('/api/providers').then(r => r.json()).then(data => {
-      setProviders(data)
-      fetch('/api/settings/llm_provider').then(r => r.json()).then(d => {
-        if (d.value && data[d.value]) {
-          setProvider(d.value)
-          fetch('/api/settings/selected_model').then(r => r.json()).then(md => {
-            if (md.value && data[d.value].models.some(m => m.id === md.value)) setModel(md.value)
-            else setModel(data[d.value].default_model)
-          }).catch(() => setModel(data[d.value].default_model))
-        } else {
-          fetch('/api/settings/selected_model').then(r => r.json()).then(md => { if (md.value) setModel(md.value) }).catch(() => {})
-        }
-      }).catch(() => {
-        fetch('/api/settings/selected_model').then(r => r.json()).then(md => { if (md.value) setModel(md.value) }).catch(() => {})
-      })
-    }).catch(() => {})
+    fetch('/api/settings/selected_model').then(r => r.json()).then(d => { if (d.value) setModel(d.value) }).catch(() => {})
     fetch('/api/settings/chat_mode').then(r => r.json()).then(d => { if (d.value) setChatMode(d.value) }).catch(() => {})
     fetch('/api/settings/irc_channel').then(r => r.json()).then(d => { if (d.value) setIrcNick(d.value) }).catch(() => {})
     fetchIrcChannels()
@@ -1418,7 +1411,7 @@ function MobileApp() {
     setLoading(true)
     const history = messages.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({ role: m.role, content: m.content }))
     try {
-      const payload = { question, model, provider, use_context: useContext, history, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, mode: chatMode, universe_id: currentUniverseId }
+      const payload = { question, model, use_context: useContext, history, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, mode: chatMode, universe_id: currentUniverseId }
       const res = await fetch('/api/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Request failed') }
       const data = await res.json()
@@ -1479,7 +1472,7 @@ function MobileApp() {
               </svg>
             </button>
             <span className="m-model-label">
-              {chatMode === 'irc' ? 'Agent Network' : (providers[provider]?.models || []).find(m => m.id === model)?.label || model}
+              {chatMode === 'irc' ? 'Agent Network' : MODELS.find(m => m.id === model)?.label}
             </span>
           </>
         )}
@@ -1517,23 +1510,8 @@ function MobileApp() {
         )}
         {chatMode === 'llm' && (
           <div className="m-menu-section">
-            <div className="m-menu-section-title">Provider</div>
-            {Object.entries(providers).map(([id, p]) => (
-              <button key={id} className={`m-menu-item ${provider === id ? 'active' : ''}`} onClick={() => {
-                setProvider(id)
-                const def = p.default_model
-                setModel(def)
-                fetch('/api/settings/llm_provider', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: id }) }).catch(() => {})
-                fetch('/api/settings/selected_model', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: def }) }).catch(() => {})
-                setMenuOpen(false)
-              }}>{p.name}</button>
-            ))}
-          </div>
-        )}
-        {chatMode === 'llm' && (
-          <div className="m-menu-section">
             <div className="m-menu-section-title">Model</div>
-            {(providers[provider]?.models || []).map(m => (
+            {MODELS.map(m => (
               <button key={m.id} className={`m-menu-item ${model === m.id ? 'active' : ''}`} onClick={() => {
                 setModel(m.id); setMenuOpen(false)
                 fetch('/api/settings/selected_model', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: m.id }) }).catch(() => {})

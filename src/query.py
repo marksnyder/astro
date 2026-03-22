@@ -1,4 +1,4 @@
-"""RAG query chain with multi-provider LLM support and tool calling."""
+"""RAG query chain using OpenAI with tool calling."""
 
 import json
 from dataclasses import dataclass
@@ -9,67 +9,10 @@ from zoneinfo import ZoneInfo
 from ddgs import DDGS
 from langchain_core.documents import Document
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_openai import ChatOpenAI
 
-from src.markdowns import create_action_item, get_provider_api_key, list_categories
+from src.markdowns import create_action_item, get_openai_api_key, list_categories
 from src.store import get_retriever, upsert_action_item
-
-PROVIDERS = {
-    "anthropic": {
-        "name": "Anthropic",
-        "models": [
-            {"id": "claude-sonnet-4-20250514", "label": "Claude Sonnet 4"},
-            {"id": "claude-3-7-sonnet-20250219", "label": "Claude 3.7 Sonnet"},
-            {"id": "claude-3-5-sonnet-20241022", "label": "Claude 3.5 Sonnet"},
-            {"id": "claude-3-5-haiku-20241022", "label": "Claude 3.5 Haiku"},
-            {"id": "claude-3-opus-20240229", "label": "Claude 3 Opus"},
-        ],
-        "default_model": "claude-sonnet-4-20250514",
-    },
-    "openai": {
-        "name": "OpenAI",
-        "models": [
-            {"id": "gpt-5.2", "label": "GPT-5.2"},
-            {"id": "gpt-5.1", "label": "GPT-5.1"},
-            {"id": "gpt-5", "label": "GPT-5"},
-            {"id": "gpt-5-mini", "label": "GPT-5 Mini"},
-            {"id": "gpt-5-nano", "label": "GPT-5 Nano"},
-            {"id": "o4-mini", "label": "o4 Mini"},
-            {"id": "o3", "label": "o3"},
-            {"id": "gpt-4.1", "label": "GPT-4.1"},
-            {"id": "gpt-4.1-mini", "label": "GPT-4.1 Mini"},
-            {"id": "gpt-4o", "label": "GPT-4o"},
-            {"id": "gpt-4o-mini", "label": "GPT-4o Mini"},
-        ],
-        "default_model": "gpt-5-mini",
-    },
-    "google": {
-        "name": "Google",
-        "models": [
-            {"id": "gemini-2.5-pro", "label": "Gemini 2.5 Pro"},
-            {"id": "gemini-2.5-flash", "label": "Gemini 2.5 Flash"},
-            {"id": "gemini-2.0-flash", "label": "Gemini 2.0 Flash"},
-        ],
-        "default_model": "gemini-2.5-flash",
-    },
-}
-
-DEFAULT_PROVIDER = "anthropic"
-
-
-def _get_llm(model: str, provider: str):
-    """Return a LangChain chat model for the given provider. Imports are lazy
-    so only the package for the active provider needs to be installed."""
-    api_key = get_provider_api_key(provider)
-    if provider == "anthropic":
-        from langchain_anthropic import ChatAnthropic
-        return ChatAnthropic(model=model, api_key=api_key, max_tokens=8192)
-    if provider == "openai":
-        from langchain_openai import ChatOpenAI
-        return ChatOpenAI(model=model, api_key=api_key)
-    if provider == "google":
-        from langchain_google_genai import ChatGoogleGenerativeAI
-        return ChatGoogleGenerativeAI(model=model, google_api_key=api_key)
-    raise ValueError(f"Unknown provider: {provider}")
 
 SYSTEM_PROMPT = """\
 You are a helpful assistant. Answer the user's question based only on the
@@ -257,7 +200,7 @@ def _invoke_with_tools(
     response = llm_with_tools.invoke(messages)
 
     if not response.tool_calls:
-        actual_model = response.response_metadata.get("model_name") or response.response_metadata.get("model", model)
+        actual_model = response.response_metadata.get("model_name", model)
         return QueryResult(answer=response.content, model=actual_model)
 
     messages.append(response)
@@ -266,7 +209,7 @@ def _invoke_with_tools(
         messages.append(ToolMessage(content=result, tool_call_id=tc["id"]))
 
     final = llm_with_tools.invoke(messages)
-    actual_model = final.response_metadata.get("model_name") or final.response_metadata.get("model", model)
+    actual_model = final.response_metadata.get("model_name", model)
     return QueryResult(answer=final.content, model=actual_model)
 
 
@@ -284,8 +227,7 @@ def _today_and_tz_blurb(user_timezone: str | None) -> str:
 
 def ask(
     question: str,
-    model: str = "claude-sonnet-4-20250514",
-    provider: str = DEFAULT_PROVIDER,
+    model: str = "gpt-5-mini",
     history: list[dict] | None = None,
     user_timezone: str | None = None,
     universe_id: int | None = None,
@@ -299,7 +241,7 @@ def ask(
         print(f"  [{i}] source={src!r}, len={len(d.page_content)}, preview={d.page_content[:120]!r}")
     context = _format_docs(docs)
 
-    llm = _get_llm(model, provider)
+    llm = ChatOpenAI(model=model, api_key=get_openai_api_key())
     system_content = SYSTEM_PROMPT.format(context=context)
     system_content += _today_and_tz_blurb(user_timezone)
     messages = [SystemMessage(content=system_content)]
@@ -312,14 +254,13 @@ def ask(
 
 def ask_direct(
     question: str,
-    model: str = "claude-sonnet-4-20250514",
-    provider: str = DEFAULT_PROVIDER,
+    model: str = "gpt-5-mini",
     history: list[dict] | None = None,
     user_timezone: str | None = None,
     universe_id: int = 1,
 ) -> QueryResult:
     """Ask a question directly with optional conversation history."""
-    llm = _get_llm(model, provider)
+    llm = ChatOpenAI(model=model, api_key=get_openai_api_key())
     system_content = DIRECT_SYSTEM_PROMPT
     system_content += _today_and_tz_blurb(user_timezone)
     messages = [SystemMessage(content=system_content)]
