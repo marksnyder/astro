@@ -40,6 +40,12 @@ Organize and send reusable messages to Agent Network channels on demand or via c
 ### Feeds
 Ingest data from external services into Astro through authenticated API endpoints. Each feed has its own API key and accepts markdown or file uploads via a simple HTTP POST. Incoming artifacts are stored in a timeline view, organized by category, with full search, pagination, and pinning support. Use feeds to pipe CI reports, monitoring alerts, automated summaries, or any external content into your workspace.
 
+### Vector Search API
+A `/api/search` endpoint exposes semantic search over the vector store via simple HTTP GET requests, making it easy for scripts and agents to query your knowledge base.
+
+### MCP Server
+A built-in [Model Context Protocol](https://modelcontextprotocol.io) server at `/mcp/` lets AI agents discover and use Astro's tools — search, notes, action items, links, feeds, and categories — through a standardized interface. Point any MCP-compatible client (Claude Desktop, Cursor, custom agents) at the endpoint to get started.
+
 ### Mobile Interface
 A mobile-optimized interface at `/mobile` keeps your Universe accessible anywhere.
 
@@ -128,6 +134,64 @@ Create an auth key at [login.tailscale.com/admin/settings/keys](https://login.ta
 2. Start uploading documents, creating markdowns, or coordinating agents
 
 Embeddings are handled locally — no external API keys are required.
+
+---
+
+## Agent Integration
+
+Astro provides two ways for AI agents to interact with your knowledge base.
+
+### REST Search Endpoint
+
+```bash
+curl "http://localhost:8000/api/search?q=meeting+notes&k=5"
+```
+
+Returns the top-k semantically similar chunks from the vector store as JSON.
+
+### MCP Server
+
+The MCP server is available at `http://localhost:8000/mcp/` and exposes 23 tools:
+
+| Tool | Description |
+|---|---|
+| **Search** | |
+| `search` | Semantic vector search across all indexed content |
+| **Markdowns** | |
+| `search_markdowns` | List/search markdown notes |
+| `read_markdown` | Read a single note by ID |
+| `write_markdown` | Create a new note |
+| `update_markdown_note` | Update an existing note |
+| `delete_markdown_note` | Delete a note |
+| **Action Items** | |
+| `search_action_items` | List/search tasks and to-dos |
+| `read_action_item` | Read a single task by ID |
+| `write_action_item` | Create a new task |
+| `update_action_item_tool` | Update a task |
+| `delete_action_item_tool` | Delete a task |
+| **Categories** | |
+| `list_all_categories` | List all categories |
+| `write_category` | Create a new category |
+| `update_category_tool` | Update a category's name/emoji |
+| `delete_category_tool` | Delete a category |
+| **Links** | |
+| `search_links` | List/search bookmarks |
+| `write_link` | Save a new bookmark |
+| `update_link_tool` | Update a bookmark |
+| `delete_link_tool` | Delete a bookmark |
+| **Documents** | |
+| `list_documents` | List uploaded documents with metadata |
+| **Feeds** | |
+| `search_feeds` | List/search feeds |
+| `read_feed_posts` | Read posts from a feed |
+| **Stats** | |
+| `get_stats` | Vector store statistics |
+
+To connect from an MCP client, point it at:
+
+```
+http://your-astro-host:8000/mcp/
+```
 
 ---
 

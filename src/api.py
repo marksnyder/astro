@@ -127,13 +127,77 @@ from src.store import (
     delete_document_chunks,
     delete_markdown_from_store,
     doc_count,
+    get_retriever,
     upsert_action_item,
     upsert_markdown,
 )
 
 DOCUMENTS_DIR = Path(__file__).resolve().parent.parent / "documents"
 
-app = FastAPI(title="Astro", version="1.0.0")
+_ngircd_proc = None
+
+
+def _start_ngircd():
+    """Launch ngircd as a background process if not already running."""
+    global _ngircd_proc
+    import subprocess, shutil, time
+    if shutil.which("ngircd") is None:
+        print("[IRC] ngircd not found — install it with: apt install ngircd")
+        return
+    conf = Path(__file__).resolve().parent.parent / "config" / "ngircd.conf"
+    if not conf.exists():
+        print(f"[IRC] Config not found: {conf}")
+        return
+    try:
+        _ngircd_proc = subprocess.Popen(
+            ["ngircd", "-n", "-f", str(conf)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        print(f"[IRC] ngircd started (config: {conf})")
+        time.sleep(0.5)
+    except Exception as e:
+        print(f"[IRC] Failed to start ngircd: {e}")
+
+
+# MCP server for AI agent integration
+from contextlib import asynccontextmanager
+from src.mcp_server import mcp as _mcp
+
+_mcp_app = _mcp.http_app(path="/", stateless_http=True)
+
+
+@asynccontextmanager
+async def _lifespan(application):
+    _start_ngircd()
+    from src.irc_client import IRCClient
+    IRCClient.get()
+    from src.irc_monitor import IRCMonitor
+    IRCMonitor.get()
+    from src.irc_scheduler import IRCScheduler
+    IRCScheduler.get()
+
+    async with _mcp_app.lifespan(application):
+        yield
+
+    from src.irc_client import IRCClient as _IC
+    if _IC._instance:
+        _IC._instance.stop()
+    from src.irc_monitor import IRCMonitor as _IM
+    if _IM._instance:
+        _IM._instance.stop()
+    from src.irc_scheduler import IRCScheduler as _IS
+    if _IS._instance:
+        _IS._instance.stop()
+    if _ngircd_proc:
+        _ngircd_proc.terminate()
+        try:
+            _ngircd_proc.wait(timeout=3)
+        except Exception:
+            _ngircd_proc.kill()
+
+
+app = FastAPI(title="Astro", version="1.0.0", lifespan=_lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -141,6 +205,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.mount("/mcp", _mcp_app)
 
 
 
@@ -1633,65 +1699,34 @@ def api_delete_prompt_category(cat_id: int):
     return {"ok": True}
 
 
-_ngircd_proc = None
+
+# ── Search ────────────────────────────────────────────────────────────────
 
 
-@app.on_event("startup")
-def on_startup():
-    _start_ngircd()
-    from src.irc_client import IRCClient
-    IRCClient.get()
-    from src.irc_monitor import IRCMonitor
-    IRCMonitor.get()
-    from src.irc_scheduler import IRCScheduler
-    IRCScheduler.get()
+@app.get("/api/search")
+def api_search(q: str, k: int = 4, universe_id: int = 1):
+    """Semantic search over the vector store. Returns the top-k most relevant
+    chunks for the given query, useful for RAG pipelines and agent tooling."""
+    if not q.strip():
+        raise HTTPException(status_code=400, detail="Query parameter 'q' is required")
+    k = max(1, min(k, 20))
+    retriever = get_retriever(k=k, universe_id=universe_id)
+    docs = retriever.invoke(q)
+    return {
+        "query": q,
+        "universe_id": universe_id,
+        "results": [
+            {
+                "content": d.page_content,
+                "source": d.metadata.get("source", ""),
+                "metadata": {k: v for k, v in d.metadata.items() if k != "source"},
+            }
+            for d in docs
+        ],
+    }
 
 
-@app.on_event("shutdown")
-def on_shutdown():
-    from src.irc_client import IRCClient
-    if IRCClient._instance:
-        IRCClient._instance.stop()
-    from src.irc_monitor import IRCMonitor
-    if IRCMonitor._instance:
-        IRCMonitor._instance.stop()
-    from src.irc_scheduler import IRCScheduler
-    if IRCScheduler._instance:
-        IRCScheduler._instance.stop()
-    if _ngircd_proc:
-        _ngircd_proc.terminate()
-        try:
-            _ngircd_proc.wait(timeout=3)
-        except Exception:
-            _ngircd_proc.kill()
-
-
-def _start_ngircd():
-    """Launch ngircd as a background process if not already running."""
-    global _ngircd_proc
-    import subprocess, shutil, time
-    if shutil.which("ngircd") is None:
-        print("[IRC] ngircd not found — install it with: apt install ngircd")
-        return
-    conf = Path(__file__).resolve().parent.parent / "config" / "ngircd.conf"
-    if not conf.exists():
-        print(f"[IRC] Config not found: {conf}")
-        return
-    try:
-        _ngircd_proc = subprocess.Popen(
-            ["ngircd", "-n", "-f", str(conf)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        print(f"[IRC] ngircd started (config: {conf})")
-        time.sleep(0.5)
-    except Exception as e:
-        print(f"[IRC] Failed to start ngircd: {e}")
-
-
-
-
-# ── Stats ─────────────────────────────────────────────────────────────────
+# ── Stats ────────────────────────────────────────────────────────────────
 
 
 @app.get("/api/stats", response_model=StatsResponse)

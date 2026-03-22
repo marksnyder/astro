@@ -96,6 +96,30 @@ After installation:
 
 Embeddings are handled locally — no external API keys are required.
 
+## Connecting AI Agents
+
+Astro exposes an MCP (Model Context Protocol) server so AI agents can discover and use your knowledge base.
+
+**MCP endpoint:** `http://localhost:8000/mcp/`
+
+Point any MCP-compatible client at this URL. For example, in a Cursor MCP config:
+
+```json
+{
+  "mcpServers": {
+    "astro": {
+      "url": "http://localhost:8000/mcp/"
+    }
+  }
+}
+```
+
+There's also a simple REST search endpoint for scripts and lightweight integrations:
+
+```
+GET http://localhost:8000/api/search?q=your+query&k=5
+```
+
 ## Useful Commands
 
 ```

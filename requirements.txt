@@ -2,6 +2,7 @@ langchain
 langchain-chroma
 langchain-community
 fastembed
+fastmcp
 langchain-text-splitters
 chromadb
 pypdf

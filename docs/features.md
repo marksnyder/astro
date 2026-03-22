@@ -27,6 +27,54 @@ Astro maintains a ChromaDB vector store that indexes your markdowns, documents, 
 - Local, CPU-based embeddings — no API key needed
 - Automatic indexing of all content
 - Full rebuild via the Settings panel
+- REST search endpoint at `/api/search` for scripts and agents
+
+---
+
+## MCP Server (Model Context Protocol)
+
+Astro includes a built-in [MCP](https://modelcontextprotocol.io) server that lets AI agents discover and use Astro's tools through a standardized interface. Point any MCP-compatible client — Claude Desktop, Cursor, or custom agents — at your Astro instance and they can read, write, and search your knowledge base.
+
+The MCP endpoint is available at `/mcp/` and exposes 23 tools:
+
+### Search
+- **search** — semantic vector search across all indexed content
+
+### Markdowns
+- **search_markdowns** — list or search notes
+- **read_markdown** — read a single note by ID
+- **write_markdown** — create a new note
+- **update_markdown_note** — update an existing note
+- **delete_markdown_note** — delete a note
+
+### Action Items
+- **search_action_items** — list or search tasks
+- **read_action_item** — read a single task by ID
+- **write_action_item** — create a new task
+- **update_action_item_tool** — update a task
+- **delete_action_item_tool** — delete a task
+
+### Categories
+- **list_all_categories** — list all categories
+- **write_category** — create a new category
+- **update_category_tool** — update a category's name or emoji
+- **delete_category_tool** — delete a category
+
+### Links
+- **search_links** — list or search bookmarks
+- **write_link** — save a new bookmark
+- **update_link_tool** — update a bookmark
+- **delete_link_tool** — delete a bookmark
+
+### Documents
+- **list_documents** — list uploaded documents with metadata
+
+### Feeds
+- **search_feeds** — list or search feeds
+- **read_feed_posts** — read posts from a feed
+
+### Stats
+- **get_stats** — vector store statistics
 
 ---
 
