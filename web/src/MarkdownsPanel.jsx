@@ -720,7 +720,76 @@ function MarkdownActionItems({ markdownId, categories }) {
 
 // ── Markdowns panel ───────────────────────────────────────
 
-export function MarkdownEditorView({ markdown, categories, onClose, onSaved, previewMode }) {
+function MarkdownApiView({ markdownId, isNew }) {
+  const base = window.location.origin
+
+  if (isNew) {
+    return (
+      <div className="api-view">
+        <h3 className="api-view-title">API Endpoints</h3>
+        <p className="api-view-hint">Save this markdown first to see all available endpoints.</p>
+        <div className="api-endpoint">
+          <span className="api-method api-method-post">POST</span>
+          <span className="api-endpoint-label">Create markdown</span>
+          <pre className="api-code-block"><code>{`${base}/api/markdowns?universe_id={universe_id}`}</code></pre>
+          <span className="api-endpoint-label">Request body</span>
+          <pre className="api-code-block"><code>{`{
+  "title": "...",
+  "body": "...",
+  "category_id": null
+}`}</code></pre>
+        </div>
+      </div>
+    )
+  }
+
+  const id = markdownId
+  return (
+    <div className="api-view">
+      <h3 className="api-view-title">API Endpoints</h3>
+      <div className="api-endpoint">
+        <span className="api-method api-method-get">GET</span>
+        <span className="api-endpoint-label">Read markdown</span>
+        <pre className="api-code-block"><code>{`${base}/api/markdowns/${id}`}</code></pre>
+      </div>
+      <div className="api-endpoint">
+        <span className="api-method api-method-put">PUT</span>
+        <span className="api-endpoint-label">Update markdown</span>
+        <pre className="api-code-block"><code>{`${base}/api/markdowns/${id}`}</code></pre>
+        <span className="api-endpoint-label">Request body</span>
+        <pre className="api-code-block"><code>{`{
+  "title": "...",
+  "body": "...",
+  "category_id": null
+}`}</code></pre>
+      </div>
+      <div className="api-endpoint">
+        <span className="api-method api-method-delete">DELETE</span>
+        <span className="api-endpoint-label">Delete markdown</span>
+        <pre className="api-code-block"><code>{`${base}/api/markdowns/${id}`}</code></pre>
+      </div>
+      <div className="api-endpoint">
+        <span className="api-method api-method-put">PUT</span>
+        <span className="api-endpoint-label">Toggle pin</span>
+        <pre className="api-code-block"><code>{`${base}/api/markdowns/${id}/pin?pinned=true`}</code></pre>
+      </div>
+      <div className="api-endpoint">
+        <span className="api-method api-method-get">GET</span>
+        <span className="api-endpoint-label">List images</span>
+        <pre className="api-code-block"><code>{`${base}/api/markdowns/${id}/images`}</code></pre>
+      </div>
+      <div className="api-endpoint">
+        <span className="api-method api-method-post">POST</span>
+        <span className="api-endpoint-label">Upload image</span>
+        <pre className="api-code-block"><code>{`${base}/api/markdowns/${id}/images`}</code></pre>
+        <span className="api-endpoint-label">Content-Type: multipart/form-data</span>
+      </div>
+    </div>
+  )
+}
+
+export function MarkdownEditorView({ markdown, categories, onClose, onSaved, previewMode, viewMode }) {
+  const resolvedMode = viewMode || (previewMode ? 'preview' : 'edit')
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [categoryId, setCategoryId] = useState(null)
@@ -787,10 +856,12 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
       <div className="markdown-inline-body">
         <input ref={titleRef} className="markdown-title-input" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
         <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId} />
-        {previewMode ? (
+        {resolvedMode === 'preview' ? (
           <div className="markdown-preview markdown-body">
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}>{body}</ReactMarkdown>
           </div>
+        ) : resolvedMode === 'api' ? (
+          <MarkdownApiView markdownId={currentId} isNew={isNew} />
         ) : (
           <MarkdownEditor
             key={isNew ? 'new' : markdown.id}

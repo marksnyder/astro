@@ -103,6 +103,8 @@ function MobileMarkdowns({ categories, universeId }) {
   const [body, setBody] = useState('')
   const [categoryId, setCategoryId] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [viewTab, setViewTab] = useState('content')
+  const [editApiVisible, setEditApiVisible] = useState(false)
   const [listening, setListening] = useState(false)
   const recognitionRef = useRef(null)
   const baseBodyRef = useRef('')
@@ -249,6 +251,7 @@ function MobileMarkdowns({ categories, universeId }) {
   const startEdit = (markdown) => {
     setViewing(null)
     setEditing(markdown)
+    setEditApiVisible(false)
     setTitle(markdown.title)
     setBody(stripHtml(markdown.body, true))
     setCategoryId(markdown.category_id)
@@ -306,6 +309,7 @@ function MobileMarkdowns({ categories, universeId }) {
 
   // ── View markdown ─────────────────────────
   if (viewing) {
+    const baseUrl = window.location.origin
     return (
       <div className="mn-view">
         <div className="mn-view-header">
@@ -324,24 +328,75 @@ function MobileMarkdowns({ categories, universeId }) {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /></svg>
           </button>
         </div>
-        <div className="mn-view-body">
-          <h2 className="mn-view-title">{viewing.title || 'Untitled'}</h2>
-          <div className="mn-view-meta">
-            <span>{formatDate(viewing.updated_at)}</span>
-            {viewing.category_id && catMap[viewing.category_id] && <span className="mn-cat-badge">{catLabel(viewing.category_id)}</span>}
-          </div>
-          <div className="mn-view-content markdown-body">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {stripHtml(viewing.body || '', true)}
-            </ReactMarkdown>
-          </div>
+        <div className="mn-view-tab-bar">
+          <button className={`mn-view-tab ${viewTab === 'content' ? 'active' : ''}`} onClick={() => setViewTab('content')}>Content</button>
+          <button className={`mn-view-tab ${viewTab === 'api' ? 'active' : ''}`} onClick={() => setViewTab('api')}>API</button>
         </div>
+        {viewTab === 'api' ? (
+          <div className="mn-view-body">
+            <div className="api-view">
+              <h3 className="api-view-title">API Endpoints</h3>
+              <div className="api-endpoint">
+                <span className="api-method api-method-get">GET</span>
+                <span className="api-endpoint-label">Read markdown</span>
+                <pre className="api-code-block"><code>{`${baseUrl}/api/markdowns/${viewing.id}`}</code></pre>
+              </div>
+              <div className="api-endpoint">
+                <span className="api-method api-method-put">PUT</span>
+                <span className="api-endpoint-label">Update markdown</span>
+                <pre className="api-code-block"><code>{`${baseUrl}/api/markdowns/${viewing.id}`}</code></pre>
+                <span className="api-endpoint-label">Request body</span>
+                <pre className="api-code-block"><code>{`{
+  "title": "...",
+  "body": "...",
+  "category_id": null
+}`}</code></pre>
+              </div>
+              <div className="api-endpoint">
+                <span className="api-method api-method-delete">DELETE</span>
+                <span className="api-endpoint-label">Delete markdown</span>
+                <pre className="api-code-block"><code>{`${baseUrl}/api/markdowns/${viewing.id}`}</code></pre>
+              </div>
+              <div className="api-endpoint">
+                <span className="api-method api-method-put">PUT</span>
+                <span className="api-endpoint-label">Toggle pin</span>
+                <pre className="api-code-block"><code>{`${baseUrl}/api/markdowns/${viewing.id}/pin?pinned=true`}</code></pre>
+              </div>
+              <div className="api-endpoint">
+                <span className="api-method api-method-get">GET</span>
+                <span className="api-endpoint-label">List images</span>
+                <pre className="api-code-block"><code>{`${baseUrl}/api/markdowns/${viewing.id}/images`}</code></pre>
+              </div>
+              <div className="api-endpoint">
+                <span className="api-method api-method-post">POST</span>
+                <span className="api-endpoint-label">Upload image</span>
+                <pre className="api-code-block"><code>{`${baseUrl}/api/markdowns/${viewing.id}/images`}</code></pre>
+                <span className="api-endpoint-label">Content-Type: multipart/form-data</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="mn-view-body">
+            <h2 className="mn-view-title">{viewing.title || 'Untitled'}</h2>
+            <div className="mn-view-meta">
+              <span>{formatDate(viewing.updated_at)}</span>
+              {viewing.category_id && catMap[viewing.category_id] && <span className="mn-cat-badge">{catLabel(viewing.category_id)}</span>}
+            </div>
+            <div className="mn-view-content markdown-body">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {stripHtml(viewing.body || '', true)}
+              </ReactMarkdown>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
 
   // ── Edit / New markdown ───────────────────
   if (editing) {
+    const isExisting = editing !== 'new' && editing.id
+    const baseUrl = window.location.origin
     return (
       <div className="mn-edit">
         <div className="mn-view-header">
@@ -350,6 +405,11 @@ function MobileMarkdowns({ categories, universeId }) {
           </button>
           <span className="mn-view-header-title">{editing === 'new' ? 'New Markdown' : 'Edit Markdown'}</span>
           <span style={{ flex: 1 }} />
+          {isExisting && (
+            <button className={`mn-action-btn ${editApiVisible ? 'mn-api-active' : ''}`} onClick={() => setEditApiVisible(v => !v)} title="API">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 18l6-6-6-6" /><path d="M8 6l-6 6 6 6" /></svg>
+            </button>
+          )}
           <button className={`mn-mic-header-btn ${listening ? 'active' : ''}`} onClick={toggleDictation} title={listening ? 'Stop dictation' : 'Start dictation'}>
             {listening ? (
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>
@@ -362,11 +422,56 @@ function MobileMarkdowns({ categories, universeId }) {
           </button>
         </div>
         {listening && <div className="mn-listening-bar">Listening...</div>}
-        <div className="mn-edit-body">
-          <input ref={titleRef} className="mn-edit-title" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-          <MobileCategorySelect categories={categories} value={categoryId} onChange={setCategoryId} />
-          <textarea className="mn-edit-content" placeholder="Write your markdown..." value={body} onChange={(e) => setBody(e.target.value)} />
-        </div>
+        {editApiVisible && isExisting ? (
+          <div className="mn-edit-body">
+            <div className="api-view">
+              <h3 className="api-view-title">API Endpoints</h3>
+              <div className="api-endpoint">
+                <span className="api-method api-method-get">GET</span>
+                <span className="api-endpoint-label">Read markdown</span>
+                <pre className="api-code-block"><code>{`${baseUrl}/api/markdowns/${editing.id}`}</code></pre>
+              </div>
+              <div className="api-endpoint">
+                <span className="api-method api-method-put">PUT</span>
+                <span className="api-endpoint-label">Update markdown</span>
+                <pre className="api-code-block"><code>{`${baseUrl}/api/markdowns/${editing.id}`}</code></pre>
+                <span className="api-endpoint-label">Request body</span>
+                <pre className="api-code-block"><code>{`{
+  "title": "...",
+  "body": "...",
+  "category_id": null
+}`}</code></pre>
+              </div>
+              <div className="api-endpoint">
+                <span className="api-method api-method-delete">DELETE</span>
+                <span className="api-endpoint-label">Delete markdown</span>
+                <pre className="api-code-block"><code>{`${baseUrl}/api/markdowns/${editing.id}`}</code></pre>
+              </div>
+              <div className="api-endpoint">
+                <span className="api-method api-method-put">PUT</span>
+                <span className="api-endpoint-label">Toggle pin</span>
+                <pre className="api-code-block"><code>{`${baseUrl}/api/markdowns/${editing.id}/pin?pinned=true`}</code></pre>
+              </div>
+              <div className="api-endpoint">
+                <span className="api-method api-method-get">GET</span>
+                <span className="api-endpoint-label">List images</span>
+                <pre className="api-code-block"><code>{`${baseUrl}/api/markdowns/${editing.id}/images`}</code></pre>
+              </div>
+              <div className="api-endpoint">
+                <span className="api-method api-method-post">POST</span>
+                <span className="api-endpoint-label">Upload image</span>
+                <pre className="api-code-block"><code>{`${baseUrl}/api/markdowns/${editing.id}/images`}</code></pre>
+                <span className="api-endpoint-label">Content-Type: multipart/form-data</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="mn-edit-body">
+            <input ref={titleRef} className="mn-edit-title" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <MobileCategorySelect categories={categories} value={categoryId} onChange={setCategoryId} />
+            <textarea className="mn-edit-content" placeholder="Write your markdown..." value={body} onChange={(e) => setBody(e.target.value)} />
+          </div>
+        )}
       </div>
     )
   }
@@ -388,7 +493,7 @@ function MobileMarkdowns({ categories, universeId }) {
         {markdowns.length === 0 ? (
           <div className="mn-empty">{search || filterCatId ? 'No matching markdowns.' : 'No markdowns yet. Tap + to create one.'}</div>
         ) : markdowns.map(markdown => (
-          <div key={markdown.id} className={`mn-markdown-card ${markdown.pinned ? 'pinned' : ''}`} onClick={() => setViewing(markdown)}>
+          <div key={markdown.id} className={`mn-markdown-card ${markdown.pinned ? 'pinned' : ''}`} onClick={() => { setViewTab('content'); setViewing(markdown) }}>
             <div className="mn-markdown-title">
               {markdown.pinned && <svg className="mn-pin-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1"><path d="M12 2l3 9h9l-7 5 3 9-8-6-8 6 3-9-7-5h9z" /></svg>}
               {markdown.title || 'Untitled'}
@@ -991,6 +1096,77 @@ function MobilePostTimeline({ category, onBack }) {
 
 // ── Main mobile app ───────────────────────────────────
 
+function MobileHelpView({ onClose }) {
+  const [section, setSection] = useState('irc')
+  const hostname = window.location.hostname
+  const origin = window.location.origin
+
+  return (
+    <div className="m-help-fullscreen">
+      <div className="m-help-header">
+        <button className="m-help-back" onClick={onClose}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+        </button>
+        <h2>Help &amp; Setup</h2>
+      </div>
+      <div className="m-help-tabs">
+        <button className={`m-help-tab ${section === 'irc' ? 'active' : ''}`} onClick={() => setSection('irc')}>IRC</button>
+        <button className={`m-help-tab ${section === 'mcp' ? 'active' : ''}`} onClick={() => setSection('mcp')}>MCP</button>
+        <button className={`m-help-tab ${section === 'prompts' ? 'active' : ''}`} onClick={() => setSection('prompts')}>Prompts</button>
+      </div>
+      <div className="m-help-body">
+        {section === 'irc' && (
+          <div className="m-help-section">
+            <h3>Connecting to the IRC Server</h3>
+            <p>Astro runs an IRC server (ngircd) for agent communication. Any standard IRC client can connect.</p>
+            <div className="m-help-details">
+              <div className="m-help-row"><span>Host</span><code>{hostname}</code></div>
+              <div className="m-help-row"><span>Port</span><code>6667</code></div>
+              <div className="m-help-row"><span>Channel</span><code>#astro</code></div>
+            </div>
+            <h4>Client Examples</h4>
+            <div className="m-help-code">
+              <div className="m-help-code-title">irssi</div>
+              <pre>/server add -auto astro {hostname} 6667{'\n'}/join #astro</pre>
+            </div>
+            <div className="m-help-code">
+              <div className="m-help-code-title">weechat</div>
+              <pre>/server add astro {hostname}/6667{'\n'}/connect astro{'\n'}/join #astro</pre>
+            </div>
+          </div>
+        )}
+        {section === 'mcp' && (
+          <div className="m-help-section">
+            <h3>Connecting AI Agents via MCP</h3>
+            <p>Astro exposes a stateless HTTP-based MCP (Model Context Protocol) server for AI agents.</p>
+            <div className="m-help-details">
+              <div className="m-help-row"><span>MCP URL</span><code>{origin}/mcp</code></div>
+              <div className="m-help-row"><span>Transport</span><code>HTTP (Streamable)</code></div>
+            </div>
+            <h4>Agent Configuration</h4>
+            <div className="m-help-code">
+              <div className="m-help-code-title">mcp_config.json</div>
+              <pre>{JSON.stringify({ mcpServers: { astro: { url: `${origin}/mcp` } } }, null, 2)}</pre>
+            </div>
+          </div>
+        )}
+        {section === 'prompts' && (
+          <div className="m-help-section">
+            <h3>Example Prompts</h3>
+            <p>Try these prompts with your AI agent:</p>
+            <div className="m-help-prompts">
+              <div className="m-help-prompt"><span className="m-help-num">1</span>Search my documents for information about [topic] and create a summary markdown</div>
+              <div className="m-help-prompt"><span className="m-help-num">2</span>Review the latest feed posts and create action items for anything urgent</div>
+              <div className="m-help-prompt"><span className="m-help-num">3</span>List all incomplete action items and generate a status report</div>
+              <div className="m-help-prompt"><span className="m-help-num">4</span>Create a new markdown with a project plan for [project name]</div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function MobileApp() {
   const [input, setInput] = useState('')
   const [ircNick, setIrcNick] = useState('')
@@ -1000,6 +1176,7 @@ function MobileApp() {
   const ircHistoryTsRef = useRef(0)
   const [ircHasMore, setIrcHasMore] = useState(false)
   const [ircLoadingHistory, setIrcLoadingHistory] = useState(false)
+  const [ircChannelLoading, setIrcChannelLoading] = useState(false)
   const ircChatAreaRef = useRef(null)
   const [ircChannels, setIrcChannels] = useState([])
   const [showAddChannel, setShowAddChannel] = useState(false)
@@ -1007,6 +1184,7 @@ function MobileApp() {
   const [unreadCounts, setUnreadCounts] = useState({})
   const lastSeenTsRef = useRef({})
   const [menuOpen, setMenuOpen] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
   const [view, setView] = useState('chat')
   const [categories, setCategories] = useState([])
   const [universes, setUniverses] = useState([])
@@ -1094,12 +1272,17 @@ function MobileApp() {
     const oldestId = ircMessages.length > 0 ? ircMessages[0].id : null
     if (!oldestId) return
     const area = ircChatAreaRef.current
-    const prevScrollHeight = area ? area.scrollHeight : 0
     fetchIrcHistory(channel, oldestId).then(older => {
       if (older.length > 0) {
+        const prevScrollHeight = area ? area.scrollHeight : 0
+        const prevScrollTop = area ? area.scrollTop : 0
         setIrcMessages(prev => [...older, ...prev])
         requestAnimationFrame(() => {
-          if (area) area.scrollTop = area.scrollHeight - prevScrollHeight
+          requestAnimationFrame(() => {
+            if (area) {
+              area.scrollTop = area.scrollHeight - prevScrollHeight + prevScrollTop
+            }
+          })
         })
       }
     })
@@ -1118,15 +1301,20 @@ function MobileApp() {
     setIrcMessages([])
     setIrcHasMore(false)
     ircHistoryTsRef.current = 0
+    setIrcChannelLoading(true)
     fetch('/api/irc/switch', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
       .then(() => {
         fetchIrcHistory(name).then(msgs => {
           if (msgs.length > 0) ircHistoryTsRef.current = Math.max(...msgs.map(m => m.timestamp))
           setIrcMessages(msgs)
+          setIrcChannelLoading(false)
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
+          }, 50)
         })
         setTimeout(fetchIrcUsers, 500)
         setTimeout(fetchIrcChannels, 1000)
-      }).catch(() => {})
+      }).catch(() => { setIrcChannelLoading(false) })
   }
 
   const handleJoinChannel = () => {
@@ -1265,7 +1453,7 @@ function MobileApp() {
   }, [currentUniverseId])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
   }, [ircMessages])
 
   useEffect(() => {
@@ -1415,15 +1603,12 @@ function MobileApp() {
         )}
         <span style={{ flex: 1 }} />
         {view === 'chat' && (
-          <>
-            <button className={`m-voice-toggle ${voiceChat ? 'active' : ''}`} onClick={toggleVoiceChat} title={voiceChat ? 'Voice chat on' : 'Voice chat off'}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill={voiceChat ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                {voiceChat && <><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /></>}
-              </svg>
-            </button>
-            <span className="m-model-label">Agent Network</span>
-          </>
+          <button className={`m-voice-toggle ${voiceChat ? 'active' : ''}`} onClick={toggleVoiceChat} title={voiceChat ? 'Voice chat on' : 'Voice chat off'}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill={voiceChat ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              {voiceChat && <><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /></>}
+            </svg>
+          </button>
         )}
       </header>
 
@@ -1451,6 +1636,10 @@ function MobileApp() {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>
             Desktop Version
           </a>
+          <button className="m-menu-item m-menu-link m-menu-help" onClick={() => { setShowHelp(true); setMenuOpen(false) }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
+            Help &amp; Setup
+          </button>
         </div>
       </nav>
 
@@ -1504,11 +1693,17 @@ function MobileApp() {
             )}
             <main className="m-messages" ref={ircChatAreaRef} onScroll={handleIrcScroll}>
               {ircMessages.length === 0 && !ircLoadingHistory ? (
+                ircChannelLoading ? (
+                  <div className="m-channel-loading">
+                    <div className="m-channel-spinner" />
+                  </div>
+                ) : (
                 <div className="m-empty">
                   <img className="m-empty-logo" src={LOGO_URL} alt="Astro" />
                   <h2>Agent Network</h2>
                   <p style={{ color: 'var(--text-secondary, #999)', fontSize: 14 }}>Messages from {ircStatus.channel || '#astro'} will appear here</p>
                 </div>
+                )
               ) : (
                 <>
                   {ircLoadingHistory && (
@@ -1627,6 +1822,7 @@ function MobileApp() {
           <span>Feeds</span>
         </button>
       </nav>
+      {showHelp && <MobileHelpView onClose={() => setShowHelp(false)} />}
     </div>
   )
 }

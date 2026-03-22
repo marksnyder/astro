@@ -255,6 +255,101 @@ function UniverseManager({ universes, currentId, onSwitch, onClose, onRefresh })
   )
 }
 
+function HelpDialog({ onClose }) {
+  const [section, setSection] = useState('irc')
+  const hostname = window.location.hostname
+  const origin = window.location.origin
+
+  return (
+    <div className="br-modal" onClick={onClose}>
+      <div className="help-modal-content" onClick={e => e.stopPropagation()}>
+        <h2>Help &amp; Integration Guide</h2>
+        <p className="br-subtitle">Connect your IRC clients and AI agents to Astro.</p>
+
+        <div className="help-tabs">
+          <button className={`help-tab ${section === 'irc' ? 'active' : ''}`} onClick={() => setSection('irc')}>IRC Server</button>
+          <button className={`help-tab ${section === 'mcp' ? 'active' : ''}`} onClick={() => setSection('mcp')}>MCP Integration</button>
+          <button className={`help-tab ${section === 'prompts' ? 'active' : ''}`} onClick={() => setSection('prompts')}>Example Prompts</button>
+        </div>
+
+        <div className="help-body">
+          {section === 'irc' && (
+            <div className="help-section">
+              <h3>Connecting to the IRC Server</h3>
+              <p>Astro runs an IRC server (ngircd) for agent communication. Any standard IRC client can connect.</p>
+              <div className="help-details">
+                <div className="help-detail-row"><span className="help-label">Host</span><code>{hostname}</code></div>
+                <div className="help-detail-row"><span className="help-label">Port</span><code>6667</code></div>
+                <div className="help-detail-row"><span className="help-label">Channel</span><code>#astro</code></div>
+              </div>
+              <h4>Client Examples</h4>
+              <div className="help-code-block">
+                <div className="help-code-title">HexChat / mIRC</div>
+                <pre>Server: {hostname}/6667{'\n'}Channel: #astro</pre>
+              </div>
+              <div className="help-code-block">
+                <div className="help-code-title">irssi</div>
+                <pre>/server add -auto astro {hostname} 6667{'\n'}/join #astro</pre>
+              </div>
+              <div className="help-code-block">
+                <div className="help-code-title">weechat</div>
+                <pre>/server add astro {hostname}/6667{'\n'}/connect astro{'\n'}/join #astro</pre>
+              </div>
+            </div>
+          )}
+
+          {section === 'mcp' && (
+            <div className="help-section">
+              <h3>Connecting AI Agents via MCP</h3>
+              <p>Astro exposes a stateless HTTP-based MCP (Model Context Protocol) server that AI agents can use to interact with your data.</p>
+              <div className="help-details">
+                <div className="help-detail-row"><span className="help-label">MCP URL</span><code>{origin}/mcp</code></div>
+                <div className="help-detail-row"><span className="help-label">Transport</span><code>HTTP (Streamable)</code></div>
+              </div>
+              <h4>Agent Configuration</h4>
+              <p>Add the following to your agent&apos;s MCP server configuration (e.g. Claude Desktop, Open Claw, Cursor):</p>
+              <div className="help-code-block">
+                <div className="help-code-title">mcp_config.json</div>
+                <pre>{JSON.stringify({ mcpServers: { astro: { url: `${origin}/mcp` } } }, null, 2)}</pre>
+              </div>
+              <p className="help-note">The MCP server provides tools for managing action items, markdowns, documents, links, feeds, and IRC messaging.</p>
+            </div>
+          )}
+
+          {section === 'prompts' && (
+            <div className="help-section">
+              <h3>Example Prompts for AI Agents</h3>
+              <p>Once connected via MCP or IRC, try these prompts with your AI agent:</p>
+              <div className="help-prompt-list">
+                <div className="help-prompt-item">
+                  <span className="help-prompt-num">1</span>
+                  <span>&ldquo;Search my documents for information about [topic] and create a summary markdown&rdquo;</span>
+                </div>
+                <div className="help-prompt-item">
+                  <span className="help-prompt-num">2</span>
+                  <span>&ldquo;Review the latest feed posts and create action items for anything urgent&rdquo;</span>
+                </div>
+                <div className="help-prompt-item">
+                  <span className="help-prompt-num">3</span>
+                  <span>&ldquo;List all incomplete action items and generate a status report&rdquo;</span>
+                </div>
+                <div className="help-prompt-item">
+                  <span className="help-prompt-num">4</span>
+                  <span>&ldquo;Create a new markdown with a project plan for [project name]&rdquo;</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="br-close-row">
+          <button className="br-close-btn" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function SettingsDialog({ onClose, onRestored }) {
   const [status, setStatus] = useState(null) // { type: 'success'|'error'|'info', text: string }
   const [busy, setBusy] = useState(false)
@@ -1463,6 +1558,7 @@ function App() {
   const [ircChannels, setIrcChannels] = useState([])
   const [ircHasMore, setIrcHasMore] = useState(false)
   const [ircLoadingHistory, setIrcLoadingHistory] = useState(false)
+  const [ircChannelLoading, setIrcChannelLoading] = useState(false)
   const ircChatAreaRef = useRef(null)
   const [joiningChannel, setJoiningChannel] = useState(false)
   const [joinChannelName, setJoinChannelName] = useState('')
@@ -1499,7 +1595,7 @@ function App() {
     { id: 'irc', type: 'irc', title: 'Agent Network', closable: false },
   ])
   const [activeTabId, setActiveTabId] = useState('irc')
-  const [markdownPreviewMode, setMarkdownPreviewMode] = useState(false)
+  const [markdownViewMode, setMarkdownViewMode] = useState('edit')
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const resizing = useRef(false)
@@ -1741,12 +1837,17 @@ function App() {
     const oldestId = ircMessages.length > 0 ? ircMessages[0].id : null
     if (!oldestId) return
     const area = ircChatAreaRef.current
-    const prevScrollHeight = area ? area.scrollHeight : 0
     fetchIrcHistory(channel, oldestId).then(older => {
       if (older.length > 0) {
+        const prevScrollHeight = area ? area.scrollHeight : 0
+        const prevScrollTop = area ? area.scrollTop : 0
         setIrcMessages(prev => [...older, ...prev])
         requestAnimationFrame(() => {
-          if (area) area.scrollTop = area.scrollHeight - prevScrollHeight
+          requestAnimationFrame(() => {
+            if (area) {
+              area.scrollTop = area.scrollHeight - prevScrollHeight + prevScrollTop
+            }
+          })
         })
       }
     })
@@ -1767,6 +1868,7 @@ function App() {
     setIrcMessages([])
     setIrcHasMore(false)
     ircHistoryTsRef.current = 0
+    setIrcChannelLoading(true)
     fetch('/api/irc/switch', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -1777,10 +1879,14 @@ function App() {
           ircHistoryTsRef.current = Math.max(...msgs.map(m => m.timestamp))
         }
         setIrcMessages(msgs)
+        setIrcChannelLoading(false)
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
+        }, 50)
       })
       setTimeout(fetchIrcUsers, 500)
       setTimeout(fetchIrcChannels, 1000)
-    }).catch(() => {})
+    }).catch(() => { setIrcChannelLoading(false) })
   }
 
   const handleJoinChannel = () => {
@@ -2091,6 +2197,7 @@ function App() {
   }
 
   const [showSettings, setShowSettings] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
   const [showUniverseManager, setShowUniverseManager] = useState(false)
 
   const IRC_MSG_LIMIT = 400
@@ -2197,16 +2304,11 @@ function App() {
           )}
           {activeTab.type === 'markdown' && (
             <div className="markdown-mode-toggle">
-              <button className={`markdown-mode-btn ${!markdownPreviewMode ? 'active' : ''}`} onClick={() => setMarkdownPreviewMode(false)}>Edit</button>
-              <button className={`markdown-mode-btn ${markdownPreviewMode ? 'active' : ''}`} onClick={() => setMarkdownPreviewMode(true)}>Preview</button>
+              <button className={`markdown-mode-btn ${markdownViewMode === 'edit' ? 'active' : ''}`} onClick={() => setMarkdownViewMode('edit')}>Edit</button>
+              <button className={`markdown-mode-btn ${markdownViewMode === 'preview' ? 'active' : ''}`} onClick={() => setMarkdownViewMode('preview')}>Preview</button>
+              <button className={`markdown-mode-btn ${markdownViewMode === 'api' ? 'active' : ''}`} onClick={() => setMarkdownViewMode('api')}>API</button>
             </div>
           )}
-          <button className="backup-restore-btn" onClick={() => setShowSettings(true)} title="Settings">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-          </button>
           <a href="/mobile" className="mobile-link" title="Switch to mobile view">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
@@ -2269,6 +2371,20 @@ function App() {
             <button className={`rail-tab ${sidebarTab === 'categories' ? 'active' : ''}`} onClick={() => setSidebarTab('categories')} title="Categories">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+              </svg>
+            </button>
+            <div style={{ flex: 1 }} />
+            <button className="rail-tab rail-tab-help" onClick={() => setShowHelp(true)} title="Help">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </button>
+            <button className="rail-tab rail-tab-settings" onClick={() => setShowSettings(true)} title="Settings">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
               </svg>
             </button>
           </div>
@@ -2399,7 +2515,7 @@ function App() {
               key={activeTab.id}
               markdown={activeTab.data}
               categories={categories}
-              previewMode={markdownPreviewMode}
+              viewMode={markdownViewMode}
               onClose={() => closeTab(activeTab.id)}
               onSaved={(created, closed) => {
                 setMarkdownRefreshKey(k => k + 1)
@@ -2528,11 +2644,17 @@ function App() {
                 </div>
                 <main className="chat-area irc-chat-area" ref={ircChatAreaRef} onScroll={handleIrcScroll}>
                   {ircMessages.length === 0 && !ircLoadingHistory ? (
+                    ircChannelLoading ? (
+                      <div className="irc-channel-loading">
+                        <div className="irc-channel-spinner" />
+                      </div>
+                    ) : (
                     <div className="empty-state">
                       <AstroLogo className="empty-logo" />
                       <h2>Agent Network</h2>
                       <p className="irc-hint">Messages from {ircStatus.channel || '#astro'} will appear here</p>
                     </div>
+                    )
                   ) : (
                     <div className="messages irc-messages">
                       {ircLoadingHistory && (
@@ -2592,6 +2714,7 @@ function App() {
         </div>
       </div>
       {quickView && <QuickView item={quickView} onClose={() => setQuickView(null)} />}
+      {showHelp && <HelpDialog onClose={() => setShowHelp(false)} />}
       {showSettings && (
         <SettingsDialog
           onClose={() => setShowSettings(false)}
