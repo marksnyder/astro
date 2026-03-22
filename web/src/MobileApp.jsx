@@ -60,20 +60,6 @@ function MobileIrcMessageGroup({ group }) {
   )
 }
 
-const MODELS = [
-  { id: 'gpt-5.2', label: 'GPT-5.2' },
-  { id: 'gpt-5.1', label: 'GPT-5.1' },
-  { id: 'gpt-5', label: 'GPT-5' },
-  { id: 'gpt-5-mini', label: 'GPT-5 Mini' },
-  { id: 'gpt-5-nano', label: 'GPT-5 Nano' },
-  { id: 'o4-mini', label: 'o4 Mini' },
-  { id: 'o3', label: 'o3' },
-  { id: 'gpt-4.1', label: 'GPT-4.1' },
-  { id: 'gpt-4.1-mini', label: 'GPT-4.1 Mini' },
-  { id: 'gpt-4o', label: 'GPT-4o' },
-  { id: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-]
-
 // ── Shared mobile category picker ─────────────────────
 
 function MobileCategorySelect({ categories, value, onChange }) {
@@ -1006,12 +992,7 @@ function MobilePostTimeline({ category, onBack }) {
 // ── Main mobile app ───────────────────────────────────
 
 function MobileApp() {
-  const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [model, setModel] = useState('gpt-5-mini')
-  const [useContext, setUseContext] = useState(true)
-  const [chatMode, setChatMode] = useState('llm')
   const [ircNick, setIrcNick] = useState('')
   const [ircMessages, setIrcMessages] = useState([])
   const [ircStatus, setIrcStatus] = useState({ connected: false, nick: '', channel: '', host: '', port: 0 })
@@ -1038,7 +1019,6 @@ function MobileApp() {
   const chatBaseInputRef = useRef('')
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
-  const [stats, setStats] = useState(null)
   const [showPromptPicker, setShowPromptPicker] = useState(false)
   const [mobilePrompts, setMobilePrompts] = useState([])
   const [promptSearchQ, setPromptSearchQ] = useState('')
@@ -1064,9 +1044,6 @@ function MobileApp() {
   }
 
   useEffect(() => {
-    fetch('/api/stats').then(r => r.json()).then(setStats).catch(() => {})
-    fetch('/api/settings/selected_model').then(r => r.json()).then(d => { if (d.value) setModel(d.value) }).catch(() => {})
-    fetch('/api/settings/chat_mode').then(r => r.json()).then(d => { if (d.value) setChatMode(d.value) }).catch(() => {})
     fetch('/api/settings/irc_channel').then(r => r.json()).then(d => { if (d.value) setIrcNick(d.value) }).catch(() => {})
     fetchIrcChannels()
     fetch('/api/universes').then(r => r.json()).then(data => {
@@ -1162,11 +1139,6 @@ function MobileApp() {
 
   // IRC WebSocket
   useEffect(() => {
-    if (chatMode !== 'irc') {
-      if (ircWsRef.current) { ircWsRef.current.close(); ircWsRef.current = null }
-      ircHistoryTsRef.current = 0
-      return
-    }
     let cancelled = false
     let ws = null
     let reconnectTimer = null
@@ -1227,10 +1199,9 @@ function MobileApp() {
       clearInterval(channelsPoll)
       if (ws) { ws.close(); ircWsRef.current = null }
     }
-  }, [chatMode])
+  }, [])
 
   useEffect(() => {
-    if (chatMode !== 'irc') return
     const poll = () => {
       const since = lastSeenTsRef.current
       if (Object.keys(since).length === 0) return
@@ -1253,7 +1224,7 @@ function MobileApp() {
     poll()
     const iv = setInterval(poll, 5000)
     return () => clearInterval(iv)
-  }, [chatMode, ircNick])
+  }, [ircNick])
 
   const [chatBg, setChatBg] = useState({ current: null, next: null, fading: false, author: null, authorUrl: null })
 
@@ -1295,11 +1266,11 @@ function MobileApp() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, ircMessages])
+  }, [ircMessages])
 
   useEffect(() => {
-    if (!loading && view === 'chat') inputRef.current?.focus()
-  }, [loading, view])
+    if (view === 'chat') inputRef.current?.focus()
+  }, [view])
 
   // ── Chat dictation ─────────────────────
   const startChatRecSession = () => {
@@ -1377,7 +1348,7 @@ function MobileApp() {
   }
 
   const IRC_MSG_LIMIT = 400
-  const ircByteCount = chatMode === 'irc' && input
+  const ircByteCount = input
     ? new TextEncoder().encode(input.trim()).length
     : 0
 
@@ -1391,40 +1362,20 @@ function MobileApp() {
       if (chatWakeLockRef.current) { chatWakeLockRef.current.release().catch(() => {}); chatWakeLockRef.current = null }
     }
 
-    if (chatMode === 'irc') {
-      setInput('')
-      chatBaseInputRef.current = ''
-      if (inputRef.current) inputRef.current.style.height = 'auto'
-      const ws = ircWsRef.current
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'send', message: question }))
-      } else {
-        setIrcMessages(prev => [...prev, { id: Date.now(), sender: 'system', text: 'Not connected to IRC', kind: 'error', timestamp: Date.now() / 1000, self: false }])
-      }
-      return
-    }
-
-    if (loading) return
-    setMessages(prev => [...prev, { role: 'user', content: question }])
     setInput('')
     chatBaseInputRef.current = ''
-    setLoading(true)
-    const history = messages.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({ role: m.role, content: m.content }))
-    try {
-      const payload = { question, model, use_context: useContext, history, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, mode: chatMode, universe_id: currentUniverseId }
-      const res = await fetch('/api/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-      if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Request failed') }
-      const data = await res.json()
-      setMessages(prev => [...prev, { role: 'assistant', content: data.answer, model: data.model }])
-      speakText(data.answer)
-    } catch (err) {
-      setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${err.message}` }])
-    } finally { setLoading(false) }
+    if (inputRef.current) inputRef.current.style.height = 'auto'
+    const ws = ircWsRef.current
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'send', message: question }))
+    } else {
+      setIrcMessages(prev => [...prev, { id: Date.now(), sender: 'system', text: 'Not connected to IRC', kind: 'error', timestamp: Date.now() / 1000, self: false }])
+    }
   }
 
   const clearChat = () => {
-    if (chatMode === 'irc') { setIrcMessages([]); setMenuOpen(false); return }
-    if (messages.length === 0) return; window.speechSynthesis?.cancel(); setMessages([]); setMenuOpen(false)
+    setIrcMessages([])
+    setMenuOpen(false)
   }
 
   return (
@@ -1471,9 +1422,7 @@ function MobileApp() {
                 {voiceChat && <><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /></>}
               </svg>
             </button>
-            <span className="m-model-label">
-              {chatMode === 'irc' ? 'Agent Network' : MODELS.find(m => m.id === model)?.label}
-            </span>
+            <span className="m-model-label">Agent Network</span>
           </>
         )}
       </header>
@@ -1482,50 +1431,19 @@ function MobileApp() {
       {menuOpen && <div className="m-menu-overlay" onClick={() => setMenuOpen(false)} />}
       <nav className={`m-menu ${menuOpen ? 'open' : ''}`}>
         <div className="m-menu-section">
-          <div className="m-menu-section-title">Chat Mode</div>
-          <button className={`m-menu-item ${chatMode === 'llm' ? 'active' : ''}`} onClick={() => {
-            setChatMode('llm')
-            fetch('/api/settings/chat_mode', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: 'llm' }) }).catch(() => {})
-          }}>LLM (Direct / RAG)</button>
-          <button className={`m-menu-item ${chatMode === 'irc' ? 'active' : ''}`} onClick={() => {
-            setChatMode('irc')
-            fetch('/api/settings/chat_mode', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: 'irc' }) }).catch(() => {})
-          }}>Agent Network</button>
-        </div>
-        {chatMode === 'irc' && (
-          <div className="m-menu-section">
-            <div className="m-menu-section-title">Agent Network Channel</div>
-            <select
-              className="m-menu-input"
-              value={ircNick}
-              onChange={(e) => { handleSwitchChannel(e.target.value); setMenuOpen(false) }}
-            >
-              {ircChannels.length === 0 && ircNick && <option value={ircNick}>{ircNick}</option>}
-              {ircChannels.length === 0 && !ircNick && <option value="">No channels</option>}
-              {ircChannels.map((ch) => (
-                <option key={ch.name} value={ch.name}>{ch.name}{unreadCounts[ch.name] ? ` (${unreadCounts[ch.name]})` : ''}</option>
-              ))}
-            </select>
-          </div>
-        )}
-        {chatMode === 'llm' && (
-          <div className="m-menu-section">
-            <div className="m-menu-section-title">Model</div>
-            {MODELS.map(m => (
-              <button key={m.id} className={`m-menu-item ${model === m.id ? 'active' : ''}`} onClick={() => {
-                setModel(m.id); setMenuOpen(false)
-                fetch('/api/settings/selected_model', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: m.id }) }).catch(() => {})
-              }}>{m.label}</button>
+          <div className="m-menu-section-title">Agent Network Channel</div>
+          <select
+            className="m-menu-input"
+            value={ircNick}
+            onChange={(e) => { handleSwitchChannel(e.target.value); setMenuOpen(false) }}
+          >
+            {ircChannels.length === 0 && ircNick && <option value={ircNick}>{ircNick}</option>}
+            {ircChannels.length === 0 && !ircNick && <option value="">No channels</option>}
+            {ircChannels.map((ch) => (
+              <option key={ch.name} value={ch.name}>{ch.name}{unreadCounts[ch.name] ? ` (${unreadCounts[ch.name]})` : ''}</option>
             ))}
-          </div>
-        )}
-        {chatMode === 'llm' && (
-          <div className="m-menu-section">
-            <div className="m-menu-section-title">Mode</div>
-            <button className={`m-menu-item ${useContext ? 'active' : ''}`} onClick={() => { setUseContext(true); setMenuOpen(false) }}>RAG (Document Context)</button>
-            <button className={`m-menu-item ${!useContext ? 'active' : ''}`} onClick={() => { setUseContext(false); setMenuOpen(false) }}>Direct Chat</button>
-          </div>
-        )}
+          </select>
+        </div>
         <div className="m-menu-section">
           <div className="m-menu-section-title">Actions</div>
           <button className="m-menu-item m-menu-danger" onClick={clearChat}>Clear Chat</button>
@@ -1552,8 +1470,7 @@ function MobileApp() {
                 Photo by <a href={chatBg.authorUrl} target="_blank" rel="noopener noreferrer">{chatBg.author}</a> on <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer">Unsplash</a>
               </div>
             )}
-            {chatMode === 'irc' && (
-              <div className="m-irc-status-bar">
+            <div className="m-irc-status-bar">
                 <div className={`m-irc-dot ${ircStatus.connected ? 'connected' : ''}`} />
                 <span>{ircStatus.connected ? `${ircStatus.nick} on ${ircStatus.channel}` : 'Connecting...'}</span>
                 {ircStatus.connected && ircStatus.host && (
@@ -1574,9 +1491,8 @@ function MobileApp() {
                     <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
                   </svg>
                 </button>
-              </div>
-            )}
-            {chatMode === 'irc' && ircUsers.length > 0 && (
+            </div>
+            {ircUsers.length > 0 && (
               <div className="irc-users-bar">
                 {ircUsers.map((nick) => (
                   <span key={nick} className={`irc-user-chip ${nick.toLowerCase() === ircStatus.nick?.toLowerCase() ? 'irc-user-self' : ''}`}>
@@ -1586,96 +1502,53 @@ function MobileApp() {
                 ))}
               </div>
             )}
-            <main className="m-messages" ref={chatMode === 'irc' ? ircChatAreaRef : undefined} onScroll={chatMode === 'irc' ? handleIrcScroll : undefined}>
-              {chatMode === 'irc' ? (
-                ircMessages.length === 0 && !ircLoadingHistory ? (
-                  <div className="m-empty">
-                    <img className="m-empty-logo" src={LOGO_URL} alt="Astro" />
-                    <h2>Agent Network</h2>
-                    <p style={{ color: 'var(--text-secondary, #999)', fontSize: 14 }}>Messages from {ircStatus.channel || '#astro'} will appear here</p>
-                  </div>
-                ) : (
-                  <>
-                    {ircLoadingHistory && (
-                      <div style={{ textAlign: 'center', padding: '8px 0', color: 'var(--text-secondary, #999)', fontSize: 12, opacity: 0.7 }}>Loading history...</div>
-                    )}
-                    {groupIrcMessages(ircMessages.filter(msg => msg.kind !== 'join' && msg.kind !== 'part' && msg.kind !== 'quit')).map((group, i) =>
-                      group.type === 'event' ? (
-                        <div key={group.msg.id} className="m-irc-event">
-                          <span className="m-irc-event-nick">{group.msg.sender}</span> {group.msg.text}
-                        </div>
-                      ) : (
-                        <MobileIrcMessageGroup key={group.messages[0].id} group={group} />
-                      )
-                    )}
-                    <div ref={messagesEndRef} />
-                  </>
-                )
+            <main className="m-messages" ref={ircChatAreaRef} onScroll={handleIrcScroll}>
+              {ircMessages.length === 0 && !ircLoadingHistory ? (
+                <div className="m-empty">
+                  <img className="m-empty-logo" src={LOGO_URL} alt="Astro" />
+                  <h2>Agent Network</h2>
+                  <p style={{ color: 'var(--text-secondary, #999)', fontSize: 14 }}>Messages from {ircStatus.channel || '#astro'} will appear here</p>
+                </div>
               ) : (
-                messages.length === 0 ? (
-                  <div className="m-empty">
-                    <img className="m-empty-logo" src={LOGO_URL} alt="Astro" />
-                    <h2>Ask Astro anything</h2>
-                    {stats?.schema_version != null && (
-                      <span className="schema-version">schema v{stats.schema_version}</span>
-                    )}
-                  </div>
-                ) : (
-                  <>
-                    {messages.map((msg, i) => (
-                      <div key={i} className={`m-msg ${msg.role}`}>
-                        <div className="m-msg-avatar">{msg.role === 'user' ? 'You' : <img src={LOGO_URL} alt="A" />}</div>
-                        <div className="m-msg-body">
-                          <div className="m-msg-role">
-                            {msg.role === 'user' ? 'You' : 'Astro'}
-                            {msg.role === 'assistant' && msg.model && <span className="m-msg-model">{msg.model}</span>}
-                          </div>
-                          <div className="m-msg-content markdown-body">
-                            {msg.role === 'assistant' ? (
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                            ) : msg.content}
-                          </div>
-                        </div>
+                <>
+                  {ircLoadingHistory && (
+                    <div style={{ textAlign: 'center', padding: '8px 0', color: 'var(--text-secondary, #999)', fontSize: 12, opacity: 0.7 }}>Loading history...</div>
+                  )}
+                  {groupIrcMessages(ircMessages.filter(msg => msg.kind !== 'join' && msg.kind !== 'part' && msg.kind !== 'quit')).map((group, i) =>
+                    group.type === 'event' ? (
+                      <div key={group.msg.id} className="m-irc-event">
+                        <span className="m-irc-event-nick">{group.msg.sender}</span> {group.msg.text}
                       </div>
-                    ))}
-                    {loading && (
-                      <div className="m-msg assistant">
-                        <div className="m-msg-avatar"><img src={LOGO_URL} alt="A" /></div>
-                        <div className="m-msg-body">
-                          <div className="m-msg-role">Astro</div>
-                          <div className="m-msg-content m-thinking"><span className="m-dot" /><span className="m-dot" /><span className="m-dot" /></div>
-                        </div>
-                      </div>
-                    )}
-                    <div ref={messagesEndRef} />
-                  </>
-                )
+                    ) : (
+                      <MobileIrcMessageGroup key={group.messages[0].id} group={group} />
+                    )
+                  )}
+                  <div ref={messagesEndRef} />
+                </>
               )}
             </main>
             {chatListening && <div className="mn-listening-bar">Listening...</div>}
             <footer className="m-input-area">
               <form className="m-input-form" onSubmit={handleSubmit}>
-                {chatMode === 'irc' && (
-                  <button type="button" className="m-prompt-picker-btn" onClick={openPromptPicker} title="Run a prompt">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10" /><polygon points="10 8 16 12 10 16 10 8" />
-                    </svg>
-                  </button>
-                )}
-                <button type="button" className={`m-chat-mic-btn ${chatListening ? 'active' : ''}`} onClick={toggleChatDictation} disabled={chatMode !== 'irc' && loading}>
+                <button type="button" className="m-prompt-picker-btn" onClick={openPromptPicker} title="Run a prompt">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" /><polygon points="10 8 16 12 10 16 10 8" />
+                  </svg>
+                </button>
+                <button type="button" className={`m-chat-mic-btn ${chatListening ? 'active' : ''}`} onClick={toggleChatDictation}>
                   {chatListening ? (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>
                   ) : (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" /></svg>
                   )}
                 </button>
-                <textarea ref={inputRef} className="m-input-field" rows="1" placeholder={chatMode === 'irc' ? `Message ${ircStatus.channel || '#astro'}...` : 'Ask a question...'} value={input} onChange={(e) => { setInput(e.target.value); const ta = e.target; ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 150) + 'px' }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(e) } }} disabled={chatMode !== 'irc' && loading} />
-                {chatMode === 'irc' && input.trim() && (
+                <textarea ref={inputRef} className="m-input-field" rows="1" placeholder={`Message ${ircStatus.channel || '#astro'}...`} value={input} onChange={(e) => { setInput(e.target.value); const ta = e.target; ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 150) + 'px' }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(e) } }} />
+                {input.trim() && (
                   <span className={`irc-byte-count ${ircByteCount > IRC_MSG_LIMIT ? 'over' : ircByteCount > IRC_MSG_LIMIT * 0.8 ? 'warn' : ''}`}>
                     {ircByteCount}/{IRC_MSG_LIMIT}
                   </span>
                 )}
-                <button type="submit" className="m-send-btn" disabled={(chatMode !== 'irc' && loading) || !input.trim() || (chatMode === 'irc' && ircByteCount > IRC_MSG_LIMIT)}>
+                <button type="submit" className="m-send-btn" disabled={!input.trim() || ircByteCount > IRC_MSG_LIMIT}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
                 </button>
               </form>

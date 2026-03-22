@@ -6,16 +6,27 @@ subtitle: What your AI operating system includes
 
 These capabilities work together so you can manage information, agents, prompts, tasks, and feeds in one place. The sections below walk through each area in detail.
 
-## AI Chat with Retrieval (RAG)
+## AI Agent Network
 
-Astro includes a conversational AI interface powered by OpenAI (with additional providers planned). The same retrieval pipeline also feeds your agents: grounded context from your Universe becomes shared memory for chat and automation alike.
+Agent Network is a core part of Astro's AI operating system: a built-in IRC server that lets you orchestrate agents across platforms from one place.
 
-- Chat-based interaction
-- Toggle Retrieval on/off per message
-- Answers grounded in your markdowns, documents, and action items
-- Persistent knowledgebase that grows with use
+Use Astro as a central hub to:
 
-When Retrieval is enabled, Astro pulls relevant context from your stored knowledge before generating a response — making conversations contextual and meaningful, and keeping agent-facing knowledge consistent with what you see in the UI.
+- Coordinate agents
+- Communicate across systems
+- Integrate with external AI platforms
+
+Astro becomes the shared control plane between you and your agents — routing messages, handoffs, and status without scattering tools across services.
+
+---
+
+## Vector Store & Semantic Search
+
+Astro maintains a ChromaDB vector store that indexes your markdowns, documents, and action items using local embeddings (BAAI/bge-small-en-v1.5). This enables semantic search across your entire knowledge base without requiring any external API keys.
+
+- Local, CPU-based embeddings — no API key needed
+- Automatic indexing of all content
+- Full rebuild via the Settings panel
 
 ---
 
@@ -28,7 +39,7 @@ Create and organize structured markdowns.
 - Rich formatting via markdown
 - Embed images (PNG, JPG, GIF, WebP, BMP, SVG)
 - Fully searchable
-- Included in AI retrieval context
+- Automatically vectorized for semantic search
 
 Markdowns are first-class citizens in your Universe.
 
@@ -56,9 +67,9 @@ Upload and manage knowledge files directly inside Astro.
 - Pin important documents
 - Assign categories
 - Filter by name
-- Included in AI retrieval context
+- Included in semantic search
 
-Your documents become queryable memory — not just storage.
+Your documents become searchable memory — not just storage.
 
 ---
 
@@ -70,7 +81,7 @@ Track what matters.
 - Priority ("hot") flag
 - Due dates
 - Categories
-- Included in AI retrieval
+- Vectorized for search
 
 Tasks integrate directly into your knowledge system.
 
@@ -135,20 +146,6 @@ Quickly search across markdowns, documents, and links. Find what you need instan
 ## Mobile-Optimized Interface
 
 Astro includes a mobile-friendly version at `/mobile`, built for access on the go. Your Universe stays accessible anywhere.
-
----
-
-## AI Agent Network
-
-Agent Network is a core part of Astro’s AI operating system: a built-in IRC server that lets you orchestrate agents across platforms from one place.
-
-Use Astro as a central hub to:
-
-- Coordinate agents
-- Communicate across systems
-- Integrate with external AI platforms
-
-Astro becomes the shared control plane between you and your agents — routing messages, handoffs, and status without scattering tools across services.
 
 ---
 

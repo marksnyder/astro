@@ -2,7 +2,7 @@
 
 **Your Universe, Organized.**
 
-Astro is a self-hosted, AI-powered workspace that brings chat, markdowns, documents, action items, bookmarks, and autonomous agents into one platform. Everything lives inside **Universes** — cleanly separated workspaces that keep your knowledge organized and contained.
+Astro is a self-hosted workspace that brings agent orchestration, markdowns, documents, action items, bookmarks, and data feeds into one platform. Everything lives inside **Universes** — cleanly separated workspaces that keep your knowledge organized and contained.
 
 [Documentation](https://runastro.sh) · [Chrome/Edge Extension](https://chromewebstore.google.com/detail/astro-browse/djbiamicfibnldnmhfnmndpdmghilmmi)
 
@@ -10,17 +10,17 @@ Astro is a self-hosted, AI-powered workspace that brings chat, markdowns, docume
 
 ## Features
 
-### AI Chat with Retrieval (RAG)
-Conversational AI with retrieval you can toggle per message. When enabled, answers are grounded in your markdowns, documents, and action items — building a persistent knowledgebase that grows with use.
+### AI Agent Network
+A built-in IRC server enables communication with AI agents across platforms. Coordinate agents, communicate across systems, and integrate with external AI platforms from one central hub.
 
 ### Markdowns
-Create and organize structured markdowns with rich formatting, embedded images, category assignment, and full-text search. Every markdown is automatically included in AI retrieval context.
+Create and organize structured markdowns with rich formatting, embedded images, category assignment, and full-text search. Every markdown is automatically vectorized for semantic search.
 
 ### Document Archive
-Upload PDF, DOCX, XLSX, PPTX, TXT, MD, and CSV files. Documents are automatically ingested and embedded so they become queryable memory — not just storage. Includes inline PDF viewing and Excel rendering as styled tables.
+Upload PDF, DOCX, XLSX, PPTX, TXT, MD, and CSV files. Documents are automatically ingested and embedded into the vector store so they become searchable memory — not just storage. Includes inline PDF viewing and Excel rendering as styled tables.
 
 ### Action Items
-Track tasks with priority flags, due dates, and categories. Tasks integrate directly into your knowledge system and are included in AI retrieval.
+Track tasks with priority flags, due dates, and categories. Tasks integrate directly into your knowledge system and are vectorized for search.
 
 ### Bookmarks
 Save and organize links with titles, URLs, and categories. Links become part of your searchable knowledge base.
@@ -33,9 +33,6 @@ A parent/child category tree organizes content across markdowns, documents, task
 
 ### Pinned Items Bar
 Pin important markdowns, documents, links, and feeds to a unified header bar for quick access.
-
-### AI Agent Network
-A built-in IRC server enables communication with AI agents across platforms. Coordinate agents, communicate across systems, and integrate with external AI platforms from one central hub.
 
 ### Prompts
 Organize and send reusable messages to Agent Network channels on demand or via cron. Create prompt categories with custom emoji labels and arrange them in a 3-column board layout with drag-and-drop. Each prompt has a target channel, message body, and optional cron schedule. Move prompts between categories, reorder them by dragging, and run any prompt instantly from the UI or let the scheduler fire it automatically.
@@ -128,9 +125,9 @@ Create an auth key at [login.tailscale.com/admin/settings/keys](https://login.ta
 ## First Run
 
 1. Open **http://localhost:8000**
-2. Click the gear icon to open Settings
-3. Enter your **OpenAI API key** (required for chat and embeddings)
-4. Start uploading documents, creating markdowns, or chatting
+2. Start uploading documents, creating markdowns, or coordinating agents
+
+Embeddings are handled locally — no external API keys are required.
 
 ---
 
@@ -148,7 +145,6 @@ cd astro
 ## Requirements
 
 - **Docker** 20.10+
-- **OpenAI API key** (for chat and embeddings)
 - **Tailscale auth key** (optional, for remote access)
 
 ---

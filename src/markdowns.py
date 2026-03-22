@@ -1,6 +1,5 @@
 """SQLite-backed markdowns, document-metadata, and category storage."""
 
-import os
 import sqlite3
 import uuid
 from dataclasses import asdict, dataclass
@@ -8,16 +7,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "astro.db"
-
-OPENAI_KEY_SETTING = "openai_api_key"
-
-
-def get_openai_api_key() -> str:
-    """Return the OpenAI API key from DB settings, falling back to env var."""
-    key = get_setting(OPENAI_KEY_SETTING)
-    if key.strip():
-        return key.strip()
-    return os.getenv("OPENAI_API_KEY", "")
 
 
 # ── Data classes ──────────────────────────────────────────────────────────

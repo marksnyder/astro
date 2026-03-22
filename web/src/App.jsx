@@ -7,7 +7,7 @@ import ActionItemsPanel from './ActionItemsPanel'
 import FeedsPanel, { PostTimeline } from './FeedsPanel'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import CategoryTree, { CategoryPicker, EmojiPopover } from './CategoryTree'
+import CategoryTree, { EmojiPopover } from './CategoryTree'
 import BACKGROUNDS from './backgrounds'
 
 const LOGO_URL = '/logo.png'
@@ -16,24 +16,6 @@ function AstroLogo({ className }) {
   return <img src={LOGO_URL} alt="Astro" className={`astro-logo ${className || ''}`} />
 }
 
-function ChatMessage({ role, content, model }) {
-  return (
-    <div className={`message ${role}`}>
-      <div className="message-avatar">
-        {role === 'user' ? 'You' : <AstroLogo />}
-      </div>
-      <div className="message-body">
-        <div className="message-role">
-          {role === 'user' ? 'You' : 'Astro'}
-          {role === 'assistant' && model && <span className="message-model">{model}</span>}
-        </div>
-        <div className="message-content markdown-body">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 function ircTimestamp(ts) {
   if (!ts) return ''
@@ -120,19 +102,6 @@ function IrcMessageGroup({ group }) {
   )
 }
 
-const MODELS = [
-  { id: 'gpt-5.2', label: 'GPT-5.2' },
-  { id: 'gpt-5.1', label: 'GPT-5.1' },
-  { id: 'gpt-5', label: 'GPT-5' },
-  { id: 'gpt-5-mini', label: 'GPT-5 Mini' },
-  { id: 'gpt-5-nano', label: 'GPT-5 Nano' },
-  { id: 'o4-mini', label: 'o4 Mini' },
-  { id: 'o3', label: 'o3' },
-  { id: 'gpt-4.1', label: 'GPT-4.1' },
-  { id: 'gpt-4.1-mini', label: 'GPT-4.1 Mini' },
-  { id: 'gpt-4o', label: 'GPT-4o' },
-  { id: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-]
 
 function QuickView({ item, onClose }) {
   if (!item) return null
@@ -175,70 +144,6 @@ function QuickView({ item, onClose }) {
   )
 }
 
-function SaveChatModal({ categories, messages, onClose, onSaved, universeId }) {
-  const [title, setTitle] = useState(`Chat ${new Date().toLocaleString()}`)
-  const [categoryId, setCategoryId] = useState(null)
-  const [saving, setSaving] = useState(false)
-  const titleRef = useRef(null)
-
-  useEffect(() => { titleRef.current?.select() }, [])
-
-  const handleSave = async () => {
-    if (!title.trim()) return
-    setSaving(true)
-    const body = messages
-      .map(m => `<p><strong>${m.role === 'user' ? 'You' : 'Astro'}:</strong> ${m.content}</p>`)
-      .join('\n')
-    try {
-      await fetch(`/api/markdowns?universe_id=${universeId || 1}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: title.trim(), body, category_id: categoryId }),
-      })
-      onSaved?.()
-      onClose()
-    } catch {
-      alert('Failed to save chat as markdown.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="quickview-overlay">
-      <div className="save-chat-modal">
-        <div className="quickview-header">
-          <span className="quickview-type">Save as Markdown</span>
-          <h3 className="quickview-title">Save Chat</h3>
-          <button className="quickview-close" onClick={onClose}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-        <div className="save-chat-body">
-          <label className="save-chat-label">Title</label>
-          <input
-            ref={titleRef}
-            className="markdown-title-input"
-            placeholder="Markdown title..."
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleSave() }}
-          />
-          <label className="save-chat-label">Category</label>
-          <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId} />
-          <div className="save-chat-actions">
-            <button className="markdown-save-btn" onClick={handleSave} disabled={saving || !title.trim()}>
-              {saving ? 'Saving...' : 'Save'}
-            </button>
-            <button className="markdown-delete-btn" onClick={onClose}>Cancel</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 function UniverseManager({ universes, currentId, onSwitch, onClose, onRefresh }) {
   const [newName, setNewName] = useState('')
@@ -355,34 +260,6 @@ function SettingsDialog({ onClose, onRestored }) {
   const [busy, setBusy] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
   const [reindexing, setReindexing] = useState(false)
-  const [apiKey, setApiKey] = useState('')
-  const [apiKeyLoaded, setApiKeyLoaded] = useState(false)
-  const [apiKeySaving, setApiKeySaving] = useState(false)
-  const [apiKeyStatus, setApiKeyStatus] = useState(null)
-  useEffect(() => {
-    fetch('/api/settings/openai_api_key')
-      .then(r => r.json())
-      .then(d => { setApiKey(d.value || ''); setApiKeyLoaded(true) })
-      .catch(() => setApiKeyLoaded(true))
-  }, [])
-
-  const handleSaveApiKey = async () => {
-    setApiKeySaving(true)
-    setApiKeyStatus(null)
-    try {
-      const res = await fetch('/api/settings/openai_api_key', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: apiKey.trim() }),
-      })
-      if (!res.ok) throw new Error('Failed to save')
-      setApiKeyStatus({ type: 'success', text: 'API key saved.' })
-    } catch (e) {
-      setApiKeyStatus({ type: 'error', text: `Failed to save: ${e.message}` })
-    } finally {
-      setApiKeySaving(false)
-    }
-  }
 
   const handleBackup = async () => {
     setBusy(true)
@@ -458,28 +335,6 @@ function SettingsDialog({ onClose, onRestored }) {
     <div className="br-modal" onClick={onClose}>
       <div className="br-modal-content" onClick={e => e.stopPropagation()}>
         <h2>Settings</h2>
-
-        <div className="br-section">
-          <h3>OpenAI API Key</h3>
-          <p>Required for chat and embeddings. Stored in the database.</p>
-          <div className="br-restore-row">
-            <input
-              type="password"
-              className="br-api-key-input"
-              placeholder={apiKeyLoaded ? 'sk-...' : 'Loading...'}
-              value={apiKey}
-              onChange={e => setApiKey(e.target.value)}
-              disabled={!apiKeyLoaded || apiKeySaving}
-              autoComplete="off"
-            />
-            <button className="br-action-btn" onClick={handleSaveApiKey} disabled={!apiKeyLoaded || apiKeySaving}>
-              {apiKeySaving ? 'Saving...' : 'Save'}
-            </button>
-          </div>
-          {apiKeyStatus && <div className={`br-status ${apiKeyStatus.type}`}>{apiKeyStatus.text}</div>}
-        </div>
-
-        <div className="br-divider" />
 
         <div className="br-section">
           <h3>Backup</h3>
@@ -1597,13 +1452,8 @@ function PromptBoard({ categories, prompts, filterChannel, search, onEditPrompt,
 }
 
 function App() {
-  const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState(null)
-  const [model, setModel] = useState('gpt-5-mini')
-  const [useContext, setUseContext] = useState(true)
-  const [chatMode, setChatMode] = useState('llm') // 'llm' or 'irc'
   const [feedUnreadCounts, setFeedUnreadCounts] = useState({})
   const [feedRecent7d, setFeedRecent7d] = useState({})
   const [ircNick, setIrcNick] = useState('')
@@ -1646,10 +1496,9 @@ function App() {
   const [openFeedRequest, setOpenFeedRequest] = useState(null)
 
   const [tabs, setTabs] = useState([
-    { id: 'llm', type: 'llm', title: 'LLM Chat', closable: false },
     { id: 'irc', type: 'irc', title: 'Agent Network', closable: false },
   ])
-  const [activeTabId, setActiveTabId] = useState('llm')
+  const [activeTabId, setActiveTabId] = useState('irc')
   const [markdownPreviewMode, setMarkdownPreviewMode] = useState(false)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -1696,14 +1545,6 @@ function App() {
   }, [])
 
   useEffect(() => {
-    fetch('/api/settings/selected_model')
-      .then(r => r.json())
-      .then(d => { if (d.value) setModel(d.value) })
-      .catch(() => {})
-    fetch('/api/settings/chat_mode')
-      .then(r => r.json())
-      .then(d => { if (d.value) { setChatMode(d.value); if (d.value === 'irc') setActiveTabId('irc') } })
-      .catch(() => {})
     fetch('/api/settings/irc_channel')
       .then(r => r.json())
       .then(d => { if (d.value) setIrcNick(d.value) })
@@ -1954,11 +1795,6 @@ function App() {
   const ircWsRef = useRef(null)
   const ircHistoryTsRef = useRef(0)
   useEffect(() => {
-    if (chatMode !== 'irc') {
-      if (ircWsRef.current) { ircWsRef.current.close(); ircWsRef.current = null }
-      ircHistoryTsRef.current = 0
-      return
-    }
     let cancelled = false
     let ws = null
     let reconnectTimer = null
@@ -2027,10 +1863,9 @@ function App() {
       clearInterval(channelsPoll)
       if (ws) { ws.close(); ircWsRef.current = null }
     }
-  }, [chatMode])
+  }, [])
 
   useEffect(() => {
-    if (chatMode !== 'irc') return
     const poll = () => {
       const since = lastSeenTsRef.current
       const channels = Object.keys(since)
@@ -2054,7 +1889,7 @@ function App() {
     poll()
     const iv = setInterval(poll, 5000)
     return () => clearInterval(iv)
-  }, [chatMode, ircNick])
+  }, [ircNick])
 
   const fetchCategories = useCallback(() => {
     const params = currentUniverseId ? `?universe_id=${currentUniverseId}` : ''
@@ -2090,12 +1925,7 @@ function App() {
   const switchToTab = useCallback((tabId) => {
     setActiveTabId(tabId)
     if (tabId === 'irc') {
-      setChatMode('irc')
-      fetch('/api/settings/chat_mode', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: 'irc' }) }).catch(() => {})
       fetchIrcChannels()
-    } else if (tabId === 'llm') {
-      setChatMode('llm')
-      fetch('/api/settings/chat_mode', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: 'llm' }) }).catch(() => {})
     }
   }, [])
 
@@ -2123,7 +1953,7 @@ function App() {
 
   const closeTab = useCallback((tabId) => {
     setTabs(prev => prev.filter(t => t.id !== tabId))
-    setActiveTabId(prev => prev === tabId ? 'llm' : prev)
+    setActiveTabId(prev => prev === tabId ? 'irc' : prev)
   }, [])
 
   const updateTabsOverflow = useCallback(() => {
@@ -2232,101 +2062,39 @@ function App() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, ircMessages])
+  }, [ircMessages])
 
   useEffect(() => {
-    if (!loading) inputRef.current?.focus()
-  }, [loading])
+    inputRef.current?.focus()
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     const question = input.trim()
     if (!question) return
 
-    if (chatMode === 'irc') {
-      setInput('')
-      if (inputRef.current) inputRef.current.style.height = 'auto'
-      const ws = ircWsRef.current
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'send', message: question }))
-      } else {
-        setIrcMessages(prev => [...prev, { id: Date.now(), sender: 'system', text: 'Not connected to IRC', kind: 'error', timestamp: Date.now() / 1000, self: false }])
-      }
-      return
-    }
-
-    if (loading) return
-
-    const userMsg = { role: 'user', content: question }
-    const updatedMessages = [...messages, userMsg]
-    setMessages(updatedMessages)
     setInput('')
     if (inputRef.current) inputRef.current.style.height = 'auto'
-    setLoading(true)
-
-    const history = messages
-      .filter(m => m.role === 'user' || m.role === 'assistant')
-      .map(m => ({ role: m.role, content: m.content }))
-
-    try {
-      const payload = {
-        question,
-        model,
-        use_context: useContext,
-        history,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        mode: chatMode,
-        universe_id: currentUniverseId,
-      }
-      const res = await fetch('/api/query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.detail || 'Request failed')
-      }
-
-      const data = await res.json()
-      setMessages(prev => [...prev, { role: 'assistant', content: data.answer, model: data.model }])
-    } catch (err) {
-      setMessages(prev => [
-        ...prev,
-        { role: 'assistant', content: `Error: ${err.message}` },
-      ])
-    } finally {
-      setLoading(false)
+    const ws = ircWsRef.current
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'send', message: question }))
+    } else {
+      setIrcMessages(prev => [...prev, { id: Date.now(), sender: 'system', text: 'Not connected to IRC', kind: 'error', timestamp: Date.now() / 1000, self: false }])
     }
   }
 
   const clearChat = () => {
-    if (chatMode === 'irc') {
-      if (ircMessages.length === 0) return
-      if (!confirm('Clear IRC message history?')) return
-      setIrcMessages([])
-      setIrcHasMore(false)
-      return
-    }
-    if (messages.length === 0) return
-    if (!confirm('Clear chat and start a new session?')) return
-    setMessages([])
+    if (ircMessages.length === 0) return
+    if (!confirm('Clear IRC message history?')) return
+    setIrcMessages([])
+    setIrcHasMore(false)
   }
 
-  const [showSaveChatModal, setShowSaveChatModal] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showUniverseManager, setShowUniverseManager] = useState(false)
 
-  useEffect(() => {
-    fetch('/api/settings/openai_api_key')
-      .then(r => r.json())
-      .then(d => { if (!d.value || !d.value.trim()) setShowSettings(true) })
-      .catch(() => setShowSettings(true))
-  }, [])
-
   const IRC_MSG_LIMIT = 400
-  const ircByteCount = chatMode === 'irc' && input
+  const ircByteCount = input
     ? new TextEncoder().encode(input.trim()).length
     : 0
 
@@ -2424,41 +2192,8 @@ function App() {
           </div>
         )}
         <div className="header-controls">
-          {activeTab.type === 'llm' && (
-            <>
-              <select
-                className="model-select"
-                value={model}
-                onChange={(e) => {
-                  setModel(e.target.value)
-                  fetch('/api/settings/selected_model', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ value: e.target.value }),
-                  }).catch(() => {})
-                }}
-                disabled={loading}
-              >
-                {MODELS.map((m) => (
-                  <option key={m.id} value={m.id}>{m.label}</option>
-                ))}
-              </select>
-              <label className="context-toggle" title={useContext ? 'Using document context (RAG)' : 'Direct chat, no context'}>
-                <input
-                  type="checkbox"
-                  checked={useContext}
-                  onChange={(e) => setUseContext(e.target.checked)}
-                  disabled={loading}
-                />
-                <span className="context-toggle-slider" />
-                <span className="context-toggle-label">{useContext ? 'RAG' : 'Chat'}</span>
-              </label>
-              {stats !== null && (
-                <div className="header-stats">
-                  {stats.chunks} chunks indexed
-                </div>
-              )}
-            </>
+          {activeTab.type === 'irc' && (
+            <span className="header-chat-label">Agent Network</span>
           )}
           {activeTab.type === 'markdown' && (
             <div className="markdown-mode-toggle">
@@ -2727,7 +2462,6 @@ function App() {
                   <button
                     className="irc-channel-tab irc-channel-tab-add"
                     onClick={() => setJoiningChannel(true)}
-                    disabled={loading}
                     title="Join a channel"
                   >
                     +
@@ -2819,71 +2553,15 @@ function App() {
                 </main>
               </div>
             </div>
-          ) : (
-            <>
-              {messages.length > 0 && (
-                <div className="chat-toolbar">
-                  <button className="chat-toolbar-btn" onClick={clearChat} disabled={loading} title="Clear chat and start new session">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                      <path d="M10 11v6" /><path d="M14 11v6" />
-                      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                    </svg>
-                    New Chat
-                  </button>
-                  <button className="chat-toolbar-btn" onClick={() => setShowSaveChatModal(true)} disabled={loading} title="Save this chat as a markdown">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                      <polyline points="17 21 17 13 7 13 7 21" />
-                      <polyline points="7 3 7 8 15 8" />
-                    </svg>
-                    Save as Markdown
-                  </button>
-                  <span className="chat-msg-count">{messages.length} messages</span>
-                </div>
-              )}
-              <main className="chat-area">
-                {messages.length === 0 ? (
-                  <div className="empty-state">
-                    <AstroLogo className="empty-logo" />
-                    <h2>Ask Astro anything</h2>
-                    {stats?.schema_version != null && (
-                      <span className="schema-version">schema v{stats.schema_version}</span>
-                    )}
-                  </div>
-                ) : (
-                  <div className="messages">
-                    {messages.map((msg, i) => (
-                      <ChatMessage key={i} role={msg.role} content={msg.content} model={msg.model} />
-                    ))}
-                    {loading && (
-                      <div className="message assistant">
-                        <div className="message-avatar"><AstroLogo /></div>
-                        <div className="message-body">
-                          <div className="message-role">Astro</div>
-                          <div className="message-content thinking">
-                            <span className="dot" />
-                            <span className="dot" />
-                            <span className="dot" />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <div ref={messagesEndRef} />
-                  </div>
-                )}
-              </main>
-            </>
-          )}
+          ) : null}
 
-          {(activeTab.type === 'llm' || activeTab.type === 'irc') && <footer className="input-area">
+          {activeTab.type === 'irc' && <footer className="input-area">
             <form onSubmit={handleSubmit} className="input-form">
               <textarea
                 ref={inputRef}
                 className="input-field"
                 rows="1"
-                placeholder={chatMode === 'irc' ? `Message ${ircStatus.channel || '#astro'}...` : 'Ask a question...'}
+                placeholder={`Message ${ircStatus.channel || '#astro'}...`}
                 value={input}
                 onChange={(e) => {
                   setInput(e.target.value)
@@ -2892,9 +2570,8 @@ function App() {
                   ta.style.height = Math.min(ta.scrollHeight, 150) + 'px'
                 }}
                 onKeyDown={handleKeyDown}
-                disabled={chatMode !== 'irc' && loading}
               />
-              {chatMode === 'irc' && input.trim() && (
+              {input.trim() && (
                 <span className={`irc-byte-count ${ircByteCount > IRC_MSG_LIMIT ? 'over' : ircByteCount > IRC_MSG_LIMIT * 0.8 ? 'warn' : ''}`}>
                   {ircByteCount}/{IRC_MSG_LIMIT}
                 </span>
@@ -2902,7 +2579,7 @@ function App() {
               <button
                 type="submit"
                 className="send-button"
-                disabled={(chatMode !== 'irc' && loading) || !input.trim() || (chatMode === 'irc' && ircByteCount > IRC_MSG_LIMIT)}
+                disabled={!input.trim() || ircByteCount > IRC_MSG_LIMIT}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="22" y1="2" x2="11" y2="13" />
@@ -2915,15 +2592,6 @@ function App() {
         </div>
       </div>
       {quickView && <QuickView item={quickView} onClose={() => setQuickView(null)} />}
-      {showSaveChatModal && (
-        <SaveChatModal
-          categories={categories}
-          messages={messages}
-          onClose={() => setShowSaveChatModal(false)}
-          onSaved={fetchPinned}
-          universeId={currentUniverseId}
-        />
-      )}
       {showSettings && (
         <SettingsDialog
           onClose={() => setShowSettings(false)}

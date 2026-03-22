@@ -121,7 +121,6 @@ from src.markdowns import (
     delete_post_comment,
     post_comment_to_dict,
 )
-from src.query import ask, ask_direct
 from src.store import (
     add_documents,
     delete_action_item_from_store,
@@ -148,25 +147,6 @@ app.add_middleware(
 
 # ── Schemas ───────────────────────────────────────────────────────────────
 
-
-class ChatMessage(BaseModel):
-    role: str
-    content: str
-
-
-class QueryRequest(BaseModel):
-    question: str
-    model: str = "gpt-5-mini"
-    use_context: bool = True
-    history: list[ChatMessage] = []
-    timezone: Optional[str] = None
-    mode: str = "llm"
-    universe_id: Optional[int] = None
-
-
-class QueryResponse(BaseModel):
-    answer: str
-    model: str = ""
 
 
 class StatsResponse(BaseModel):
@@ -1607,34 +1587,6 @@ def api_run_prompt(prompt_id: int):
         raise HTTPException(status_code=500, detail=f"Failed to send: {e}")
 
 
-class SummarizeTitleRequest(BaseModel):
-    message: str
-    cron_expr: str = ""
-    channel: str = ""
-
-
-@app.post("/api/prompts/generate-title")
-def api_generate_prompt_title(req: SummarizeTitleRequest):
-    from langchain_openai import ChatOpenAI
-    api_key = get_setting("openai_api_key")
-    if not api_key:
-        return {"title": ""}
-    model = get_setting("selected_model") or "gpt-5-mini"
-    llm = ChatOpenAI(model=model, api_key=api_key, max_tokens=60)
-    prompt_text = (
-        "Generate a short title (max 8 words) that summarizes this IRC prompt message. "
-        "Return ONLY the title text, no quotes or punctuation around it.\n\n"
-        f"Channel: {req.channel}\n"
-        f"Schedule: {req.cron_expr}\n"
-        f"Message:\n{req.message}"
-    )
-    try:
-        resp = llm.invoke(prompt_text)
-        return {"title": resp.content.strip().strip('"').strip("'")}
-    except Exception:
-        return {"title": ""}
-
-
 # ── Prompt Categories API ────────────────────────────────────────────────
 
 
@@ -1739,22 +1691,7 @@ def _start_ngircd():
 
 
 
-# ── Query & Stats ─────────────────────────────────────────────────────────
-
-
-@app.post("/api/query", response_model=QueryResponse)
-def api_query(req: QueryRequest):
-    history = [{"role": m.role, "content": m.content} for m in req.history]
-
-    uid = req.universe_id or 1
-    print(f"[Astro] Query: model={req.model}, use_context={req.use_context}, history_len={len(history)}, tz={req.timezone}, universe={uid}")
-    if req.use_context:
-        if doc_count(universe_id=uid) == 0:
-            raise HTTPException(status_code=400, detail="No documents in this universe. Ingest documents first or disable context.")
-        result = ask(req.question, model=req.model, history=history, user_timezone=req.timezone, universe_id=uid)
-    else:
-        result = ask_direct(req.question, model=req.model, history=history, user_timezone=req.timezone, universe_id=uid)
-    return QueryResponse(answer=result.answer, model=result.model)
+# ── Stats ─────────────────────────────────────────────────────────────────
 
 
 @app.get("/api/stats", response_model=StatsResponse)

@@ -345,15 +345,9 @@ document.addEventListener('keydown', (e) => {
 const $readLaterUrl     = document.getElementById('readLaterUrl')
 const $readLaterBtn     = document.getElementById('readLaterBtn')
 const $readLaterStatus  = document.getElementById('readLaterStatus')
-const $summarizeBtn     = document.getElementById('summarizeBtn')
-const $summarizeStatus  = document.getElementById('summarizeStatus')
-const $summaryBox       = document.getElementById('summaryBox')
-const $saveMarkdownBtn      = document.getElementById('saveMarkdownBtn')
-const $saveMarkdownStatus   = document.getElementById('saveMarkdownStatus')
 
 let currentTabUrl = ''
 let currentTabTitle = ''
-let lastSummary = ''
 
 function toolStatus(el, msg, type) {
   el.textContent = msg
@@ -383,102 +377,6 @@ $readLaterBtn.addEventListener('click', async () => {
   }
   $readLaterBtn.disabled = false
   $readLaterBtn.textContent = 'Add to Read Later'
-})
-
-// ── Tools: Summarize ────────────────────────────────
-
-async function extractPageContent() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-  if (!tab?.id) throw new Error('No active tab')
-
-  if (!chrome.scripting?.executeScript) {
-    throw new Error('Scripting API not available. Remove and re-add the extension in chrome://extensions.')
-  }
-
-  const results = await chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    func: () => document.body.innerText,
-  })
-
-  if (!results?.[0]?.result) throw new Error('Could not extract page content')
-  return results[0].result
-}
-
-$summarizeBtn.addEventListener('click', async () => {
-  $summarizeBtn.disabled = true
-  $summarizeBtn.textContent = 'Extracting...'
-  $summarizeStatus.className = 'tool-status'
-  $summaryBox.className = 'summary-box'
-  $saveMarkdownBtn.style.display = 'none'
-  $saveMarkdownStatus.className = 'tool-status'
-
-  try {
-    toolStatus($summarizeStatus, 'Extracting page content...', 'info')
-    const content = await extractPageContent()
-
-    const trimmed = content.substring(0, 12000)
-    $summarizeBtn.textContent = 'Summarizing...'
-    toolStatus($summarizeStatus, 'Sending to LLM for summary...', 'info')
-
-    const res = await fetch(`${getServer()}/api/query`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        question: `Summarize the following web page content concisely. Include key points and main takeaways. The page title is "${currentTabTitle}" and the URL is ${currentTabUrl}.\n\n---\n\n${trimmed}`,
-        model: 'gpt-5-mini',
-        use_context: false,
-        history: [],
-      }),
-    })
-
-    if (!res.ok) {
-      const errBody = await res.text()
-      throw new Error(`HTTP ${res.status}: ${errBody}`)
-    }
-    const data = await res.json()
-    console.log('LLM response:', JSON.stringify(data))
-    lastSummary = data.answer || data.text || ''
-
-    if (!lastSummary) throw new Error(`Empty response from LLM. Keys: ${Object.keys(data).join(', ')}. Raw: ${JSON.stringify(data).substring(0, 300)}`)
-
-    $summaryBox.textContent = lastSummary
-    $summaryBox.className = 'summary-box visible'
-    $saveMarkdownBtn.style.display = ''
-    $summarizeStatus.className = 'tool-status'
-  } catch (e) {
-    toolStatus($summarizeStatus, `Error: ${e.message}`, 'error')
-  }
-  $summarizeBtn.disabled = false
-  $summarizeBtn.textContent = 'Summarize This Page'
-})
-
-// ── Tools: Save summary as markdown ────────────────────
-
-$saveMarkdownBtn.addEventListener('click', async () => {
-  $saveMarkdownBtn.disabled = true
-  $saveMarkdownBtn.textContent = 'Saving...'
-  $saveMarkdownStatus.className = 'tool-status'
-
-  try {
-    const body = `${lastSummary}\n\n---\nSource: ${currentTabUrl}`
-    const uid = getUniverseId()
-    const qs = uid ? `?universe_id=${uid}` : ''
-    const res = await fetch(`${getServer()}/api/markdowns${qs}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: `Summary: ${currentTabTitle || currentTabUrl}`,
-        body,
-        category_id: null,
-      }),
-    })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    toolStatus($saveMarkdownStatus, 'Markdown saved!', 'success')
-  } catch (e) {
-    toolStatus($saveMarkdownStatus, `Error: ${e.message}`, 'error')
-  }
-  $saveMarkdownBtn.disabled = false
-  $saveMarkdownBtn.textContent = 'Save Summary as Markdown'
 })
 
 init()

@@ -92,9 +92,9 @@ You can create a Tailscale auth key at [login.tailscale.com/admin/settings/keys]
 After installation:
 
 1. Open **http://localhost:8000** in your browser
-2. Click the **gear icon** in the header to open Settings
-3. Enter your **OpenAI API key** (required for chat and embeddings)
-4. Start uploading documents, creating markdowns, or just chatting
+2. Start uploading documents, creating markdowns, or coordinating agents
+
+Embeddings are handled locally — no external API keys are required.
 
 ## Useful Commands
 
@@ -119,5 +119,4 @@ cd astro
 ## Requirements
 
 - **Docker** 20.10+ (with Docker Engine running)
-- **OpenAI API key** (for chat and embeddings)
 - **Tailscale auth key** (optional, for remote access)
