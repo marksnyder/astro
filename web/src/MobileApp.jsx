@@ -111,6 +111,9 @@ function MobileMarkdowns({ categories, universeId }) {
   const wantListeningRef = useRef(false)
   const wakeLockRef = useRef(null)
   const titleRef = useRef(null)
+  const createdIdRef = useRef(null)
+  const autosaveTimer = useRef(null)
+  const autosaveInitRef = useRef(false)
 
   const acquireWakeLock = async () => {
     try {
@@ -239,42 +242,58 @@ function MobileMarkdowns({ categories, universeId }) {
   }, [search, filterCatId, universeId])
 
   const startNew = () => {
+    autosaveInitRef.current = false
+    createdIdRef.current = null
     setEditing('new')
     const now = new Date()
     const ts = now.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
     setTitle(`Mobile Markdown # ${ts}`)
     setBody('')
     setCategoryId(filterCatId ?? getLastCategoryId())
-    setTimeout(() => titleRef.current?.focus(), 80)
+    setTimeout(() => { titleRef.current?.focus(); autosaveInitRef.current = true }, 80)
   }
 
   const startEdit = (markdown) => {
+    autosaveInitRef.current = false
+    createdIdRef.current = null
     setViewing(null)
     setEditing(markdown)
     setEditApiVisible(false)
     setTitle(markdown.title)
     setBody(stripHtml(markdown.body, true))
     setCategoryId(markdown.category_id)
-    setTimeout(() => titleRef.current?.focus(), 80)
+    setTimeout(() => { titleRef.current?.focus(); autosaveInitRef.current = true }, 80)
   }
 
-  const cancelEdit = () => setEditing(null)
+  const cancelEdit = () => {
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
+    setEditing(null)
+    fetchMarkdowns()
+  }
 
-  const save = async () => {
-    if (!title.trim() && !body.trim()) return
+  const doAutosave = useCallback(async (t, b, catId) => {
+    if (!t.trim() && !b.trim()) return
     setSaving(true)
     try {
-      const payload = { title, body, category_id: categoryId }
-      if (editing === 'new') {
-        await fetch(`/api/markdowns?universe_id=${universeId || 1}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      const payload = { title: t, body: b, category_id: catId }
+      const effectiveId = createdIdRef.current || (editing !== 'new' && editing?.id ? editing.id : null)
+      if (effectiveId) {
+        await fetch(`/api/markdowns/${effectiveId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       } else {
-        await fetch(`/api/markdowns/${editing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        const res = await fetch(`/api/markdowns?universe_id=${universeId || 1}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        const created = await res.json()
+        createdIdRef.current = created.id
       }
-      saveLastCategoryId(categoryId)
-      setEditing(null)
-      fetchMarkdowns()
+      saveLastCategoryId(catId)
     } finally { setSaving(false) }
-  }
+  }, [editing, universeId])
+
+  useEffect(() => {
+    if (!autosaveInitRef.current) return
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
+    autosaveTimer.current = setTimeout(() => doAutosave(title, body, categoryId), 800)
+    return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current) }
+  }, [title, body, categoryId, doAutosave])
 
   const remove = async (markdown) => {
     if (!confirm(`Delete "${markdown.title || 'Untitled'}"?`)) return
@@ -416,9 +435,6 @@ function MobileMarkdowns({ categories, universeId }) {
             ) : (
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" /></svg>
             )}
-          </button>
-          <button className="mn-save-header-btn" onClick={save} disabled={saving || (!title.trim() && !body.trim())}>
-            {saving ? 'Saving...' : 'Save'}
           </button>
         </div>
         {listening && <div className="mn-listening-bar">Listening...</div>}

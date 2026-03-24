@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
@@ -691,9 +691,11 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [categoryId, setCategoryId] = useState(null)
-  const [saving, setSaving] = useState(false)
+  const [createdId, setCreatedId] = useState(null)
   const titleRef = useRef(null)
   const isNew = !!markdown?._new
+  const autosaveTimer = useRef(null)
+  const initializedRef = useRef(false)
 
   const htmlToMarkdownText = (html) => {
     if (!html) return ''
@@ -707,6 +709,8 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
   }
 
   useEffect(() => {
+    setCreatedId(null)
+    initializedRef.current = false
     if (isNew) {
       setTitle('')
       setBody('')
@@ -717,37 +721,41 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
       setCategoryId(markdown.category_id)
     }
     if (isNew) setTimeout(() => titleRef.current?.focus(), 50)
+    setTimeout(() => { initializedRef.current = true }, 0)
+    return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current) }
   }, [markdown])
 
-  const save = async (close = true) => {
-    if (!title.trim() && !body.trim()) return
-    setSaving(true)
-    try {
-      const payload = { title, body, category_id: categoryId }
-      if (isNew) {
-        const res = await fetch(`/api/markdowns?universe_id=${markdown.universeId || 1}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
-        if (!close) {
-          const created = await res.json()
-          onSaved?.(created, false)
-          return
-        }
-      } else {
-        await fetch(`/api/markdowns/${markdown.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
-      }
-      onSaved?.(null, close)
-      if (close) onClose?.()
-    } finally { setSaving(false) }
-  }
+  const doAutosave = useCallback(async (t, b, catId) => {
+    if (!t.trim() && !b.trim()) return
+    const payload = { title: t, body: b, category_id: catId }
+    const effectiveId = createdId || (!isNew ? markdown.id : null)
+    if (effectiveId) {
+      await fetch(`/api/markdowns/${effectiveId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      onSaved?.(null, false)
+    } else {
+      const res = await fetch(`/api/markdowns?universe_id=${markdown.universeId || 1}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const created = await res.json()
+      setCreatedId(created.id)
+      onSaved?.(created, false)
+    }
+  }, [markdown, isNew, onSaved, createdId])
 
-  const currentId = isNew ? null : markdown.id
+  useEffect(() => {
+    if (!initializedRef.current) return
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
+    autosaveTimer.current = setTimeout(() => doAutosave(title, body, categoryId), 800)
+    return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current) }
+  }, [title, body, categoryId, doAutosave])
+
+  const currentId = createdId || (isNew ? null : markdown.id)
 
   return (
     <div className="markdown-inline-editor">
@@ -768,14 +776,6 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
         )}
         {currentId && <MarkdownImageGallery markdownId={currentId} />}
         {currentId && <MarkdownActionItems markdownId={currentId} categories={categories} />}
-        <div className="markdown-editor-actions">
-          <button className="markdown-save-btn" onClick={() => save(true)} disabled={saving || (!title.trim() && !body.trim())}>
-            {saving ? 'Saving...' : 'Save & Close'}
-          </button>
-          <button className="markdown-save-continue-btn" onClick={() => save(false)} disabled={saving || (!title.trim() && !body.trim())}>
-            {saving ? 'Saving...' : 'Save'}
-          </button>
-        </div>
       </div>
     </div>
   )
