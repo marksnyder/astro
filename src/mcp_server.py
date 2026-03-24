@@ -4,21 +4,27 @@ from __future__ import annotations
 
 from fastmcp import FastMCP
 
+from pathlib import Path
+
 from src.markdowns import (
     action_item_to_dict,
     category_to_dict,
     create_action_item,
     create_category,
+    create_feed_post_markdown,
     create_link,
     create_markdown,
-    delete_action_item,
-    delete_category,
-    delete_link,
-    delete_markdown,
+    delete_action_item as _db_delete_action_item,
+    delete_category as _db_delete_category,
+    delete_document_meta,
+    delete_feed_post as _db_delete_feed_post,
+    delete_link as _db_delete_link,
+    delete_markdown as _db_delete_markdown,
     feed_post_to_dict,
     feed_to_dict,
     get_action_item,
     get_all_document_meta,
+    get_feed,
     get_link,
     get_markdown,
     get_setting,
@@ -31,21 +37,27 @@ from src.markdowns import (
     list_markdowns,
     list_universes,
     markdown_to_dict,
+    set_document_universe,
     set_setting,
     universe_to_dict,
-    update_action_item,
-    update_category,
-    update_link,
-    update_markdown,
+    update_action_item as _db_update_action_item,
+    update_category as _db_update_category,
+    update_link as _db_update_link,
+    update_markdown as _db_update_markdown,
 )
+from src.ingest import load_document as _load_document, chunk_documents as _chunk_documents
 from src.store import (
-    delete_markdown_from_store,
+    add_documents as _add_documents,
     delete_action_item_from_store,
+    delete_document_chunks,
+    delete_markdown_from_store,
     doc_count,
     get_retriever,
     upsert_action_item,
     upsert_markdown,
 )
+
+DOCUMENTS_DIR = Path(__file__).resolve().parent.parent / "documents"
 
 MCP_UNIVERSE_SETTING = "mcp_default_universe"
 
@@ -148,11 +160,11 @@ def write_markdown(
 
 
 @mcp.tool
-def update_markdown_note(
+def update_markdown(
     markdown_id: int, title: str, body: str, category_id: int | None = None
 ) -> dict | str:
     """Update an existing markdown note. All fields are replaced."""
-    md = update_markdown(markdown_id, title, body, category_id)
+    md = _db_update_markdown(markdown_id, title, body, category_id)
     if md is None:
         return "Markdown not found"
     upsert_markdown(md.id, body, title, md.universe_id)
@@ -160,9 +172,9 @@ def update_markdown_note(
 
 
 @mcp.tool
-def delete_markdown_note(markdown_id: int) -> str:
+def delete_markdown(markdown_id: int) -> str:
     """Permanently delete a markdown note by ID."""
-    if not delete_markdown(markdown_id):
+    if not _db_delete_markdown(markdown_id):
         return "Markdown not found"
     delete_markdown_from_store(markdown_id)
     return "Deleted"
@@ -206,7 +218,7 @@ def write_action_item(
 
 
 @mcp.tool
-def update_action_item_tool(
+def update_action_item(
     item_id: int,
     title: str,
     hot: bool = False,
@@ -215,7 +227,7 @@ def update_action_item_tool(
     category_id: int | None = None,
 ) -> dict | str:
     """Update an existing action item. All fields are replaced."""
-    item = update_action_item(item_id, title, hot, completed, due_date, category_id)
+    item = _db_update_action_item(item_id, title, hot, completed, due_date, category_id)
     if item is None:
         return "Action item not found"
     cat_name = None
@@ -227,9 +239,9 @@ def update_action_item_tool(
 
 
 @mcp.tool
-def delete_action_item_tool(item_id: int) -> str:
+def delete_action_item(item_id: int) -> str:
     """Permanently delete an action item by ID."""
-    if not delete_action_item(item_id):
+    if not _db_delete_action_item(item_id):
         return "Action item not found"
     delete_action_item_from_store(item_id)
     return "Deleted"
@@ -261,20 +273,20 @@ def write_category(
 
 
 @mcp.tool
-def update_category_tool(
+def update_category(
     category_id: int, name: str | None = None, emoji: str | None = None
 ) -> dict | str:
     """Update a category's name and/or emoji."""
-    cat = update_category(category_id, name, emoji)
+    cat = _db_update_category(category_id, name, emoji)
     if cat is None:
         return "Category not found"
     return category_to_dict(cat)
 
 
 @mcp.tool
-def delete_category_tool(category_id: int) -> str:
+def delete_category(category_id: int) -> str:
     """Permanently delete a category by ID. Items in the category are not deleted."""
-    if not delete_category(category_id):
+    if not _db_delete_category(category_id):
         return "Category not found"
     return "Deleted"
 
@@ -302,20 +314,20 @@ def write_link(
 
 
 @mcp.tool
-def update_link_tool(
+def update_link(
     link_id: int, title: str, url: str, category_id: int | None = None
 ) -> dict | str:
     """Update an existing bookmark/link. All fields are replaced."""
-    lnk = update_link(link_id, title, url, category_id)
+    lnk = _db_update_link(link_id, title, url, category_id)
     if lnk is None:
         return "Link not found"
     return link_to_dict(lnk)
 
 
 @mcp.tool
-def delete_link_tool(link_id: int) -> str:
+def delete_link(link_id: int) -> str:
     """Permanently delete a bookmark/link by ID."""
-    if not delete_link(link_id):
+    if not _db_delete_link(link_id):
         return "Link not found"
     return "Deleted"
 
@@ -350,6 +362,61 @@ def list_documents(universe_id: int | None = None) -> list[dict]:
     return results
 
 
+@mcp.tool
+def upload_document(
+    filename: str, content: str, universe_id: int | None = None
+) -> dict | str:
+    """Upload a text document to the knowledge base. Provide a filename
+    (e.g. 'notes.md' or 'report.txt') and its text content. The document
+    is saved, indexed in the vector store, and becomes searchable."""
+    import shutil, tempfile
+    uid = universe_id if universe_id is not None else _default_universe()
+    ext = Path(filename).suffix.lower()
+    if not ext:
+        ext = ".txt"
+        filename = filename + ext
+    archive_folder = ext.lstrip(".")
+    archive_dir = DOCUMENTS_DIR / archive_folder
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    stem = Path(filename).stem
+    dest = archive_dir / filename
+    counter = 1
+    while dest.exists():
+        dest = archive_dir / f"{stem}_{counter}{ext}"
+        counter += 1
+    dest.write_text(content, encoding="utf-8")
+    try:
+        docs = _load_document(str(dest))
+        if not docs:
+            return "Could not extract content from file"
+        for doc in docs:
+            doc.metadata["source"] = str(dest)
+        chunks = _chunk_documents(docs)
+        _add_documents(chunks, universe_id=uid)
+    except Exception as e:
+        dest.unlink(missing_ok=True)
+        return f"Ingestion failed: {e}"
+    rel = str(dest.relative_to(DOCUMENTS_DIR))
+    set_document_universe(rel, uid)
+    return {"name": dest.name, "path": rel, "chunks": len(chunks)}
+
+
+@mcp.tool
+def delete_document(path: str) -> str:
+    """Permanently delete a document by its path (as returned by list_documents).
+    Removes the file from disk and its chunks from the vector store."""
+    safe = (DOCUMENTS_DIR / path).resolve()
+    if not str(safe).startswith(str(DOCUMENTS_DIR.resolve())):
+        return "Invalid path"
+    if not safe.is_file():
+        return "Document not found"
+    delete_document_chunks(str(safe))
+    rel = str(safe.relative_to(DOCUMENTS_DIR))
+    delete_document_meta(rel)
+    safe.unlink()
+    return "Deleted"
+
+
 # ── Feeds ─────────────────────────────────────────────────────────────────
 
 
@@ -369,6 +436,24 @@ def read_feed_posts(
     """Read posts from a specific feed. Supports pagination and text search."""
     posts, total = list_feed_posts(feed_id, query, page, page_size)
     return {"posts": [feed_post_to_dict(p) for p in posts], "total": total}
+
+
+@mcp.tool
+def write_feed_post(feed_id: int, title: str, markdown: str) -> dict | str:
+    """Create a new markdown post in a feed. The post content is markdown text."""
+    feed = get_feed(feed_id)
+    if not feed:
+        return "Feed not found"
+    post = create_feed_post_markdown(feed_id, title, markdown)
+    return feed_post_to_dict(post)
+
+
+@mcp.tool
+def delete_feed_post(post_id: int) -> str:
+    """Permanently delete a feed post by ID."""
+    if not _db_delete_feed_post(post_id):
+        return "Post not found"
+    return "Deleted"
 
 
 # ── Stats ─────────────────────────────────────────────────────────────────

@@ -33,6 +33,10 @@ RUN pip install --no-cache-dir --upgrade pip \
 COPY src/ src/
 COPY web/dist/ web/dist/
 COPY config/ config/
+COPY VERSION .
+
+ARG ASTRO_BUILD_ID=""
+ENV ASTRO_BUILD_ID=$ASTRO_BUILD_ID
 
 # Entrypoint script
 COPY deploy/entrypoint.sh /app/entrypoint.sh

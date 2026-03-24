@@ -354,8 +354,26 @@
   align-items: center;
 }
 
+.universe-create-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .universe-create-row .markdown-title-input {
   flex: 1;
+}
+
+.universe-template-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.universe-template-label {
+  font-size: 0.82rem;
+  color: #aaa;
+  flex-shrink: 0;
 }
 
 .header-controls {
@@ -1974,7 +1992,7 @@
   border: 1px solid var(--border);
   border-radius: 16px;
   width: 90%;
-  max-width: 440px;
+  max-width: 520px;
   display: flex;
   flex-direction: column;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
@@ -4806,9 +4824,6 @@
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  position: sticky;
-  top: 0;
-  z-index: 1;
   background: var(--bg-tertiary);
   border-bottom: 1px solid var(--border);
 }
@@ -7016,7 +7031,7 @@
 
 /* ── Markdown editor insert menu ────────────────────── */
 .md-insert-btn { font-weight: 600; }
-.md-insert-menu { position: absolute; top: 100%; left: 0; z-index: 100; background: #1e1e2e; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); min-width: 200px; padding: 4px 0; }
+.md-insert-menu { position: fixed; z-index: 1000; background: #1e1e2e; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); min-width: 220px; padding: 4px 0; max-height: 400px; overflow-y: auto; }
 .md-insert-menu-item { padding: 7px 14px; font-size: 0.82rem; color: #ccc; cursor: pointer; }
 .md-insert-menu-item:hover { background: rgba(99,102,241,0.15); color: #fff; }
 .md-insert-menu-sep { height: 1px; background: rgba(255,255,255,0.08); margin: 4px 0; }
@@ -7294,4 +7309,19 @@
 
 @keyframes irc-spin {
   to { transform: rotate(360deg); }
+}
+
+/* ── Version update pulse ──────────────────────────── */
+.rail-tab-update {
+  color: #48bb78;
+  animation: update-pulse 2s ease-in-out infinite;
+}
+
+.rail-tab-update:hover {
+  color: #38a169;
+}
+
+@keyframes update-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
 }

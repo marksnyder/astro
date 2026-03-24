@@ -3,188 +3,132 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
 
-// ── Markdown Insert Tool Modal ────────────────────────
+// ── MCP tool templates ────────────────────────────────
 
-function MarkdownInsertModal({ tool, onInsert, onClose }) {
+const MD_MCP_DIRECT = {
+  search: (uid) => `> Use the \`search\` tool to find "<query>" in the knowledge base${uid ? ` (universe_id: ${uid})` : ''}\n`,
+  search_markdowns: (uid) => `> Use the \`search_markdowns\` tool to search for markdowns matching "<query>"${uid ? ` (universe_id: ${uid})` : ''}\n`,
+  write_markdown: (uid) => `> Use the \`write_markdown\` tool to create a new markdown with title: "<title>", body: "<content>"${uid ? ` (universe_id: ${uid})` : ''}\n`,
+  search_action_items: (uid) => `> Use the \`search_action_items\` tool to list action items${uid ? ` (universe_id: ${uid})` : ''}\n`,
+  write_action_item: (uid) => `> Use the \`write_action_item\` tool to create an action item with title: "<title>"${uid ? ` (universe_id: ${uid})` : ''}\n`,
+  list_all_categories: (uid) => `> Use the \`list_all_categories\` tool to list all categories${uid ? ` (universe_id: ${uid})` : ''}\n`,
+  write_category: (uid) => `> Use the \`write_category\` tool to create a category with name: "<name>"${uid ? ` (universe_id: ${uid})` : ''}\n`,
+  search_links: (uid) => `> Use the \`search_links\` tool to search for bookmarks matching "<query>"${uid ? ` (universe_id: ${uid})` : ''}\n`,
+  write_link: (uid) => `> Use the \`write_link\` tool to save a bookmark with title: "<title>", url: "<url>"${uid ? ` (universe_id: ${uid})` : ''}\n`,
+  list_documents: (uid) => `> Use the \`list_documents\` tool to list all uploaded documents${uid ? ` (universe_id: ${uid})` : ''}\n`,
+  upload_document: (uid) => `> Use the \`upload_document\` tool to upload a document with filename: "<filename>", content: "<content>"${uid ? ` (universe_id: ${uid})` : ''}\n`,
+  search_feeds: (uid) => `> Use the \`search_feeds\` tool to list available feeds${uid ? ` (universe_id: ${uid})` : ''}\n`,
+  list_all_universes: () => '> Use the `list_all_universes` tool to list all available universes\n',
+  set_default_universe: () => '> Use the `set_default_universe` tool to set the default universe (universe_id: <id>)\n',
+  get_stats: () => '> Use the `get_stats` tool to get vector store statistics\n',
+}
+
+const MD_UNIVERSE_TOOLS = new Set([
+  'search', 'search_markdowns', 'write_markdown', 'search_action_items',
+  'write_action_item', 'list_all_categories', 'write_category',
+  'search_links', 'write_link', 'list_documents', 'upload_document', 'search_feeds',
+])
+
+function MdUniversePicker({ tool, onConfirm, onClose }) {
+  const [universes, setUniverses] = useState([])
+  const [selected, setSelected] = useState('')
+  useEffect(() => { fetch('/api/universes').then(r => r.json()).then(setUniverses).catch(() => {}) }, [])
+  return (
+    <div className="feed-key-modal-overlay">
+      <div className="feed-key-modal" style={{ maxWidth: 380 }}>
+        <div className="feed-key-modal-header">
+          <h3>Select Universe</h3>
+          <button type="button" className="feed-key-modal-close" onClick={onClose}>&times;</button>
+        </div>
+        <p className="feed-post-modal-desc">Choose a universe for the <code>{tool}</code> tool, or use the default.</p>
+        <select className="prompt-form-input" value={selected} onChange={e => setSelected(e.target.value)} style={{ margin: '8px 16px', width: 'calc(100% - 32px)' }}>
+          <option value="">Default Universe</option>
+          {universes.map(u => <option key={u.id} value={u.id}>{u.name} (#{u.id})</option>)}
+        </select>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 16px' }}>
+          <button type="button" className="prompt-form-cancel" onClick={onClose}>Cancel</button>
+          <button type="button" className="prompt-form-save" onClick={() => { onConfirm(selected ? Number(selected) : null); onClose(); }}>Insert</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MdMcpLookup({ tool, onInsert, onClose }) {
   const [items, setItems] = useState([])
   const [search, setSearch] = useState('')
-  const [inserted, setInserted] = useState(null)
-  const [universes, setUniverses] = useState([])
-  const [selectedUniverse, setSelectedUniverse] = useState('')
+
+  const endpoints = {
+    read_markdown: '/api/markdowns', update_markdown: '/api/markdowns', delete_markdown: '/api/markdowns',
+    read_action_item: '/api/action-items?show_completed=true', update_action_item: '/api/action-items?show_completed=true', delete_action_item: '/api/action-items?show_completed=true',
+    update_category: '/api/categories', delete_category: '/api/categories',
+    update_link: '/api/links', delete_link: '/api/links',
+    delete_document: '/api/documents',
+    read_feed_posts: '/api/feeds', write_feed_post: '/api/feeds', delete_feed_post: '/api/feeds',
+  }
+  const titles = {
+    read_markdown: 'Read Markdown', update_markdown: 'Update Markdown', delete_markdown: 'Delete Markdown',
+    read_action_item: 'Read Action Item', update_action_item: 'Update Action Item', delete_action_item: 'Delete Action Item',
+    update_category: 'Update Category', delete_category: 'Delete Category',
+    update_link: 'Update Link', delete_link: 'Delete Link',
+    delete_document: 'Delete Document',
+    read_feed_posts: 'Read Feed Posts', write_feed_post: 'Post to Feed', delete_feed_post: 'Delete Feed Post',
+  }
+  const descs = {
+    read_markdown: 'Select a markdown to read.', update_markdown: 'Select a markdown to update.', delete_markdown: 'Select a markdown to delete.',
+    read_action_item: 'Select an action item to read.', update_action_item: 'Select an action item to update.', delete_action_item: 'Select an action item to delete.',
+    update_category: 'Select a category to update.', delete_category: 'Select a category to delete.',
+    update_link: 'Select a link to update.', delete_link: 'Select a link to delete.',
+    delete_document: 'Select a document to delete.',
+    read_feed_posts: 'Select a feed to read posts from.', write_feed_post: 'Select a feed to post to.', delete_feed_post: 'Select a feed, then a post to delete.',
+  }
 
   useEffect(() => {
-    if (tool === 'feedMarkdown' || tool === 'feedDocument' || tool === 'readPosts' || tool === 'commentPost') {
-      fetch('/api/feeds').then(r => r.json()).then(setItems).catch(() => {})
-    } else if (tool === 'readMarkdown' || tool === 'updateMarkdown') {
-      fetch('/api/markdowns').then(r => r.json()).then(setItems).catch(() => {})
-    } else if (tool === 'editActionItem') {
-      fetch('/api/action-items?show_completed=true').then(r => r.json()).then(setItems).catch(() => {})
-    } else if (tool === 'downloadDoc') {
-      fetch('/api/documents').then(r => r.json()).then(setItems).catch(() => {})
-    }
-    if (tool === 'listActionItems' || tool === 'searchDocs' || tool === 'addActionItem') {
-      fetch('/api/universes').then(r => r.json()).then(data => {
-        setUniverses(data)
-        if (tool === 'addActionItem' && data.length > 0) setSelectedUniverse(String(data[0].id))
-      }).catch(() => {})
-    }
+    const url = endpoints[tool]
+    if (url) fetch(url).then(r => r.json()).then(setItems).catch(() => {})
   }, [tool])
 
-  const baseUrl = window.location.origin
   const filtered = items.filter(i => {
     if (!search) return true
-    const name = i.title || i.name || ''
-    return name.toLowerCase().includes(search.toLowerCase())
+    return (i.title || i.name || '').toLowerCase().includes(search.toLowerCase())
   })
 
-  const titles = {
-    feedMarkdown: 'Post Feed Markdown', feedDocument: 'Post Feed Document',
-    readMarkdown: 'Read Markdown', updateMarkdown: 'Update Markdown',
-    addActionItem: 'Add Action Item', editActionItem: 'Edit Action Item',
-    listActionItems: 'List Action Items', searchDocs: 'Search Documents',
-    downloadDoc: 'Download Document', readPosts: 'Read Feed Posts', commentPost: 'Comment on Post',
-  }
-
-  if (tool === 'addActionItem') {
-    const handleInsertAdd = () => {
-      const uParam = selectedUniverse ? `?universe_id=${selectedUniverse}` : ''
-      const uLabel = universes.find(u => String(u.id) === selectedUniverse)
-      const text = '```\n' + [
-        `POST ${baseUrl}/api/action-items${uParam}`,
-        `Content-Type: application/json`,
-        ``,
-        ...(uLabel ? [`Universe: ${uLabel.name}`] : []),
-        `Payload: {"title":"<title>","hot":false,"due_date":null,"category_id":null}`,
-        `Response: {"id":<id>,"title":"...","hot":false,"completed":false}`,
-      ].join('\n') + '\n```'
-      onInsert(text); onClose()
-    }
-    return (
-      <div className="feed-key-modal-overlay">
-        <div className="feed-key-modal">
-          <div className="feed-key-modal-header"><h3>{titles[tool]}</h3><button type="button" className="feed-key-modal-close" onClick={onClose}>&times;</button></div>
-          <p className="feed-post-modal-desc">Insert a POST template to create a new action item.</p>
-          <div style={{ padding: '0 16px' }}>
-            <label style={{ fontSize: '0.82rem', color: '#aaa', marginBottom: 4, display: 'block' }}>Universe</label>
-            <select className="prompt-form-input" value={selectedUniverse} onChange={e => setSelectedUniverse(e.target.value)}>
-              {universes.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
-          </div>
-          <div style={{ padding: '12px 16px 16px' }}><button className="prompt-save-btn" onClick={handleInsertAdd}>Insert Template</button></div>
-        </div>
-      </div>
-    )
-  }
-
-  if (tool === 'listActionItems' || tool === 'searchDocs') {
-    const handleInsert = () => {
-      let text
-      if (tool === 'listActionItems') {
-        const params = selectedUniverse ? `?universe_id=${selectedUniverse}` : ''
-        text = '```\n' + `GET ${baseUrl}/api/action-items${params}\n\nResponse: [{"id":<id>,"title":"...","hot":false,"completed":false}]` + '\n```'
-      } else {
-        const params = selectedUniverse ? `?universe_id=${selectedUniverse}&q=<search_term>` : '?q=<search_term>'
-        text = '```\n' + `GET ${baseUrl}/api/documents${params}\n\nResponse: [{"name":"...","path":"...","extension":"...","size":...}]` + '\n```'
-      }
-      onInsert(text)
-      onClose()
-    }
-    return (
-      <div className="feed-key-modal-overlay">
-        <div className="feed-key-modal">
-          <div className="feed-key-modal-header"><h3>{titles[tool]}</h3><button type="button" className="feed-key-modal-close" onClick={onClose}>&times;</button></div>
-          <p className="feed-post-modal-desc">{tool === 'listActionItems' ? 'Insert a template to list action items.' : 'Insert a template to search documents.'} Optionally filter by universe.</p>
-          <div style={{ padding: '0 16px' }}>
-            <label style={{ fontSize: '0.82rem', color: '#aaa', marginBottom: 4, display: 'block' }}>Universe</label>
-            <select className="prompt-form-input" value={selectedUniverse} onChange={e => setSelectedUniverse(e.target.value)}>
-              <option value="">All universes</option>
-              {universes.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
-          </div>
-          <div style={{ padding: '12px 16px 16px' }}><button className="prompt-save-btn" onClick={handleInsert}>Insert Template</button></div>
-        </div>
-      </div>
-    )
-  }
-
-  if (tool === 'readPosts') {
-    return (
-      <div className="feed-key-modal-overlay">
-        <div className="feed-key-modal">
-          <div className="feed-key-modal-header"><h3>{titles[tool]}</h3><button type="button" className="feed-key-modal-close" onClick={onClose}>&times;</button></div>
-          <p className="feed-post-modal-desc">Select a feed to read posts from.</p>
-          <input className="prompt-form-input feed-key-modal-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search feeds..." autoFocus />
-          <div className="feed-key-modal-list">
-            {filtered.length === 0 && <div className="feed-key-lookup-empty">No feeds found</div>}
-            {filtered.map(f => (
-              <div key={f.id} className="feed-key-lookup-item" onClick={() => {
-                const text = '```\n' + `GET ${baseUrl}/api/feeds/${f.id}/posts\n\nFeed: ${f.title} (ID: ${f.id})\nResponse: {"posts":[{"id":<id>,"title":"...","content_type":"markdown","markdown":"...","feed_name":"..."}],"total":<n>}` + '\n```'
-                onInsert(text); onClose()
-              }} style={{ cursor: 'pointer' }}>
-                <span className="feed-key-lookup-title">{f.title || 'Untitled'}</span>
-                <code className="feed-key-lookup-key">#{f.id}</code>
-                {inserted === (f.id) && <span className="feed-key-inserted">Inserted</span>}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   const handleSelect = (item) => {
-    let text
-    if (tool === 'feedMarkdown') {
-      text = '```\n' + `POST ${baseUrl}/api/feeds/${item.id}/ingest\nContent-Type: multipart/form-data\nX-Feed-Key: ${item.api_key}\n\nPayload: title=<title>&markdown=<markdown_content>\nResponse: {"ok":true,"post_id":<id>,"content_type":"markdown"}` + '\n```'
-    } else if (tool === 'feedDocument') {
-      text = '```\n' + `POST ${baseUrl}/api/feeds/${item.id}/ingest\nContent-Type: multipart/form-data\nX-Feed-Key: ${item.api_key}\n\nPayload: title=<title>&file=@<filepath>\nResponse: {"ok":true,"post_id":<id>,"content_type":"file"}` + '\n```'
-    } else if (tool === 'readMarkdown') {
-      text = '```\n' + `GET ${baseUrl}/api/markdowns/${item.id}\n\nResponse: {"id":${item.id},"title":"${item.title}","body":"...","category_id":${item.category_id ?? 'null'},"pinned":${item.pinned}}` + '\n```'
-    } else if (tool === 'updateMarkdown') {
-      text = '```\n' + `PUT ${baseUrl}/api/markdowns/${item.id}\nContent-Type: application/json\n\nPayload: {"title":"${item.title}","body":"<new_body>","category_id":${item.category_id ?? 'null'}}\nResponse: {"id":${item.id},"title":"...","body":"..."}` + '\n```'
-    } else if (tool === 'editActionItem') {
-      text = '```\n' + `PUT ${baseUrl}/api/action-items/${item.id}\nContent-Type: application/json\n\nPayload: {"title":"${item.title}","hot":${item.hot},"completed":${item.completed},"due_date":${item.due_date ? `"${item.due_date}"` : 'null'},"category_id":${item.category_id ?? 'null'}}\nResponse: {"id":${item.id},"title":"...","hot":...,"completed":...}` + '\n```'
-    } else if (tool === 'downloadDoc') {
-      text = '```\n' + `GET ${baseUrl}/api/documents/download?path=${encodeURIComponent(item.path)}\n\nDownloads: ${item.name} (${item.extension})` + '\n```'
-    } else if (tool === 'commentPost') {
-      text = '```\n' + `POST ${baseUrl}/api/feed-posts/<post_id>/comments\nContent-Type: application/json\n\nPayload: {"author":"astro","content":"<comment_text>"}\nResponse: {"id":<id>,"post_id":<post_id>,"author":"astro","content":"..."}\n\nFeed: ${item.title} (ID: ${item.id})\nTo get post IDs, first list posts for this feed's category.` + '\n```'
+    const name = item.title || item.name || 'Untitled'
+    const id = item.id
+    const path = item.path || ''
+    const tpls = {
+      read_markdown: `> Use the \`read_markdown\` tool to read markdown "${name}" (markdown_id: ${id})\n`,
+      update_markdown: `> Use the \`update_markdown\` tool to update markdown "${name}" (markdown_id: ${id}) with title: "<title>", body: "<body>"\n`,
+      delete_markdown: `> Use the \`delete_markdown\` tool to delete markdown "${name}" (markdown_id: ${id})\n`,
+      read_action_item: `> Use the \`read_action_item\` tool to read action item "${name}" (item_id: ${id})\n`,
+      update_action_item: `> Use the \`update_action_item\` tool to update action item "${name}" (item_id: ${id}) with title: "<title>"\n`,
+      delete_action_item: `> Use the \`delete_action_item\` tool to delete action item "${name}" (item_id: ${id})\n`,
+      update_category: `> Use the \`update_category\` tool to update category "${name}" (category_id: ${id}) with name: "<name>"\n`,
+      delete_category: `> Use the \`delete_category\` tool to delete category "${name}" (category_id: ${id})\n`,
+      update_link: `> Use the \`update_link\` tool to update link "${name}" (link_id: ${id}) with title: "<title>", url: "<url>"\n`,
+      delete_link: `> Use the \`delete_link\` tool to delete link "${name}" (link_id: ${id})\n`,
+      delete_document: `> Use the \`delete_document\` tool to delete document "${name}" (path: "${path}")\n`,
+      read_feed_posts: `> Use the \`read_feed_posts\` tool to read posts from feed "${name}" (feed_id: ${id})\n`,
+      write_feed_post: `> Use the \`write_feed_post\` tool to create a post in feed "${name}" (feed_id: ${id}) with title: "<title>", markdown: "<content>"\n`,
+      delete_feed_post: `> Use the \`read_feed_posts\` tool to list posts from feed "${name}" (feed_id: ${id}), then use the \`delete_feed_post\` tool with the post_id to delete\n`,
     }
-    onInsert(text)
-    setInserted(item.id || item.path)
-    setTimeout(() => setInserted(null), 1500)
-  }
-
-  const needsSearch = ['feedMarkdown', 'feedDocument', 'readMarkdown', 'updateMarkdown', 'editActionItem', 'downloadDoc', 'commentPost'].includes(tool)
-  const itemLabel = (item) => {
-    if (tool === 'downloadDoc') return item.name
-    return item.title || 'Untitled'
-  }
-  const itemKey = (item) => {
-    if (tool === 'downloadDoc') return item.path
-    return item.id
-  }
-  const itemSub = (item) => {
-    if (tool === 'feedMarkdown' || tool === 'feedDocument') return item.api_key
-    if (tool === 'readMarkdown' || tool === 'updateMarkdown') return `#${item.id}`
-    if (tool === 'editActionItem') return `#${item.id}`
-    if (tool === 'downloadDoc') return item.extension
-    if (tool === 'commentPost') return `${item.post_count || 0} posts`
-    return ''
+    onInsert(tpls[tool] || '')
+    onClose()
   }
 
   return (
     <div className="feed-key-modal-overlay">
       <div className="feed-key-modal">
         <div className="feed-key-modal-header"><h3>{titles[tool]}</h3><button type="button" className="feed-key-modal-close" onClick={onClose}>&times;</button></div>
-        <p className="feed-post-modal-desc">Select an item to insert a template.</p>
-        {needsSearch && <input className="prompt-form-input feed-key-modal-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." autoFocus />}
+        <p className="feed-post-modal-desc">{descs[tool]}</p>
+        <input className="prompt-form-input feed-key-modal-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." autoFocus />
         <div className="feed-key-modal-list">
           {filtered.length === 0 && <div className="feed-key-lookup-empty">No items found</div>}
           {filtered.map(item => (
-            <div key={itemKey(item)} className="feed-key-lookup-item" onClick={() => handleSelect(item)} style={{ cursor: 'pointer' }}>
-              <span className="feed-key-lookup-title">{itemLabel(item)}</span>
-              <code className="feed-key-lookup-key">{itemSub(item)}</code>
-              {inserted === itemKey(item) && <span className="feed-key-inserted">Inserted</span>}
+            <div key={item.id} className="feed-key-lookup-item" onClick={() => handleSelect(item)} style={{ cursor: 'pointer' }}>
+              <span className="feed-key-lookup-title">{item.title || item.name || 'Untitled'}</span>
+              <code className="feed-key-lookup-key">#{item.id}</code>
             </div>
           ))}
         </div>
@@ -197,8 +141,11 @@ function MarkdownInsertModal({ tool, onInsert, onClose }) {
 
 function MarkdownEditor({ value, onChange, placeholder }) {
   const ref = useRef(null)
+  const mcpBtnRef = useRef(null)
   const [showInsertMenu, setShowInsertMenu] = useState(false)
-  const [activeInsertTool, setActiveInsertTool] = useState(null)
+  const [insertMenuPos, setInsertMenuPos] = useState(null)
+  const [mcpLookup, setMcpLookup] = useState(null)
+  const [universePicker, setUniversePicker] = useState(null)
 
   const insert = (before, after = '') => {
     const ta = ref.current
@@ -317,25 +264,43 @@ function MarkdownEditor({ value, onChange, placeholder }) {
         </div>
         <div className="md-toolbar-sep" />
         <div className="md-toolbar-group" style={{ position: 'relative' }}>
-          <button className="md-toolbar-btn md-insert-btn" onMouseDown={e => e.preventDefault()} onClick={() => setShowInsertMenu(!showInsertMenu)} title="Insert tool snippet">
+          <button ref={mcpBtnRef} className="md-toolbar-btn md-insert-btn" onMouseDown={e => e.preventDefault()} onClick={() => { if (!showInsertMenu && mcpBtnRef.current) { const r = mcpBtnRef.current.getBoundingClientRect(); const menuH = 400; const spaceBelow = window.innerHeight - r.bottom - 8; const top = spaceBelow >= menuH ? r.bottom + 4 : Math.max(8, r.top - menuH - 4); setInsertMenuPos({ top, left: Math.min(r.left, window.innerWidth - 240) }); } setShowInsertMenu(!showInsertMenu); }} title="MCP Tools">
+            <span style={{ marginRight: 2, fontSize: '11px' }}>MCP</span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
           </button>
-          {showInsertMenu && (
-            <div className="md-insert-menu">
-              <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActiveInsertTool('feedMarkdown') }}>Post Feed Markdown</div>
-              <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActiveInsertTool('feedDocument') }}>Post Feed Document</div>
-              <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActiveInsertTool('readMarkdown') }}>Read Markdown</div>
-              <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActiveInsertTool('updateMarkdown') }}>Update Markdown</div>
-              <div className="md-insert-menu-sep" />
-              <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActiveInsertTool('addActionItem') }}>Add Action Item</div>
-              <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActiveInsertTool('editActionItem') }}>Edit Action Item</div>
-              <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActiveInsertTool('listActionItems') }}>List Action Items</div>
-              <div className="md-insert-menu-sep" />
-              <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActiveInsertTool('searchDocs') }}>Search Documents</div>
-              <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActiveInsertTool('downloadDoc') }}>Download Document</div>
-              <div className="md-insert-menu-sep" />
-              <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActiveInsertTool('readPosts') }}>Read Posts</div>
-              <div className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setActiveInsertTool('commentPost') }}>Comment on Post</div>
+          {showInsertMenu && insertMenuPos && (
+            <div className="md-insert-menu" style={{ top: insertMenuPos.top, left: insertMenuPos.left }}>
+              {[
+                { type: 'direct', name: 'search' },
+                { type: 'sep' },
+                { type: 'direct', name: 'search_markdowns' }, { type: 'direct', name: 'write_markdown' },
+                { type: 'lookup', name: 'read_markdown' }, { type: 'lookup', name: 'update_markdown' }, { type: 'lookup', name: 'delete_markdown' },
+                { type: 'sep' },
+                { type: 'direct', name: 'search_action_items' }, { type: 'direct', name: 'write_action_item' },
+                { type: 'lookup', name: 'read_action_item' }, { type: 'lookup', name: 'update_action_item' }, { type: 'lookup', name: 'delete_action_item' },
+                { type: 'sep' },
+                { type: 'direct', name: 'list_all_categories' }, { type: 'direct', name: 'write_category' },
+                { type: 'lookup', name: 'update_category' }, { type: 'lookup', name: 'delete_category' },
+                { type: 'sep' },
+                { type: 'direct', name: 'search_links' }, { type: 'direct', name: 'write_link' },
+                { type: 'lookup', name: 'update_link' }, { type: 'lookup', name: 'delete_link' },
+                { type: 'sep' },
+                { type: 'direct', name: 'list_documents' }, { type: 'direct', name: 'upload_document' },
+                { type: 'lookup', name: 'delete_document' },
+                { type: 'sep' },
+                { type: 'direct', name: 'search_feeds' }, { type: 'lookup', name: 'read_feed_posts' },
+                { type: 'lookup', name: 'write_feed_post' }, { type: 'lookup', name: 'delete_feed_post' },
+                { type: 'sep' },
+                { type: 'direct', name: 'list_all_universes' }, { type: 'direct', name: 'set_default_universe' },
+                { type: 'sep' },
+                { type: 'direct', name: 'get_stats' },
+              ].map((item, i) => item.type === 'sep' ? (
+                <div key={`sep-${i}`} className="md-insert-menu-sep" />
+              ) : item.type === 'lookup' ? (
+                <div key={item.name} className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setMcpLookup(item.name); }}>{item.name}</div>
+              ) : (
+                <div key={item.name} className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); if (MD_UNIVERSE_TOOLS.has(item.name)) { setUniversePicker(item.name); } else { insertBlock(MD_MCP_DIRECT[item.name]()); } }}>{item.name}</div>
+              ))}
             </div>
           )}
         </div>
@@ -349,7 +314,8 @@ function MarkdownEditor({ value, onChange, placeholder }) {
         placeholder={placeholder}
         spellCheck
       />
-      {activeInsertTool && <MarkdownInsertModal tool={activeInsertTool} onInsert={(text) => { insertBlock(text); setActiveInsertTool(null) }} onClose={() => setActiveInsertTool(null)} />}
+      {mcpLookup && <MdMcpLookup tool={mcpLookup} onInsert={(text) => { insertBlock(text); setMcpLookup(null) }} onClose={() => setMcpLookup(null)} />}
+      {universePicker && <MdUniversePicker tool={universePicker} onConfirm={(uid) => insertBlock(MD_MCP_DIRECT[universePicker](uid))} onClose={() => setUniversePicker(null)} />}
     </div>
   )
 }
@@ -720,74 +686,6 @@ function MarkdownActionItems({ markdownId, categories }) {
 
 // ── Markdowns panel ───────────────────────────────────────
 
-function MarkdownApiView({ markdownId, isNew }) {
-  const base = window.location.origin
-
-  if (isNew) {
-    return (
-      <div className="api-view">
-        <h3 className="api-view-title">API Endpoints</h3>
-        <p className="api-view-hint">Save this markdown first to see all available endpoints.</p>
-        <div className="api-endpoint">
-          <span className="api-method api-method-post">POST</span>
-          <span className="api-endpoint-label">Create markdown</span>
-          <pre className="api-code-block"><code>{`${base}/api/markdowns?universe_id={universe_id}`}</code></pre>
-          <span className="api-endpoint-label">Request body</span>
-          <pre className="api-code-block"><code>{`{
-  "title": "...",
-  "body": "...",
-  "category_id": null
-}`}</code></pre>
-        </div>
-      </div>
-    )
-  }
-
-  const id = markdownId
-  return (
-    <div className="api-view">
-      <h3 className="api-view-title">API Endpoints</h3>
-      <div className="api-endpoint">
-        <span className="api-method api-method-get">GET</span>
-        <span className="api-endpoint-label">Read markdown</span>
-        <pre className="api-code-block"><code>{`${base}/api/markdowns/${id}`}</code></pre>
-      </div>
-      <div className="api-endpoint">
-        <span className="api-method api-method-put">PUT</span>
-        <span className="api-endpoint-label">Update markdown</span>
-        <pre className="api-code-block"><code>{`${base}/api/markdowns/${id}`}</code></pre>
-        <span className="api-endpoint-label">Request body</span>
-        <pre className="api-code-block"><code>{`{
-  "title": "...",
-  "body": "...",
-  "category_id": null
-}`}</code></pre>
-      </div>
-      <div className="api-endpoint">
-        <span className="api-method api-method-delete">DELETE</span>
-        <span className="api-endpoint-label">Delete markdown</span>
-        <pre className="api-code-block"><code>{`${base}/api/markdowns/${id}`}</code></pre>
-      </div>
-      <div className="api-endpoint">
-        <span className="api-method api-method-put">PUT</span>
-        <span className="api-endpoint-label">Toggle pin</span>
-        <pre className="api-code-block"><code>{`${base}/api/markdowns/${id}/pin?pinned=true`}</code></pre>
-      </div>
-      <div className="api-endpoint">
-        <span className="api-method api-method-get">GET</span>
-        <span className="api-endpoint-label">List images</span>
-        <pre className="api-code-block"><code>{`${base}/api/markdowns/${id}/images`}</code></pre>
-      </div>
-      <div className="api-endpoint">
-        <span className="api-method api-method-post">POST</span>
-        <span className="api-endpoint-label">Upload image</span>
-        <pre className="api-code-block"><code>{`${base}/api/markdowns/${id}/images`}</code></pre>
-        <span className="api-endpoint-label">Content-Type: multipart/form-data</span>
-      </div>
-    </div>
-  )
-}
-
 export function MarkdownEditorView({ markdown, categories, onClose, onSaved, previewMode, viewMode }) {
   const resolvedMode = viewMode || (previewMode ? 'preview' : 'edit')
   const [title, setTitle] = useState('')
@@ -860,8 +758,6 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
           <div className="markdown-preview markdown-body">
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}>{body}</ReactMarkdown>
           </div>
-        ) : resolvedMode === 'api' ? (
-          <MarkdownApiView markdownId={currentId} isNew={isNew} />
         ) : (
           <MarkdownEditor
             key={isNew ? 'new' : markdown.id}
@@ -1009,7 +905,6 @@ function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMa
               <div className="ai-group-header">
                 <span className="ai-group-emoji">{group.categoryId ? (catEmojiMap[group.categoryId] || '🏷️') : '🏷️'}</span>
                 <span className="ai-group-name">{group.name || 'Uncategorized'}</span>
-                <span className="ai-group-count">{group.items.length}</span>
               </div>
               {group.items.map((markdown) => (
                 <div key={markdown.id} className="markdown-card" onClick={() => startEdit(markdown)}>

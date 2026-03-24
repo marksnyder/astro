@@ -209,6 +209,23 @@ app.add_middleware(
 app.mount("/mcp", _mcp_app)
 
 
+@app.middleware("http")
+async def api_key_middleware(request: fastapi.Request, call_next):
+    path = request.url.path
+    skip_paths = ("/api/auth/", "/api/version", "/assets/", "/index.html", "/favicon")
+    if path == "/" or any(path.startswith(p) for p in skip_paths):
+        return await call_next(request)
+    if not path.startswith("/api/") and not path.startswith("/mcp"):
+        return await call_next(request)
+    stored_key = get_setting("api_key", "")
+    if not stored_key:
+        return await call_next(request)
+    provided = request.headers.get("x-api-key", "") or request.query_params.get("api_key", "")
+    if provided == stored_key:
+        return await call_next(request)
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=401, content={"detail": "Invalid or missing API key"})
+
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────
@@ -387,6 +404,186 @@ def api_delete_universe(uid: int):
     if not delete_universe(uid):
         raise HTTPException(status_code=400, detail="Cannot delete the last universe")
     return {"ok": True}
+
+
+@app.post("/api/universes/{universe_id}/apply-template")
+def api_apply_template(universe_id: int, template: str = fastapi.Query(...)):
+    """Apply a template to a universe, creating sample categories, action items, and markdowns."""
+    u = get_universe(universe_id)
+    if not u:
+        raise HTTPException(404, "Universe not found")
+
+    templates = {
+        "software_engineer": {
+            "categories": [
+                {"name": "Projects", "emoji": "💻"},
+                {"name": "Learning", "emoji": "📚"},
+                {"name": "Infrastructure", "emoji": "🔧"},
+            ],
+            "action_items": [
+                {"title": "Review pull requests for current sprint", "hot": True, "category": "Projects"},
+                {"title": "Set up CI/CD pipeline for new service", "category": "Infrastructure"},
+            ],
+            "markdowns": [
+                {"title": "Architecture Decision Record Template", "body": "# ADR: [Title]\n\n## Status\nProposed\n\n## Context\nDescribe the context and problem statement.\n\n## Decision\nDescribe the decision made.\n\n## Consequences\nDescribe the resulting consequences.", "category": "Projects"},
+                {"title": "Weekly Standup Notes", "body": "# Week of [Date]\n\n## Completed\n- \n\n## In Progress\n- \n\n## Blockers\n- \n\n## Notes\n", "category": "Projects"},
+            ],
+        },
+        "health_wellness": {
+            "categories": [
+                {"name": "Fitness", "emoji": "💪"},
+                {"name": "Nutrition", "emoji": "🥗"},
+                {"name": "Mental Health", "emoji": "🧘"},
+            ],
+            "action_items": [
+                {"title": "Schedule annual physical exam", "hot": True, "category": "Fitness"},
+                {"title": "Try a new healthy recipe this week", "category": "Nutrition"},
+            ],
+            "markdowns": [
+                {"title": "Workout Plan", "body": "# Weekly Workout Plan\n\n## Monday - Upper Body\n- Push-ups: 3x15\n- Dumbbell rows: 3x12\n\n## Wednesday - Lower Body\n- Squats: 3x15\n- Lunges: 3x12\n\n## Friday - Cardio\n- 30 min run/walk\n- Stretching", "category": "Fitness"},
+                {"title": "Meal Prep Ideas", "body": "# Meal Prep\n\n## Breakfast\n- Overnight oats\n- Smoothie bowls\n\n## Lunch\n- Grain bowls\n- Wraps\n\n## Dinner\n- Sheet pan meals\n- Stir fry", "category": "Nutrition"},
+            ],
+        },
+        "researcher": {
+            "categories": [
+                {"name": "Papers", "emoji": "📄"},
+                {"name": "Experiments", "emoji": "🔬"},
+                {"name": "Literature Review", "emoji": "📖"},
+            ],
+            "action_items": [
+                {"title": "Submit paper draft to advisor for review", "hot": True, "category": "Papers"},
+                {"title": "Run baseline experiments for comparison", "category": "Experiments"},
+            ],
+            "markdowns": [
+                {"title": "Research Log", "body": "# Research Log\n\n## [Date]\n\n### Objective\n\n### Method\n\n### Results\n\n### Next Steps\n", "category": "Experiments"},
+                {"title": "Paper Reading Notes", "body": "# Paper: [Title]\n\n**Authors:** \n**Year:** \n**Venue:** \n\n## Summary\n\n## Key Contributions\n\n## Methodology\n\n## Relevant to my work because\n", "category": "Literature Review"},
+            ],
+        },
+        "journalist": {
+            "categories": [
+                {"name": "Stories", "emoji": "📰"},
+                {"name": "Sources", "emoji": "🗣️"},
+                {"name": "Deadlines", "emoji": "⏰"},
+            ],
+            "action_items": [
+                {"title": "Follow up with source for on-record quote", "hot": True, "category": "Sources"},
+                {"title": "Fact-check article statistics before publish", "category": "Stories"},
+            ],
+            "markdowns": [
+                {"title": "Story Pitch Template", "body": "# Story Pitch\n\n## Headline\n\n## Angle\n\n## Key Sources\n1. \n2. \n\n## Timeline\n\n## Why Now?\n", "category": "Stories"},
+                {"title": "Interview Prep", "body": "# Interview: [Subject]\n\n## Background\n\n## Key Questions\n1. \n2. \n3. \n\n## Follow-ups\n\n## Notes\n", "category": "Sources"},
+            ],
+        },
+        "parenting": {
+            "categories": [
+                {"name": "School", "emoji": "🎒"},
+                {"name": "Activities", "emoji": "⚽"},
+                {"name": "Health", "emoji": "🏥"},
+            ],
+            "action_items": [
+                {"title": "Schedule parent-teacher conference", "hot": True, "category": "School"},
+                {"title": "Sign up for summer camp registration", "category": "Activities"},
+            ],
+            "markdowns": [
+                {"title": "Weekly Family Schedule", "body": "# Family Schedule\n\n## Monday\n- \n\n## Tuesday\n- \n\n## Wednesday\n- \n\n## Thursday\n- \n\n## Friday\n- \n\n## Weekend\n- ", "category": "Activities"},
+                {"title": "Emergency Contacts", "body": "# Emergency Contacts\n\n- **Pediatrician:** \n- **School:** \n- **Dentist:** \n- **Allergist:** \n- **Emergency:** 911", "category": "Health"},
+            ],
+        },
+        "content_creator": {
+            "categories": [
+                {"name": "Ideas", "emoji": "💡"},
+                {"name": "Production", "emoji": "🎬"},
+                {"name": "Analytics", "emoji": "📊"},
+            ],
+            "action_items": [
+                {"title": "Film and edit this week's video", "hot": True, "category": "Production"},
+                {"title": "Research trending topics in niche", "category": "Ideas"},
+            ],
+            "markdowns": [
+                {"title": "Content Calendar", "body": "# Content Calendar\n\n## Week 1\n| Day | Platform | Topic | Status |\n|-----|----------|-------|--------|\n| Mon | YouTube | | Draft |\n| Wed | Blog | | Idea |\n| Fri | Social | | Planned |", "category": "Production"},
+                {"title": "Video Script Template", "body": "# Video: [Title]\n\n## Hook (0:00-0:30)\n\n## Intro (0:30-1:00)\n\n## Main Content\n### Point 1\n### Point 2\n### Point 3\n\n## CTA\n\n## Outro", "category": "Production"},
+            ],
+        },
+        "financial_goals": {
+            "categories": [
+                {"name": "Budget", "emoji": "💰"},
+                {"name": "Investments", "emoji": "📈"},
+                {"name": "Goals", "emoji": "🎯"},
+            ],
+            "action_items": [
+                {"title": "Review and update monthly budget", "hot": True, "category": "Budget"},
+                {"title": "Research index fund options for retirement account", "category": "Investments"},
+            ],
+            "markdowns": [
+                {"title": "Monthly Budget Tracker", "body": "# Budget - [Month]\n\n## Income\n- Salary: $\n- Side: $\n\n## Fixed Expenses\n- Rent/Mortgage: $\n- Utilities: $\n- Insurance: $\n\n## Variable\n- Groceries: $\n- Transport: $\n- Entertainment: $\n\n## Savings\n- Emergency: $\n- Retirement: $", "category": "Budget"},
+                {"title": "Financial Goals", "body": "# Financial Goals\n\n## Short-term (1 year)\n- [ ] Build 3-month emergency fund\n- [ ] Pay off credit card\n\n## Medium-term (5 years)\n- [ ] Down payment for house\n- [ ] Max retirement contributions\n\n## Long-term\n- [ ] Financial independence\n- [ ] Kids college fund", "category": "Goals"},
+            ],
+        },
+        "cooking": {
+            "categories": [
+                {"name": "Recipes", "emoji": "🍳"},
+                {"name": "Meal Plans", "emoji": "📋"},
+                {"name": "Shopping", "emoji": "🛒"},
+            ],
+            "action_items": [
+                {"title": "Try making homemade pasta this weekend", "hot": True, "category": "Recipes"},
+                {"title": "Organize spice rack and check expiry dates", "category": "Shopping"},
+            ],
+            "markdowns": [
+                {"title": "Favorite Recipe Template", "body": "# [Recipe Name]\n\n**Prep Time:** min\n**Cook Time:** min\n**Servings:** \n\n## Ingredients\n- \n\n## Instructions\n1. \n\n## Notes\n", "category": "Recipes"},
+                {"title": "Weekly Meal Plan", "body": "# Meal Plan - Week of [Date]\n\n| Day | Breakfast | Lunch | Dinner |\n|-----|-----------|-------|--------|\n| Mon | | | |\n| Tue | | | |\n| Wed | | | |\n| Thu | | | |\n| Fri | | | |\n| Sat | | | |\n| Sun | | | |", "category": "Meal Plans"},
+            ],
+        },
+        "event_planning": {
+            "categories": [
+                {"name": "Venues", "emoji": "🏛️"},
+                {"name": "Vendors", "emoji": "🤝"},
+                {"name": "Timeline", "emoji": "📅"},
+            ],
+            "action_items": [
+                {"title": "Confirm venue booking and deposit", "hot": True, "category": "Venues"},
+                {"title": "Get quotes from three catering companies", "category": "Vendors"},
+            ],
+            "markdowns": [
+                {"title": "Event Checklist", "body": "# Event: [Name]\n**Date:** \n**Location:** \n\n## 3 Months Before\n- [ ] Book venue\n- [ ] Hire caterer\n- [ ] Send save-the-dates\n\n## 1 Month Before\n- [ ] Confirm vendors\n- [ ] Finalize menu\n- [ ] Send invitations\n\n## 1 Week Before\n- [ ] Final headcount\n- [ ] Confirm timeline\n- [ ] Prepare materials", "category": "Timeline"},
+                {"title": "Vendor Contact List", "body": "# Vendors\n\n## Catering\n- **Name:** \n- **Contact:** \n- **Quote:** $\n\n## Photography\n- **Name:** \n- **Contact:** \n- **Quote:** $\n\n## Music/DJ\n- **Name:** \n- **Contact:** \n- **Quote:** $", "category": "Vendors"},
+            ],
+        },
+        "career_development": {
+            "categories": [
+                {"name": "Skills", "emoji": "🎓"},
+                {"name": "Networking", "emoji": "🤝"},
+                {"name": "Applications", "emoji": "📝"},
+            ],
+            "action_items": [
+                {"title": "Update resume with recent accomplishments", "hot": True, "category": "Applications"},
+                {"title": "Complete online course module this week", "category": "Skills"},
+            ],
+            "markdowns": [
+                {"title": "Career Goals", "body": "# Career Development Plan\n\n## Current Position\n\n## Target Position\n\n## Skills Gap\n- [ ] \n- [ ] \n\n## Action Plan\n1. \n2. \n3. \n\n## Timeline\n- 3 months: \n- 6 months: \n- 1 year: ", "category": "Skills"},
+                {"title": "Networking Log", "body": "# Networking\n\n## [Date] - [Person/Event]\n- **Met:** \n- **Discussed:** \n- **Follow-up:** \n- **LinkedIn:** ", "category": "Networking"},
+            ],
+        },
+    }
+
+    tmpl = templates.get(template)
+    if not tmpl:
+        raise HTTPException(400, f"Unknown template: {template}")
+
+    cat_map = {}
+    for cat_data in tmpl["categories"]:
+        cat = create_category(cat_data["name"], None, universe_id, cat_data.get("emoji"))
+        cat_map[cat_data["name"]] = cat.id
+
+    for ai_data in tmpl["action_items"]:
+        cat_id = cat_map.get(ai_data.get("category"))
+        create_action_item(ai_data["title"], ai_data.get("hot", False), ai_data.get("due_date"), cat_id, universe_id)
+
+    for md_data in tmpl["markdowns"]:
+        cat_id = cat_map.get(md_data.get("category"))
+        create_markdown(md_data["title"], md_data["body"], cat_id, universe_id)
+
+    return {"ok": True, "categories": len(tmpl["categories"]), "action_items": len(tmpl["action_items"]), "markdowns": len(tmpl["markdowns"])}
 
 
 # ── Categories ────────────────────────────────────────────────────────────
@@ -931,6 +1128,75 @@ def api_get_setting(key: str):
 def api_set_setting(key: str, req: SettingRequest):
     set_setting(key, req.value)
     return {"ok": True}
+
+
+# ── Auth ──────────────────────────────────────────────────────────────────
+
+
+@app.get("/api/auth/status")
+def api_auth_status():
+    """Check if API key auth is enabled and if a provided key is valid."""
+    stored = get_setting("api_key", "")
+    return {"enabled": bool(stored)}
+
+
+@app.post("/api/auth/login")
+def api_auth_login(req: SettingRequest):
+    """Validate an API key."""
+    stored = get_setting("api_key", "")
+    if not stored:
+        return {"ok": True}
+    if req.value == stored:
+        return {"ok": True, "api_key": stored}
+    raise HTTPException(status_code=401, detail="Invalid API key")
+
+
+@app.post("/api/auth/generate-key")
+def api_auth_generate_key():
+    """Generate a new API key (requires existing key if one is set)."""
+    import uuid
+    new_key = str(uuid.uuid4())
+    set_setting("api_key", new_key)
+    return {"api_key": new_key}
+
+
+@app.post("/api/auth/clear-key")
+def api_auth_clear_key():
+    """Clear the API key, making the app open again."""
+    set_setting("api_key", "")
+    return {"ok": True}
+
+
+# ── Version ───────────────────────────────────────────────────────────────
+
+
+@app.get("/api/version")
+def api_get_version():
+    """Return the current running version."""
+    import os
+    version_file = Path(__file__).resolve().parent.parent / "VERSION"
+    version = "dev"
+    if version_file.exists():
+        version = version_file.read_text().strip()
+    build_id = os.environ.get("ASTRO_BUILD_ID", "")
+    return {"version": version, "build_id": build_id}
+
+
+@app.get("/api/version/latest")
+def api_get_latest_version():
+    """Check for the latest available version."""
+    import urllib.request
+    version_file = Path(__file__).resolve().parent.parent / "VERSION"
+    current = "dev"
+    if version_file.exists():
+        current = version_file.read_text().strip()
+    try:
+        url = "https://raw.githubusercontent.com/AstroBaseHub/Astro/main/VERSION"
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            latest = resp.read().decode().strip()
+        return {"current": current, "latest": latest, "update_available": latest != current}
+    except Exception:
+        return {"current": current, "latest": current, "update_available": False}
 
 
 # ── Backup & Restore ──────────────────────────────────────────────────────

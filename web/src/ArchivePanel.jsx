@@ -269,7 +269,6 @@ function ArchivePanel({ categories, onPinChange, universeId }) {
               <div className="ai-group-header">
                 <span className="ai-group-emoji">{group.categoryId ? (catEmojiMap[group.categoryId] || '🏷️') : '🏷️'}</span>
                 <span className="ai-group-name">{group.name || 'Uncategorized'}</span>
-                <span className="ai-group-count">{group.items.length}</span>
               </div>
               {group.items.map((doc) => (
                 <div key={doc.path} className="archive-card" onClick={(e) => openDoc(e, doc)} title={['pdf', 'xlsx', 'xls'].includes(doc.extension) ? `View ${doc.name}` : `Download ${doc.name}`}>

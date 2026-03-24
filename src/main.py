@@ -22,6 +22,15 @@ def cmd_stats(_args: argparse.Namespace) -> None:
     print(f"Chunks in vector store: {doc_count()}")
 
 
+def cmd_get_key(_args: argparse.Namespace) -> None:
+    from src.markdowns import get_setting
+    key = get_setting("api_key", "")
+    if key:
+        print(f"Current API key: {key}")
+    else:
+        print("No API key is configured. The app is open.")
+
+
 def cmd_serve(args: argparse.Namespace) -> None:
     import uvicorn
 
@@ -52,6 +61,10 @@ def main() -> None:
     # stats
     p_stats = sub.add_parser("stats", help="Show vector store statistics")
     p_stats.set_defaults(func=cmd_stats)
+
+    # get-key
+    p_key = sub.add_parser("get-key", help="Retrieve the current API key")
+    p_key.set_defaults(func=cmd_get_key)
 
     args = parser.parse_args()
     args.func(args)
