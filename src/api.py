@@ -1184,19 +1184,65 @@ def api_get_version():
 
 @app.get("/api/version/latest")
 def api_get_latest_version():
-    """Check for the latest available version."""
-    import urllib.request
+    """Check Docker Hub for a newer image of marksnyder/astro."""
+    import json, os, re, urllib.request
+
     version_file = Path(__file__).resolve().parent.parent / "VERSION"
     current = "dev"
     if version_file.exists():
         current = version_file.read_text().strip()
+    build_id = os.environ.get("ASTRO_BUILD_ID", "")
+
     try:
-        url = "https://raw.githubusercontent.com/AstroBaseHub/Astro/main/VERSION"
-        with urllib.request.urlopen(url, timeout=5) as resp:
-            latest = resp.read().decode().strip()
-        return {"current": current, "latest": latest, "update_available": latest != current}
-    except Exception:
-        return {"current": current, "latest": current, "update_available": False}
+        url = "https://hub.docker.com/v2/repositories/marksnyder/astro/tags/?page_size=50&ordering=last_updated"
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode())
+
+        tags = data.get("results", [])
+        sha_re = re.compile(r"^[0-9a-f]{7,12}$")
+        semver_re = re.compile(r"^\d+\.\d+\.\d+$")
+
+        latest_tag = next((t for t in tags if t["name"] == "latest"), None)
+        if not latest_tag:
+            return {"current": current, "latest": current, "update_available": False, "build_id": build_id}
+
+        latest_digest = latest_tag.get("digest", "")
+
+        # Strategy 1: compare build SHA against the SHA tag that matches
+        # the 'latest' digest (most reliable for Docker-based deploys)
+        if build_id:
+            latest_sha_tag = next(
+                (t["name"] for t in tags if sha_re.match(t["name"]) and t.get("digest") == latest_digest),
+                None,
+            )
+            if latest_sha_tag:
+                update_available = not build_id.lower().startswith(latest_sha_tag.lower())
+                return {
+                    "current": current,
+                    "latest": current if not update_available else f"{current} ({latest_sha_tag})",
+                    "update_available": update_available,
+                    "build_id": build_id,
+                    "latest_build": latest_sha_tag,
+                }
+
+        # Strategy 2: compare semver VERSION against semver Docker tags
+        semver_tags = [t["name"] for t in tags if semver_re.match(t["name"])]
+        if semver_tags and current != "dev" and semver_re.match(current):
+            semver_tags.sort(key=lambda v: tuple(int(x) for x in v.split(".")), reverse=True)
+            latest_ver = semver_tags[0]
+            update_available = tuple(int(x) for x in latest_ver.split(".")) > tuple(int(x) for x in current.split("."))
+            return {
+                "current": current,
+                "latest": latest_ver,
+                "update_available": update_available,
+                "build_id": build_id,
+            }
+
+        return {"current": current, "latest": current, "update_available": False, "build_id": build_id}
+    except Exception as e:
+        print(f"[Astro] WARNING: Version check failed: {e}")
+        return {"current": current, "latest": current, "update_available": False, "build_id": build_id}
 
 
 # ── Backup & Restore ──────────────────────────────────────────────────────
