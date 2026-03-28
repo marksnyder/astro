@@ -167,7 +167,10 @@ def update_markdown(
     md = _db_update_markdown(markdown_id, title, body, category_id)
     if md is None:
         return "Markdown not found"
-    upsert_markdown(md.id, body, title, md.universe_id)
+    try:
+        upsert_markdown(md.id, f"{md.title}\n\n{md.body}", md.title, md.universe_id)
+    except Exception as e:
+        print(f"[Astro] WARNING: Failed to upsert markdown {md.id} into vector store: {e}")
     return markdown_to_dict(md)
 
 

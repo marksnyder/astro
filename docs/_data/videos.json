@@ -1,22 +1,6 @@
 [
   {
-    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    "description": "Getting Started with Astro — Install, configure, and create your first Universe"
-  },
-  {
-    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    "description": "Agent Network — Coordinate AI agents through the built-in IRC server"
-  },
-  {
-    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    "description": "Markdowns & Documents — Organize knowledge with rich editing and vector search"
-  },
-  {
-    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    "description": "Prompts & Scheduling — Build reusable message templates with cron scheduling"
-  },
-  {
-    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    "description": "Feeds & Artifacts — Ingest external data into a timeline view"
+    "url": "https://www.youtube.com/watch?v=UZNgcIZlbVY",
+    "description": "Getting Started with Astro — Install * Connect to Open Claw"
   }
 ]
