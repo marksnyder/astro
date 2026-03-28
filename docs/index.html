@@ -185,96 +185,52 @@ layout: default
   </div>
 </section>
 
-{% if site.data.screenshots.size > 0 %}
-<section class="screenshots-section">
-  <div class="screenshots-heading">
-    <button class="screenshots-arrow screenshots-arrow-left" onclick="scrollScreenshots(-1)" aria-label="Scroll left">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-    </button>
-    <h2>See It in Action</h2>
-    <button class="screenshots-arrow screenshots-arrow-right" onclick="scrollScreenshots(1)" aria-label="Scroll right">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-    </button>
-  </div>
-  <script>
-  function scrollScreenshots(dir) {
-    var track = document.querySelector('.screenshots-track');
-    var card = track.querySelector('.screenshot-card');
-    var distance = card ? card.offsetWidth + 24 : 400;
-    track.scrollBy({ left: dir * distance, behavior: 'smooth' });
-  }
-  </script>
-  <div class="screenshots-track">
-    {% for shot in site.data.screenshots %}
-    <figure class="screenshot-card" onclick="openLightbox(this)">
-      <img src="{{ '/assets/screenshots/' | append: shot.file | relative_url }}" alt="{{ shot.description }}" loading="lazy">
-      {% if shot.description %}
-      <figcaption>{{ shot.description }}</figcaption>
-      {% endif %}
-    </figure>
-    {% endfor %}
+{% if site.data.videos.size > 0 %}
+<section class="videos-section">
+  <div class="videos-inner">
+    <div class="videos-heading">
+      <h2>See It in Action</h2>
+      <p>Watch videos to see what Astro can do.</p>
+    </div>
+    <div class="videos-layout">
+      <div class="video-player-wrap">
+        <div class="video-player" id="videoPlayer">
+          <iframe id="videoIframe" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        </div>
+        <p class="video-description" id="videoDescription"></p>
+      </div>
+      <div class="video-list" id="videoList">
+        {% for video in site.data.videos %}
+        <button class="video-item{% if forloop.first %} active{% endif %}" data-url="{{ video.url }}" data-description="{{ video.description }}" onclick="selectVideo(this, {{ forloop.index0 }})">
+          <span class="video-item-index">{{ forloop.index }}</span>
+          <span class="video-item-text">{{ video.description }}</span>
+        </button>
+        {% endfor %}
+      </div>
+    </div>
   </div>
 </section>
 
-<div class="lightbox" id="screenshotLightbox" onclick="closeLightbox(event)">
-  <button class="lightbox-close" onclick="closeLightbox(event)" aria-label="Close">&times;</button>
-  <button class="lightbox-nav lightbox-prev" onclick="navLightbox(-1, event)" aria-label="Previous">
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-  </button>
-  <button class="lightbox-nav lightbox-next" onclick="navLightbox(1, event)" aria-label="Next">
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-  </button>
-  <img class="lightbox-img" id="lightboxImg" src="" alt="">
-  <p class="lightbox-caption" id="lightboxCaption"></p>
-  <p class="lightbox-counter" id="lightboxCounter"></p>
-</div>
-
 <script>
-var _lbCards = [];
-var _lbIdx = 0;
+(function() {
+  var items = document.querySelectorAll('.video-item');
+  if (!items.length) return;
 
-document.addEventListener('DOMContentLoaded', function() {
-  _lbCards = Array.from(document.querySelectorAll('.screenshot-card'));
-});
+  function youtubeEmbedUrl(url) {
+    var m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{11})/);
+    return m ? 'https://www.youtube-nocookie.com/embed/' + m[1] : url;
+  }
 
-function openLightbox(card) {
-  _lbIdx = _lbCards.indexOf(card);
-  if (_lbIdx < 0) _lbIdx = 0;
-  showLightboxSlide();
-  document.getElementById('screenshotLightbox').classList.add('active');
-  document.body.style.overflow = 'hidden';
-}
+  window.selectVideo = function(el, idx) {
+    items.forEach(function(b) { b.classList.remove('active'); });
+    el.classList.add('active');
+    document.getElementById('videoIframe').src = youtubeEmbedUrl(el.getAttribute('data-url'));
+    document.getElementById('videoDescription').textContent = el.getAttribute('data-description');
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
 
-function showLightboxSlide() {
-  var card = _lbCards[_lbIdx];
-  var img = card.querySelector('img');
-  var cap = card.querySelector('figcaption');
-  document.getElementById('lightboxImg').src = img.src;
-  document.getElementById('lightboxImg').alt = img.alt;
-  document.getElementById('lightboxCaption').textContent = cap ? cap.textContent : '';
-  document.getElementById('lightboxCounter').textContent = (_lbIdx + 1) + ' / ' + _lbCards.length;
-}
-
-function navLightbox(dir, e) {
-  e.stopPropagation();
-  _lbIdx = (_lbIdx + dir + _lbCards.length) % _lbCards.length;
-  showLightboxSlide();
-}
-
-function closeLightbox(e) {
-  if (e.target.classList.contains('lightbox-img')) return;
-  if (e.target.closest('.lightbox-nav')) return;
-  document.getElementById('screenshotLightbox').classList.remove('active');
-  document.body.style.overflow = '';
-}
-
-document.addEventListener('keydown', function(e) {
-  var lb = document.getElementById('screenshotLightbox');
-  if (!lb.classList.contains('active')) return;
-  if (e.key === 'Escape') closeLightbox(e);
-  else if (e.key === 'ArrowLeft') navLightbox(-1, e);
-  else if (e.key === 'ArrowRight') navLightbox(1, e);
-});
+  selectVideo(items[0], 0);
+})();
 </script>
 {% endif %}
 
