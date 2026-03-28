@@ -167,6 +167,7 @@ DOCKER_ARGS=(
     --name "${CONTAINER_NAME}"
     --restart unless-stopped
     -p "${PORT}:8000"
+    -p 6667:6667
     -v "${ASTRO_DATA_DIR}/data:/app/data"
     -v "${ASTRO_DATA_DIR}/documents:/app/documents"
 )
@@ -194,6 +195,7 @@ echo "  Astro is running!"
 echo "============================================"
 echo ""
 echo "  URL:        http://localhost:${PORT}"
+echo "  IRC:        localhost:6667 (any IRC client)"
 echo "  Data dir:   ${ASTRO_DATA_DIR}"
 echo "  Container:  ${CONTAINER_NAME}"
 echo ""
