@@ -1,0 +1,24 @@
+services:
+  astro:
+    image: marksnyder/astro:latest
+    ports:
+      - "8000:8000"
+      - "6667:6667"
+    volumes:
+      - astro-data:/app/data
+      - astro-docs:/app/documents
+      - tailscale-state:/var/lib/tailscale
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY:-}
+      - TS_HOSTNAME=${TS_HOSTNAME:-astro}
+      - TS_SERVE_HTTPS=${TS_SERVE_HTTPS:-true}
+      - TS_EXTRA_ARGS=${TS_EXTRA_ARGS:-}
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    restart: unless-stopped
+
+volumes:
+  astro-data:
+  astro-docs:
+  tailscale-state:
