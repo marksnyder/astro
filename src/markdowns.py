@@ -199,6 +199,7 @@ def delete_universe(uid: int) -> bool:
     conn.execute("DELETE FROM markdowns WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM links WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM action_items WHERE universe_id = ?", (uid,))
+    conn.execute("DELETE FROM diagrams WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM document_meta WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM categories WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM universes WHERE id = ?", (uid,))
@@ -1559,3 +1560,116 @@ def reorder_prompts(ordering: list[dict]) -> None:
 
 def prompt_category_to_dict(c: PromptCategory) -> dict:
     return asdict(c)
+
+
+# ── Diagrams CRUD ─────────────────────────────────────────────────────────
+
+
+@dataclass
+class Diagram:
+    id: int | None
+    title: str
+    data: str
+    category_id: int | None
+    pinned: bool
+    created_at: str
+    updated_at: str
+    universe_id: int = 1
+
+
+def _row_to_diagram(row: sqlite3.Row) -> Diagram:
+    return Diagram(
+        id=row["id"],
+        title=row["title"],
+        data=row["data"],
+        category_id=row["category_id"],
+        pinned=bool(row["pinned"]),
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+        universe_id=row["universe_id"],
+    )
+
+
+def list_diagrams(query: str = "", category_id: int | None = None, universe_id: int | None = None) -> list[Diagram]:
+    conn = _get_conn()
+    conditions: list[str] = []
+    params: list = []
+    if universe_id is not None:
+        conditions.append("universe_id = ?")
+        params.append(universe_id)
+    if query:
+        conditions.append("title LIKE ?")
+        params.append(f"%{query}%")
+    if category_id is not None:
+        ids = get_descendant_ids(category_id)
+        placeholders = ",".join("?" * len(ids))
+        conditions.append(f"category_id IN ({placeholders})")
+        params.extend(ids)
+    where = f" WHERE {' AND '.join(conditions)}" if conditions else ""
+    rows = conn.execute(f"SELECT * FROM diagrams{where} ORDER BY updated_at DESC", params).fetchall()
+    conn.close()
+    return [_row_to_diagram(r) for r in rows]
+
+
+def get_diagram(diagram_id: int) -> Diagram | None:
+    conn = _get_conn()
+    row = conn.execute("SELECT * FROM diagrams WHERE id = ?", (diagram_id,)).fetchone()
+    conn.close()
+    return _row_to_diagram(row) if row else None
+
+
+def create_diagram(title: str, data: str = '{"type":"excalidraw","version":2,"source":"https://excalidraw.com","elements":[],"appState":{"viewBackgroundColor":"#ffffff","gridSize":20},"files":{}}', category_id: int | None = None, universe_id: int = 1) -> Diagram:
+    now = _now()
+    conn = _get_conn()
+    cur = conn.execute(
+        "INSERT INTO diagrams (title, data, category_id, universe_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (title, data, category_id, universe_id, now, now),
+    )
+    conn.commit()
+    did = cur.lastrowid
+    conn.close()
+    return get_diagram(did)  # type: ignore[return-value]
+
+
+def update_diagram(diagram_id: int, title: str, data: str, category_id: int | None = None) -> Diagram | None:
+    now = _now()
+    conn = _get_conn()
+    cur = conn.execute(
+        "UPDATE diagrams SET title = ?, data = ?, category_id = ?, updated_at = ? WHERE id = ?",
+        (title, data, category_id, now, diagram_id),
+    )
+    conn.commit()
+    conn.close()
+    if cur.rowcount == 0:
+        return None
+    return get_diagram(diagram_id)
+
+
+def delete_diagram(diagram_id: int) -> bool:
+    conn = _get_conn()
+    cur = conn.execute("DELETE FROM diagrams WHERE id = ?", (diagram_id,))
+    conn.commit()
+    conn.close()
+    return cur.rowcount > 0
+
+
+def set_diagram_pinned(diagram_id: int, pinned: bool) -> bool:
+    conn = _get_conn()
+    cur = conn.execute("UPDATE diagrams SET pinned = ? WHERE id = ?", (int(pinned), diagram_id))
+    conn.commit()
+    conn.close()
+    return cur.rowcount > 0
+
+
+def list_pinned_diagrams(universe_id: int | None = None) -> list[Diagram]:
+    conn = _get_conn()
+    if universe_id is not None:
+        rows = conn.execute("SELECT * FROM diagrams WHERE pinned = 1 AND universe_id = ? ORDER BY updated_at DESC", (universe_id,)).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM diagrams WHERE pinned = 1 ORDER BY updated_at DESC").fetchall()
+    conn.close()
+    return [_row_to_diagram(r) for r in rows]
+
+
+def diagram_to_dict(d: Diagram) -> dict:
+    return asdict(d)

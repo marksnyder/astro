@@ -120,6 +120,14 @@ from src.markdowns import (
     update_post_comment,
     delete_post_comment,
     post_comment_to_dict,
+    create_diagram,
+    delete_diagram,
+    diagram_to_dict,
+    get_diagram,
+    list_diagrams,
+    list_pinned_diagrams,
+    set_diagram_pinned,
+    update_diagram,
 )
 from src.store import (
     add_documents,
@@ -706,7 +714,8 @@ def api_list_pinned(universe_id: Optional[int] = None):
     links = [link_to_dict(l) for l in list_pinned_links(universe_id=universe_id)]
     feeds = [feed_to_dict(f) for f in list_pinned_feeds(universe_id=universe_id)]
     pinned_cats = [category_to_dict(c) for c in list_pinned_categories(universe_id=universe_id)]
-    return {"markdowns": markdowns, "documents": docs, "links": links, "feeds": feeds, "feed_categories": pinned_cats}
+    diagrams = [diagram_to_dict(d) for d in list_pinned_diagrams(universe_id=universe_id)]
+    return {"markdowns": markdowns, "documents": docs, "links": links, "feeds": feeds, "feed_categories": pinned_cats, "diagrams": diagrams}
 
 
 # ── Links (bookmarks) ───────────────────────────────────────────────────
@@ -2010,6 +2019,67 @@ def api_delete_prompt_category(cat_id: int):
         raise HTTPException(status_code=404, detail="Category not found")
     return {"ok": True}
 
+
+
+# ── Diagrams ──────────────────────────────────────────────────────────────
+
+
+class DiagramRequest(BaseModel):
+    title: str
+    data: str = '{"type":"excalidraw","version":2,"source":"https://excalidraw.com","elements":[],"appState":{"viewBackgroundColor":"#ffffff","gridSize":20},"files":{}}'
+    category_id: Optional[int] = None
+
+
+class DiagramResponse(BaseModel):
+    id: int
+    title: str
+    data: str
+    category_id: Optional[int]
+    pinned: bool
+    created_at: str
+    updated_at: str
+    universe_id: int = 1
+
+
+@app.get("/api/diagrams", response_model=list[DiagramResponse])
+def api_list_diagrams(q: str = "", category_id: Optional[int] = None, universe_id: Optional[int] = None):
+    return [diagram_to_dict(d) for d in list_diagrams(q, category_id, universe_id=universe_id)]
+
+
+@app.get("/api/diagrams/{diagram_id}", response_model=DiagramResponse)
+def api_get_diagram(diagram_id: int):
+    diagram = get_diagram(diagram_id)
+    if not diagram:
+        raise HTTPException(status_code=404, detail="Diagram not found")
+    return diagram_to_dict(diagram)
+
+
+@app.post("/api/diagrams", response_model=DiagramResponse, status_code=201)
+def api_create_diagram(req: DiagramRequest, universe_id: int = 1):
+    diagram = create_diagram(req.title, req.data, req.category_id, universe_id=universe_id)
+    return diagram_to_dict(diagram)
+
+
+@app.put("/api/diagrams/{diagram_id}", response_model=DiagramResponse)
+def api_update_diagram(diagram_id: int, req: DiagramRequest):
+    diagram = update_diagram(diagram_id, req.title, req.data, req.category_id)
+    if not diagram:
+        raise HTTPException(status_code=404, detail="Diagram not found")
+    return diagram_to_dict(diagram)
+
+
+@app.delete("/api/diagrams/{diagram_id}")
+def api_delete_diagram(diagram_id: int):
+    if not delete_diagram(diagram_id):
+        raise HTTPException(status_code=404, detail="Diagram not found")
+    return {"ok": True}
+
+
+@app.put("/api/diagrams/{diagram_id}/pin")
+def api_toggle_diagram_pin(diagram_id: int, pinned: bool = True):
+    if not set_diagram_pinned(diagram_id, pinned):
+        raise HTTPException(status_code=404, detail="Diagram not found")
+    return {"ok": True}
 
 
 # ── Search ────────────────────────────────────────────────────────────────

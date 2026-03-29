@@ -11,19 +11,23 @@ from src.markdowns import (
     category_to_dict,
     create_action_item,
     create_category,
+    create_diagram,
     create_feed_post_markdown,
     create_link,
     create_markdown,
     delete_action_item as _db_delete_action_item,
     delete_category as _db_delete_category,
+    delete_diagram as _db_delete_diagram,
     delete_document_meta,
     delete_feed_post as _db_delete_feed_post,
     delete_link as _db_delete_link,
     delete_markdown as _db_delete_markdown,
+    diagram_to_dict,
     feed_post_to_dict,
     feed_to_dict,
     get_action_item,
     get_all_document_meta,
+    get_diagram,
     get_feed,
     get_link,
     get_markdown,
@@ -31,6 +35,7 @@ from src.markdowns import (
     link_to_dict,
     list_action_items,
     list_categories,
+    list_diagrams,
     list_feed_posts,
     list_feeds,
     list_links,
@@ -42,6 +47,7 @@ from src.markdowns import (
     universe_to_dict,
     update_action_item as _db_update_action_item,
     update_category as _db_update_category,
+    update_diagram as _db_update_diagram,
     update_link as _db_update_link,
     update_markdown as _db_update_markdown,
 )
@@ -75,12 +81,14 @@ mcp = FastMCP(
     instructions=(
         "Astro is a personal knowledge base and productivity app. "
         "Use these tools to search the user's notes, action items, "
-        "bookmarks, and feeds. The vector store enables semantic search "
-        "across all indexed content. Content is organized into Universes "
-        "(isolated workspaces). Most tools accept an optional universe_id; "
-        "if omitted, the configured default universe is used. Call "
-        "list_universes to see available universes and set_default_universe "
-        "to change the default."
+        "bookmarks, diagrams, and feeds. The vector store enables semantic "
+        "search across all indexed content. Content is organized into "
+        "Universes (isolated workspaces). Most tools accept an optional "
+        "universe_id; if omitted, the configured default universe is used. "
+        "Call list_universes to see available universes and "
+        "set_default_universe to change the default. Diagrams use the "
+        "Excalidraw format (https://excalidraw.com) — see write_diagram "
+        "for schema details."
     ),
 )
 
@@ -456,6 +464,84 @@ def delete_feed_post(post_id: int) -> str:
     """Permanently delete a feed post by ID."""
     if not _db_delete_feed_post(post_id):
         return "Post not found"
+    return "Deleted"
+
+
+# ── Diagrams (Excalidraw) ─────────────────────────────────────────────────
+
+
+@mcp.tool
+def search_diagrams(
+    query: str = "", category_id: int | None = None, universe_id: int | None = None
+) -> list[dict]:
+    """List or search the user's diagrams. Diagrams use the Excalidraw format
+    (https://excalidraw.com) and are stored as JSON. The data field contains
+    a full Excalidraw scene with elements, appState, and files. Returns id,
+    title, data, category, and timestamps."""
+    uid = universe_id if universe_id is not None else _default_universe()
+    return [diagram_to_dict(d) for d in list_diagrams(query, category_id, uid)]
+
+
+@mcp.tool
+def read_diagram(diagram_id: int) -> dict | str:
+    """Read a single diagram by ID. Returns the full Excalidraw-format JSON
+    in the data field. The data field contains: type ("excalidraw"), version,
+    elements (array of Excalidraw element objects with properties like type,
+    x, y, width, height, strokeColor, backgroundColor, etc.), appState
+    (viewBackgroundColor, scrollX, scrollY, zoom), and files."""
+    d = get_diagram(diagram_id)
+    if d is None:
+        return "Diagram not found"
+    return diagram_to_dict(d)
+
+
+@mcp.tool
+def write_diagram(
+    title: str,
+    data: str = '{"type":"excalidraw","version":2,"source":"https://excalidraw.com","elements":[],"appState":{"viewBackgroundColor":"#ffffff","gridSize":20},"files":{}}',
+    category_id: int | None = None,
+    universe_id: int | None = None,
+) -> dict:
+    """Create a new diagram. The data field must be a JSON string in Excalidraw
+    format (https://docs.excalidraw.com/docs/codebase/json-schema). The
+    Excalidraw element types are: rectangle, ellipse, diamond, text, arrow,
+    line, freedraw, and image. Each element has properties including: id,
+    type, x, y, width, height, strokeColor, backgroundColor, fillStyle
+    ("solid", "hachure", "cross-hatch"), strokeWidth, strokeStyle ("solid",
+    "dashed", "dotted"), roughness, opacity (0-100), angle, and more. Text
+    elements additionally have: text, fontSize, fontFamily (1=normal,
+    2=code, 3=handwritten), textAlign, and verticalAlign. Arrow/line
+    elements have a points array of [x,y] offsets. The top-level JSON
+    envelope must include type="excalidraw", version=2, elements=[], and
+    appState={}."""
+    uid = universe_id if universe_id is not None else _default_universe()
+    d = create_diagram(title, data, category_id, uid)
+    return diagram_to_dict(d)
+
+
+@mcp.tool
+def update_diagram(
+    diagram_id: int,
+    title: str,
+    data: str,
+    category_id: int | None = None,
+) -> dict | str:
+    """Update an existing diagram. The data field must be a JSON string in
+    Excalidraw format. All fields are replaced. See write_diagram for the
+    full Excalidraw schema reference. To add elements to an existing diagram,
+    first read_diagram to get the current data, parse the JSON, modify the
+    elements array, then pass the updated JSON back here."""
+    d = _db_update_diagram(diagram_id, title, data, category_id)
+    if d is None:
+        return "Diagram not found"
+    return diagram_to_dict(d)
+
+
+@mcp.tool
+def delete_diagram(diagram_id: int) -> str:
+    """Permanently delete a diagram by ID."""
+    if not _db_delete_diagram(diagram_id):
+        return "Diagram not found"
     return "Deleted"
 
 

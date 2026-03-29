@@ -5,6 +5,7 @@ import ArchivePanel from './ArchivePanel'
 import LinksPanel from './LinksPanel'
 import ActionItemsPanel from './ActionItemsPanel'
 import FeedsPanel, { PostTimeline } from './FeedsPanel'
+import DiagramsPanel, { DiagramEditorView } from './DiagramsPanel'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import CategoryTree, { EmojiPopover } from './CategoryTree'
@@ -1379,6 +1380,7 @@ function App() {
   const [quickView, setQuickView] = useState(null)
   const [editMarkdownRequest, setEditMarkdownRequest] = useState(null)
   const [markdownRefreshKey, setMarkdownRefreshKey] = useState(0)
+  const [diagramRefreshKey, setDiagramRefreshKey] = useState(0)
   const [openFeedRequest, setOpenFeedRequest] = useState(null)
 
   const [tabs, setTabs] = useState([
@@ -1847,6 +1849,19 @@ function App() {
     setActiveTabId(tabId)
   }, [])
 
+  const openDiagramTab = useCallback((diagram) => {
+    const key = diagram._new ? 'new' : diagram.id
+    const tabId = `diagram-${key}`
+    setTabs(prev => {
+      const existing = prev.find(t => t.id === tabId)
+      if (existing) {
+        return prev.map(t => t.id === tabId ? { ...t, data: diagram, title: diagram.title || 'Untitled Diagram' } : t)
+      }
+      return [...prev, { id: tabId, type: 'diagram', title: diagram.title || 'Untitled Diagram', closable: true, data: diagram }]
+    })
+    setActiveTabId(tabId)
+  }, [])
+
   const closeTab = useCallback((tabId) => {
     setTabs(prev => prev.filter(t => t.id !== tabId))
     setActiveTabId(prev => prev === tabId ? 'irc' : prev)
@@ -2145,7 +2160,7 @@ function App() {
             </button>
           )}
         </div>
-        {(pinnedItems.markdowns.length > 0 || pinnedItems.documents.length > 0 || pinnedItems.links?.length > 0 || pinnedItems.feed_categories?.length > 0) && (
+        {(pinnedItems.markdowns.length > 0 || pinnedItems.documents.length > 0 || pinnedItems.links?.length > 0 || pinnedItems.feed_categories?.length > 0 || pinnedItems.diagrams?.length > 0) && (
           <div className="pinned-bar">
             {pinnedItems.markdowns.map((n) => (
               <button key={`n-${n.id}`} className="pinned-chip pinned-markdown" onClick={() => { setSidebarTab('markdowns'); setEditMarkdownRequest(n); }} title={n.title || 'Untitled'}>
@@ -2185,6 +2200,14 @@ function App() {
                 {(feedUnreadCounts[c.id] || 0) > 0 && (
                   <span className="pinned-chip-unread">{feedUnreadCounts[c.id]}</span>
                 )}
+              </button>
+            ))}
+            {(pinnedItems.diagrams || []).map((d) => (
+              <button key={`dg-${d.id}`} className="pinned-chip pinned-diagram" onClick={() => { setSidebarTab('diagrams'); openDiagramTab(d) }} title={d.title || 'Untitled Diagram'}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+                </svg>
+                <span className="pinned-chip-label">{d.title || 'Untitled'}</span>
               </button>
             ))}
           </div>
@@ -2255,6 +2278,14 @@ function App() {
                 <path d="M4 11a9 9 0 0 1 9 9" />
                 <path d="M4 4a16 16 0 0 1 16 16" />
                 <circle cx="5" cy="19" r="1" />
+              </svg>
+            </button>
+            <button className={`rail-tab ${sidebarTab === 'diagrams' ? 'active' : ''}`} onClick={() => setSidebarTab('diagrams')} title="Diagrams">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
               </svg>
             </button>
             <div className="rail-sep" />
@@ -2341,6 +2372,15 @@ function App() {
               recent7dCounts={feedRecent7d}
             />
           )}
+          {sidebarTab === 'diagrams' && (
+            <DiagramsPanel
+              categories={categories}
+              universeId={currentUniverseId}
+              onPinChange={fetchPinned}
+              onEditDiagram={(d) => openDiagramTab(d._new ? { ...d, _key: 'new' } : d)}
+              refreshKey={diagramRefreshKey}
+            />
+          )}
           {sidebarTab === 'actions' && (
             <ActionItemsPanel
               categories={categories}
@@ -2422,6 +2462,24 @@ function App() {
                 if (created && !closed) {
                   setTabs(prev => prev.map(t => t.id === activeTab.id
                     ? { ...t, data: created, title: created.title || 'Untitled' }
+                    : t
+                  ))
+                }
+                if (closed) closeTab(activeTab.id)
+              }}
+            />
+          ) : activeTab.type === 'diagram' && activeTab.data ? (
+            <DiagramEditorView
+              key={activeTab.id}
+              diagram={activeTab.data}
+              categories={categories}
+              onClose={() => closeTab(activeTab.id)}
+              onSaved={(saved, closed) => {
+                setDiagramRefreshKey(k => k + 1)
+                fetchPinned()
+                if (saved && !closed) {
+                  setTabs(prev => prev.map(t => t.id === activeTab.id
+                    ? { ...t, data: saved, title: saved.title || 'Untitled Diagram' }
                     : t
                   ))
                 }

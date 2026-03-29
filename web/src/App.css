@@ -26,7 +26,8 @@
   overflow: hidden;
 }
 
-.chat-container:has(> .timeline-inline) {
+.chat-container:has(> .timeline-inline),
+.chat-container:has(> .diagram-editor-view) {
   max-width: none;
 }
 
@@ -7324,4 +7325,174 @@
 @keyframes update-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
+}
+
+/* ── Diagrams ─────────────────────────────────────────── */
+
+.diagram-card-count {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.12);
+  padding: 1px 5px;
+  border-radius: 8px;
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+
+.diagram-editor-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.diagram-editor-view .markdown-inline-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.diagram-editor-view .markdown-inline-body > * {
+  width: 95%;
+}
+
+.diagram-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 0 8px;
+}
+
+.diagram-view-toggle {
+  display: flex;
+  gap: 2px;
+  background: rgba(30, 41, 59, 0.6);
+  border-radius: 6px;
+  padding: 2px;
+  margin-left: auto;
+}
+
+.diagram-view-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.diagram-view-btn.active {
+  background: rgba(59, 130, 246, 0.25);
+  color: #93c5fd;
+}
+
+.diagram-view-btn:hover:not(.active) {
+  color: #e2e8f0;
+}
+
+/* Excalidraw editor wrapper */
+.diagram-excalidraw-outer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.diagram-excalidraw-wrapper {
+  flex: 1;
+  min-height: 500px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  position: relative;
+}
+
+.diagram-excalidraw-wrapper .excalidraw {
+  --color-surface-high: #ffffff;
+}
+
+.diagram-excalidraw-wrapper .excalidraw .App-menu_top .buttonList {
+  flex-wrap: wrap;
+}
+
+.diagram-excalidraw-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 0;
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.diagram-excalidraw-footer a {
+  color: #6366f1;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.diagram-excalidraw-footer a:hover {
+  text-decoration: underline;
+}
+
+.diagram-tool-sep {
+  width: 1px;
+  height: 20px;
+  background: #e2e8f0;
+  margin: 0 4px;
+}
+
+/* Source editor */
+.diagram-source-editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 400px;
+}
+
+.diagram-source-textarea {
+  flex: 1;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 8px;
+  background: #0f172a;
+  color: #e2e8f0;
+  resize: none;
+  outline: none;
+  tab-size: 2;
+}
+
+.diagram-source-textarea:focus {
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.diagram-json-error {
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+/* Pinned diagram chip */
+.pinned-diagram {
+  border-color: rgba(168, 85, 247, 0.3);
+  color: #c4b5fd;
+}
+
+.pinned-diagram:hover {
+  background: rgba(168, 85, 247, 0.15);
+  border-color: rgba(168, 85, 247, 0.5);
 }

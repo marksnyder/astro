@@ -35,7 +35,7 @@ Astro maintains a ChromaDB vector store that indexes your markdowns, documents, 
 
 Astro includes a built-in [MCP](https://modelcontextprotocol.io) server that lets AI agents discover and use Astro's tools through a standardized interface. Point any MCP-compatible client — Claude Desktop, Cursor, or custom agents — at your Astro instance and they can read, write, and search your knowledge base.
 
-The MCP endpoint is available at `/mcp/` and exposes 23 tools:
+The MCP endpoint is available at `/mcp/` and exposes 28 tools:
 
 ### Search
 - **search** — semantic vector search across all indexed content
@@ -46,6 +46,13 @@ The MCP endpoint is available at `/mcp/` and exposes 23 tools:
 - **write_markdown** — create a new note
 - **update_markdown_note** — update an existing note
 - **delete_markdown_note** — delete a note
+
+### Diagrams (Excalidraw)
+- **search_diagrams** — list or search diagrams
+- **read_diagram** — read a single diagram by ID (returns Excalidraw JSON)
+- **write_diagram** — create a new diagram in Excalidraw format
+- **update_diagram** — update an existing diagram
+- **delete_diagram** — delete a diagram
 
 ### Action Items
 - **search_action_items** — list or search tasks
@@ -121,6 +128,22 @@ Your documents become searchable memory — not just storage.
 
 ---
 
+## Diagrams (Powered by Excalidraw)
+
+Create and edit visual diagrams directly inside Astro, powered by [Excalidraw](https://excalidraw.com).
+
+- Full Excalidraw editor embedded in the app
+- Draw rectangles, ellipses, diamonds, arrows, lines, text, and freehand shapes
+- Color, stroke, fill, opacity, and font controls
+- Native Excalidraw JSON format for full compatibility
+- Import and export `.excalidraw` files — round-trips cleanly with excalidraw.com
+- Edit the raw JSON source alongside the visual editor
+- Category assignment and pinning
+- Zoom level and pan position are persisted between sessions
+- MCP tools for AI agents to create and edit diagrams programmatically
+
+---
+
 ## Action Items
 
 Track what matters.
@@ -150,7 +173,7 @@ Links become part of your searchable knowledge base.
 
 ## Universes
 
-Universes isolate all content: markdowns, documents, tasks, links, and categories.
+Universes isolate all content: markdowns, documents, diagrams, tasks, links, and categories.
 
 Use separate Universes for:
 
@@ -172,6 +195,7 @@ Categories apply across:
 
 - Markdowns
 - Documents
+- Diagrams
 - Tasks
 - Links
 
@@ -181,7 +205,7 @@ This creates consistent structure across your entire workspace.
 
 ## Pinned Items Bar
 
-Pin important markdowns, documents, and links. They appear in a unified header bar for quick access.
+Pin important markdowns, documents, diagrams, and links. They appear in a unified header bar for quick access.
 
 ---
 
