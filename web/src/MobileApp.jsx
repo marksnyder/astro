@@ -229,8 +229,10 @@ function MobileMarkdowns({ categories, universeId }) {
     fetch(`/api/markdowns?${params}`)
       .then(r => r.json())
       .then(data => {
-        data.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
-        setMarkdowns(data)
+        const seen = new Set()
+        const unique = data.filter(d => { if (seen.has(d.id)) return false; seen.add(d.id); return true })
+        unique.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
+        setMarkdowns(unique)
       })
       .catch(() => {})
   }, [search, filterCatId, universeId])
@@ -269,6 +271,9 @@ function MobileMarkdowns({ categories, universeId }) {
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
     setEditing(null)
     fetchMarkdowns()
+    window.scrollTo(0, 0)
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 0
   }
 
   const doAutosave = useCallback(async (t, b, catId) => {
@@ -294,6 +299,14 @@ function MobileMarkdowns({ categories, universeId }) {
     autosaveTimer.current = setTimeout(() => doAutosave(title, body, categoryId), 800)
     return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current) }
   }, [title, body, categoryId, doAutosave])
+
+  useEffect(() => {
+    if (!editing && !viewing) {
+      window.scrollTo(0, 0)
+      document.documentElement.scrollTop = 0
+      document.body.scrollTop = 0
+    }
+  }, [editing, viewing])
 
   const remove = async (markdown) => {
     if (!confirm(`Delete "${markdown.title || 'Untitled'}"?`)) return
@@ -332,7 +345,7 @@ function MobileMarkdowns({ categories, universeId }) {
     return (
       <div className="mn-view">
         <div className="mn-view-header">
-          <button className="mn-back-btn" onClick={() => setViewing(null)}>
+          <button className="mn-back-btn" onClick={() => { setViewing(null); window.scrollTo(0, 0) }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
           </button>
           <span className="mn-view-header-title">Markdown</span>
@@ -508,19 +521,41 @@ function MobileMarkdowns({ categories, universeId }) {
       <div className="mn-markdowns-list">
         {markdowns.length === 0 ? (
           <div className="mn-empty">{search || filterCatId ? 'No matching markdowns.' : 'No markdowns yet. Tap + to create one.'}</div>
-        ) : markdowns.map(markdown => (
-          <div key={markdown.id} className={`mn-markdown-card ${markdown.pinned ? 'pinned' : ''}`} onClick={() => { setViewTab('content'); setViewing(markdown) }}>
-            <div className="mn-markdown-title">
-              {markdown.pinned && <svg className="mn-pin-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1"><path d="M12 2l3 9h9l-7 5 3 9-8-6-8 6 3-9-7-5h9z" /></svg>}
-              {markdown.title || 'Untitled'}
+        ) : (() => {
+          const groups = {}
+          const order = []
+          for (const markdown of markdowns) {
+            const key = markdown.category_id ?? '__none__'
+            if (!groups[key]) { groups[key] = []; order.push(key) }
+            groups[key].push(markdown)
+          }
+          order.sort((a, b) => {
+            if (a === '__none__') return 1
+            if (b === '__none__') return -1
+            return (catMap[a] || '').localeCompare(catMap[b] || '')
+          })
+          return order.map(key => (
+            <div key={key} className="ma-group">
+              <div className="ma-group-header">
+                {key === '__none__' ? 'Uncategorized' : catLabel(key) || 'Unknown'}
+                <span className="ma-group-count">{groups[key].length}</span>
+              </div>
+              {groups[key].map(markdown => (
+                <div key={markdown.id} className={`mn-markdown-card ${markdown.pinned ? 'pinned' : ''}`} onClick={() => { setViewTab('content'); setViewing(markdown) }}>
+                  <div className="mn-markdown-title">
+                    {markdown.pinned && <svg className="mn-pin-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1"><path d="M12 2l3 9h9l-7 5 3 9-8-6-8 6 3-9-7-5h9z" /></svg>}
+                    {markdown.title || 'Untitled'}
+                  </div>
+                  <div className="mn-markdown-preview">{stripHtml(markdown.body).slice(0, 100)}</div>
+                  <div className="mn-markdown-card-footer">
+                    <span className="mn-markdown-date">{formatDate(markdown.updated_at)}</span>
+                    {markdown.category_id && catMap[markdown.category_id] && <span className="mn-cat-badge small">{catLabel(markdown.category_id)}</span>}
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="mn-markdown-preview">{stripHtml(markdown.body).slice(0, 100)}</div>
-            <div className="mn-markdown-card-footer">
-              <span className="mn-markdown-date">{formatDate(markdown.updated_at)}</span>
-              {markdown.category_id && catMap[markdown.category_id] && <span className="mn-cat-badge small">{catLabel(markdown.category_id)}</span>}
-            </div>
-          </div>
-        ))}
+          ))
+        })()}
       </div>
     </div>
   )
@@ -551,7 +586,11 @@ function MobileActions({ categories, universeId }) {
     if (universeId) params.set('universe_id', universeId)
     fetch(`/api/action-items?${params}`)
       .then(r => r.json())
-      .then(setItems)
+      .then(data => {
+        const seen = new Set()
+        const unique = data.filter(d => { if (seen.has(d.id)) return false; seen.add(d.id); return true })
+        setItems(unique)
+      })
       .catch(() => {})
   }, [search, showCompleted, universeId])
 
@@ -1110,6 +1149,299 @@ function MobilePostTimeline({ category, onBack }) {
 }
 
 
+function MobileTables({ categories, universeId }) {
+  const [tables, setTables] = useState([])
+  const [search, setSearch] = useState('')
+  const [viewing, setViewing] = useState(null)
+  const [editing, setEditing] = useState(null)
+  const [title, setTitle] = useState('')
+  const [categoryId, setCategoryId] = useState(null)
+  const [columns, setColumns] = useState([])
+  const [rows, setRows] = useState([])
+  const [totalRows, setTotalRows] = useState(0)
+  const [page, setPage] = useState(1)
+  const [rowSearch, setRowSearch] = useState('')
+  const [saving, setSaving] = useState(false)
+  const titleRef = useRef(null)
+
+  const catMap = Object.fromEntries(categories.map(c => [c.id, c.name]))
+  const catEmojiMap = Object.fromEntries(categories.map(c => [c.id, c.emoji]))
+  const catLabel = (id) => { const e = catEmojiMap[id]; const n = catMap[id]; return e ? `${e} ${n}` : n }
+
+  const fetchTables = useCallback(() => {
+    const params = new URLSearchParams()
+    if (search) params.set('q', search)
+    if (universeId) params.set('universe_id', universeId)
+    fetch(`/api/tables?${params}`)
+      .then(r => r.json())
+      .then(data => {
+        data.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
+        setTables(data)
+      })
+      .catch(() => {})
+  }, [search, universeId])
+
+  useEffect(() => { fetchTables() }, [universeId])
+  useEffect(() => {
+    const t = setTimeout(fetchTables, 300)
+    return () => clearTimeout(t)
+  }, [search, universeId])
+
+  const fetchRows = useCallback(() => {
+    if (!viewing) return
+    const params = new URLSearchParams({ page: String(page), page_size: '50' })
+    if (rowSearch) params.set('search', rowSearch)
+    fetch(`/api/tables/${viewing.id}/rows?${params}`)
+      .then(r => r.json())
+      .then(data => { setRows(data.rows || []); setTotalRows(data.total || 0) })
+      .catch(() => {})
+  }, [viewing, page, rowSearch])
+
+  useEffect(() => { fetchRows() }, [fetchRows])
+
+  const startNew = () => {
+    setEditing('new')
+    setTitle('')
+    setCategoryId(null)
+    setColumns([{ name: 'Name', type: 'string' }])
+    setTimeout(() => titleRef.current?.focus(), 80)
+  }
+
+  const startEdit = (table) => {
+    setEditing(table)
+    setTitle(table.title)
+    setCategoryId(table.category_id)
+    try { setColumns(JSON.parse(table.columns)) } catch { setColumns([]) }
+    setTimeout(() => titleRef.current?.focus(), 80)
+  }
+
+  const saveTable = async () => {
+    if (!title.trim()) return
+    setSaving(true)
+    try {
+      const payload = { title: title.trim(), columns: JSON.stringify(columns), category_id: categoryId }
+      if (editing === 'new') {
+        const res = await fetch(`/api/tables?universe_id=${universeId || 1}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        const created = await res.json()
+        setEditing(null)
+        setViewing(created)
+      } else {
+        await fetch(`/api/tables/${editing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        setEditing(null)
+        setViewing({ ...editing, title: title.trim(), columns: JSON.stringify(columns), category_id: categoryId })
+      }
+      fetchTables()
+    } finally { setSaving(false) }
+  }
+
+  const remove = async (table) => {
+    if (!confirm(`Delete "${table.title || 'Untitled'}"?`)) return
+    await fetch(`/api/tables/${table.id}`, { method: 'DELETE' })
+    setViewing(null)
+    setEditing(null)
+    fetchTables()
+  }
+
+  const addRow = async () => {
+    if (!viewing) return
+    const data = {}
+    const cols = (() => { try { return JSON.parse(viewing.columns) } catch { return [] } })()
+    for (const col of cols) {
+      if (col.type === 'number') data[col.name] = 0
+      else if (col.type === 'boolean') data[col.name] = false
+      else data[col.name] = ''
+    }
+    await fetch(`/api/tables/${viewing.id}/rows`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: JSON.stringify(data) }),
+    })
+    fetchRows()
+  }
+
+  const updateRowCell = async (row, colName, value) => {
+    const rowData = (() => { try { return JSON.parse(row.data) } catch { return {} } })()
+    rowData[colName] = value
+    await fetch(`/api/table-rows/${row.id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: JSON.stringify(rowData), sort_order: row.sort_order }),
+    })
+    setRows(prev => prev.map(r => r.id === row.id ? { ...r, data: JSON.stringify(rowData) } : r))
+  }
+
+  const deleteRow = async (rowId) => {
+    await fetch(`/api/table-rows/${rowId}`, { method: 'DELETE' })
+    fetchRows()
+  }
+
+  const exportCsv = () => {
+    if (!viewing) return
+    window.open(`/api/tables/${viewing.id}/export-csv`, '_blank')
+  }
+
+  const totalPages = Math.ceil(totalRows / 50) || 1
+
+  if (viewing) {
+    const cols = (() => { try { return JSON.parse(viewing.columns) } catch { return [] } })()
+    return (
+      <div className="mn-view">
+        <div className="mn-view-header">
+          <button className="mn-back-btn" onClick={() => { setViewing(null); setPage(1); setRowSearch(''); window.scrollTo(0, 0) }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+          </button>
+          <span className="mn-view-header-title">{viewing.title || 'Untitled'}</span>
+          <span style={{ flex: 1 }} />
+          <button className="mn-action-btn" onClick={() => startEdit(viewing)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button className="mn-action-btn mn-action-danger" onClick={() => remove(viewing)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+          </button>
+        </div>
+        <div className="mn-view-body" style={{ padding: '12px 8px' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+            <input className="mn-search-input" style={{ flex: 1, minWidth: 120, background: 'var(--bg-tertiary)', borderRadius: 8, padding: '6px 10px', border: '1px solid var(--border)' }} placeholder="Search rows..." value={rowSearch} onChange={e => { setRowSearch(e.target.value); setPage(1) }} />
+            <button className="mn-action-btn" onClick={addRow} title="Add row" style={{ background: 'var(--accent)', color: '#fff', borderRadius: 6, padding: '6px 12px', fontSize: 12, fontWeight: 600 }}>+ Row</button>
+            <button className="mn-action-btn" onClick={exportCsv} title="Export CSV" style={{ fontSize: 11 }}>CSV</button>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr>
+                  {cols.map((col, i) => (
+                    <th key={i} style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, fontSize: 11, color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', background: 'var(--bg-secondary)', position: 'sticky', top: 0 }}>{col.name}</th>
+                  ))}
+                  <th style={{ width: 32, borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)', position: 'sticky', top: 0 }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.length === 0 ? (
+                  <tr><td colSpan={cols.length + 1} style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)' }}>No rows</td></tr>
+                ) : rows.map(row => {
+                  const rd = (() => { try { return JSON.parse(row.data) } catch { return {} } })()
+                  return (
+                    <tr key={row.id}>
+                      {cols.map((col, ci) => (
+                        <td key={ci} style={{ padding: '6px 10px', borderBottom: '1px solid var(--border)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {col.type === 'boolean' ? (
+                            <input type="checkbox" checked={!!rd[col.name]} onChange={e => updateRowCell(row, col.name, e.target.checked)} />
+                          ) : (
+                            <input
+                              type={col.type === 'number' ? 'number' : 'text'}
+                              value={rd[col.name] ?? ''}
+                              onChange={e => updateRowCell(row, col.name, col.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value)}
+                              style={{ background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: 13, width: '100%', outline: 'none', padding: 0 }}
+                            />
+                          )}
+                        </td>
+                      ))}
+                      <td style={{ borderBottom: '1px solid var(--border)', textAlign: 'center' }}>
+                        <button onClick={() => deleteRow(row.id)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: 4, opacity: 0.5 }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '10px 0', fontSize: 12, color: 'var(--text-secondary)' }}>
+              <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)', padding: '4px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>Prev</button>
+              <span>{page} / {totalPages} ({totalRows})</span>
+              <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)', padding: '4px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>Next</button>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  if (editing) {
+    return (
+      <div className="mn-edit">
+        <div className="mn-view-header">
+          <button className="mn-back-btn" onClick={() => setEditing(null)}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+          </button>
+          <span className="mn-view-header-title">{editing === 'new' ? 'New Table' : 'Edit Table'}</span>
+          <span style={{ flex: 1 }} />
+          <button className="mn-save-btn" onClick={saveTable} disabled={saving || !title.trim()}>
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+        <div className="mn-edit-body">
+          <input ref={titleRef} className="mn-edit-title" placeholder="Table title" value={title} onChange={e => setTitle(e.target.value)} />
+          <MobileCategorySelect categories={categories} value={categoryId} onChange={setCategoryId} />
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 8 }}>Columns</div>
+          {columns.map((col, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' }}>
+              <input value={col.name} onChange={e => setColumns(prev => prev.map((c, j) => j === i ? { ...c, name: e.target.value } : c))} style={{ flex: 1, background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-primary)', padding: '6px 10px', fontSize: 14, outline: 'none' }} />
+              <select value={col.type} onChange={e => setColumns(prev => prev.map((c, j) => j === i ? { ...c, type: e.target.value } : c))} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-primary)', padding: '6px 8px', fontSize: 13 }}>
+                <option value="string">Text</option>
+                <option value="number">Number</option>
+                <option value="boolean">Bool</option>
+              </select>
+              <button onClick={() => setColumns(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#e53e3e', cursor: 'pointer', padding: 4 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+          ))}
+          <button onClick={() => setColumns(prev => [...prev, { name: '', type: 'string' }])} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--accent)', padding: '8px 12px', fontSize: 13, cursor: 'pointer', fontWeight: 600, marginTop: 4 }}>+ Add Column</button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mn-list-view">
+      <div className="mn-search-bar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+        <input className="mn-search-input" placeholder="Search tables..." value={search} onChange={e => setSearch(e.target.value)} />
+        <button className="mn-new-btn" onClick={startNew} title="New table">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+        </button>
+      </div>
+      <div className="mn-markdowns-list">
+        {tables.length === 0 ? (
+          <div className="mn-empty">{search ? 'No matching tables.' : 'No tables yet. Tap + to create one.'}</div>
+        ) : (() => {
+          const groups = {}
+          const order = []
+          for (const table of tables) {
+            const key = table.category_id ?? '__none__'
+            if (!groups[key]) { groups[key] = []; order.push(key) }
+            groups[key].push(table)
+          }
+          order.sort((a, b) => {
+            if (a === '__none__') return 1
+            if (b === '__none__') return -1
+            return (catMap[a] || '').localeCompare(catMap[b] || '')
+          })
+          return order.map(key => (
+            <div key={key} className="ma-group">
+              <div className="ma-group-header">
+                {key === '__none__' ? 'Uncategorized' : catLabel(key) || 'Unknown'}
+                <span className="ma-group-count">{groups[key].length}</span>
+              </div>
+              {groups[key].map(table => {
+                let colCount = 0
+                try { colCount = JSON.parse(table.columns).length } catch {}
+                return (
+                  <div key={table.id} className="mn-markdown-card" onClick={() => { setViewing(table); setPage(1); setRowSearch('') }}>
+                    <div className="mn-markdown-title">{table.title || 'Untitled'}</div>
+                    <div className="mn-markdown-preview">{colCount} column{colCount !== 1 ? 's' : ''}</div>
+                  </div>
+                )
+              })}
+            </div>
+          ))
+        })()}
+      </div>
+    </div>
+  )
+}
+
 // ── Main mobile app ───────────────────────────────────
 
 function MobileHelpView({ onClose }) {
@@ -1376,7 +1708,10 @@ function MobileApp() {
           const data = JSON.parse(e.data)
           if (data.type === 'msg') {
             if (data.timestamp && data.timestamp <= ircHistoryTsRef.current) return
-            setIrcMessages(prev => [...prev, data])
+            setIrcMessages(prev => {
+              if (data.id && prev.some(m => m.id === data.id)) return prev
+              return [...prev, data]
+            })
           } else if (data.type === 'status') {
             setIrcStatus({ connected: data.connected, nick: data.nick, channel: data.channel, host: data.host || '', port: data.port || 0 })
           }
@@ -1817,6 +2152,7 @@ function MobileApp() {
         {view === 'markdowns' && <MobileMarkdowns categories={categories} universeId={currentUniverseId} />}
         {view === 'actions' && <MobileActions categories={categories} universeId={currentUniverseId} />}
         {view === 'feeds' && <MobileFeeds categories={categories} universeId={currentUniverseId} />}
+        {view === 'tables' && <MobileTables categories={categories} universeId={currentUniverseId} />}
       </div>
 
       {/* Bottom tab bar */}
@@ -1836,6 +2172,10 @@ function MobileApp() {
         <button className={`m-tab ${view === 'feeds' ? 'active' : ''}`} onClick={() => setView('feeds')}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11a9 9 0 0 1 9 9" /><path d="M4 4a16 16 0 0 1 16 16" /><circle cx="5" cy="19" r="1" /></svg>
           <span>Feeds</span>
+        </button>
+        <button className={`m-tab ${view === 'tables' ? 'active' : ''}`} onClick={() => setView('tables')}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+          <span>Tables</span>
         </button>
       </nav>
       {showHelp && <MobileHelpView onClose={() => setShowHelp(false)} />}

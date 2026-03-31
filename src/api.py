@@ -121,13 +121,27 @@ from src.markdowns import (
     delete_post_comment,
     post_comment_to_dict,
     create_diagram,
+    create_table,
+    create_table_row,
     delete_diagram,
+    delete_table,
+    delete_table_row,
     diagram_to_dict,
     get_diagram,
+    get_table,
+    get_table_row,
     list_diagrams,
     list_pinned_diagrams,
+    list_pinned_tables,
+    list_table_rows,
+    list_tables,
     set_diagram_pinned,
+    set_table_pinned,
+    table_row_to_dict,
+    table_to_dict,
     update_diagram,
+    update_table,
+    update_table_row,
 )
 from src.store import (
     add_documents,
@@ -715,7 +729,8 @@ def api_list_pinned(universe_id: Optional[int] = None):
     feeds = [feed_to_dict(f) for f in list_pinned_feeds(universe_id=universe_id)]
     pinned_cats = [category_to_dict(c) for c in list_pinned_categories(universe_id=universe_id)]
     diagrams = [diagram_to_dict(d) for d in list_pinned_diagrams(universe_id=universe_id)]
-    return {"markdowns": markdowns, "documents": docs, "links": links, "feeds": feeds, "feed_categories": pinned_cats, "diagrams": diagrams}
+    tables = [table_to_dict(t) for t in list_pinned_tables(universe_id=universe_id)]
+    return {"markdowns": markdowns, "documents": docs, "links": links, "feeds": feeds, "feed_categories": pinned_cats, "diagrams": diagrams, "tables": tables}
 
 
 # ── Links (bookmarks) ───────────────────────────────────────────────────
@@ -2080,6 +2095,235 @@ def api_toggle_diagram_pin(diagram_id: int, pinned: bool = True):
     if not set_diagram_pinned(diagram_id, pinned):
         raise HTTPException(status_code=404, detail="Diagram not found")
     return {"ok": True}
+
+
+# ── Tables ────────────────────────────────────────────────────────────────
+
+
+class TableRequest(BaseModel):
+    title: str
+    columns: str = "[]"
+    category_id: Optional[int] = None
+
+
+class TableResponse(BaseModel):
+    id: int
+    title: str
+    columns: str
+    category_id: Optional[int]
+    pinned: bool
+    created_at: str
+    updated_at: str
+    universe_id: int = 1
+
+
+class TableRowRequest(BaseModel):
+    data: str = "{}"
+    sort_order: int = 0
+
+
+class TableRowResponse(BaseModel):
+    id: int
+    table_id: int
+    data: str
+    sort_order: int
+    created_at: str
+
+
+@app.get("/api/tables", response_model=list[TableResponse])
+def api_list_tables(q: str = "", category_id: Optional[int] = None, universe_id: Optional[int] = None):
+    return [table_to_dict(t) for t in list_tables(q, category_id, universe_id=universe_id)]
+
+
+@app.get("/api/tables/{table_id}", response_model=TableResponse)
+def api_get_table(table_id: int):
+    t = get_table(table_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Table not found")
+    return table_to_dict(t)
+
+
+@app.post("/api/tables", response_model=TableResponse, status_code=201)
+def api_create_table(req: TableRequest, universe_id: int = 1):
+    t = create_table(req.title, req.columns, req.category_id, universe_id=universe_id)
+    return table_to_dict(t)
+
+
+@app.put("/api/tables/{table_id}", response_model=TableResponse)
+def api_update_table(table_id: int, req: TableRequest):
+    t = update_table(table_id, req.title, req.columns, req.category_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Table not found")
+    return table_to_dict(t)
+
+
+@app.delete("/api/tables/{table_id}")
+def api_delete_table(table_id: int):
+    if not delete_table(table_id):
+        raise HTTPException(status_code=404, detail="Table not found")
+    return {"ok": True}
+
+
+@app.put("/api/tables/{table_id}/pin")
+def api_toggle_table_pin(table_id: int, pinned: bool = True):
+    if not set_table_pinned(table_id, pinned):
+        raise HTTPException(status_code=404, detail="Table not found")
+    return {"ok": True}
+
+
+# ── Table rows ────────────────────────────────────────────────────────────
+
+
+@app.get("/api/tables/{table_id}/rows")
+def api_list_table_rows(table_id: int, search: str = "", page: int = 1, page_size: int = 50):
+    if not get_table(table_id):
+        raise HTTPException(status_code=404, detail="Table not found")
+    page_size = min(page_size, 200)
+    rows, total = list_table_rows(table_id, search, page=page, page_size=page_size)
+    return {
+        "rows": [table_row_to_dict(r) for r in rows],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "has_more": (page * page_size) < total,
+    }
+
+
+@app.post("/api/tables/{table_id}/rows", status_code=201)
+def api_create_table_row(table_id: int, req: TableRowRequest):
+    if not get_table(table_id):
+        raise HTTPException(status_code=404, detail="Table not found")
+    row = create_table_row(table_id, req.data, req.sort_order)
+    return table_row_to_dict(row)
+
+
+@app.put("/api/table-rows/{row_id}")
+def api_update_table_row(row_id: int, req: TableRowRequest):
+    row = update_table_row(row_id, req.data, req.sort_order)
+    if not row:
+        raise HTTPException(status_code=404, detail="Row not found")
+    return table_row_to_dict(row)
+
+
+@app.delete("/api/table-rows/{row_id}")
+def api_delete_table_row(row_id: int):
+    if not delete_table_row(row_id):
+        raise HTTPException(status_code=404, detail="Row not found")
+    return {"ok": True}
+
+
+# ── Table CSV import/export ───────────────────────────────────────────────
+
+
+@app.get("/api/tables/{table_id}/export-csv")
+def api_export_table_csv(table_id: int):
+    import csv, io, json
+    t = get_table(table_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Table not found")
+    columns = json.loads(t.columns)
+    col_names = [c["name"] for c in columns]
+    all_rows, _ = list_table_rows(table_id, page=1, page_size=100000)
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(col_names)
+    for row in all_rows:
+        row_data = json.loads(row.data)
+        writer.writerow([row_data.get(cn, "") for cn in col_names])
+    from fastapi.responses import Response
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{t.title or "table"}.csv"'},
+    )
+
+
+@app.post("/api/tables/{table_id}/import-csv")
+async def api_import_table_csv(table_id: int, file: UploadFile):
+    import csv, io, json
+    t = get_table(table_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Table not found")
+    columns = json.loads(t.columns)
+    col_map = {c["name"]: c["type"] for c in columns}
+    content = (await file.read()).decode("utf-8-sig")
+    reader = csv.DictReader(io.StringIO(content))
+    count = 0
+    for csv_row in reader:
+        data = {}
+        for key, val in csv_row.items():
+            if key not in col_map:
+                continue
+            ctype = col_map[key]
+            if ctype == "number":
+                try:
+                    data[key] = float(val) if val else 0
+                except ValueError:
+                    data[key] = 0
+            elif ctype == "boolean":
+                data[key] = val.lower() in ("true", "1", "yes") if val else False
+            else:
+                data[key] = val or ""
+        create_table_row(table_id, json.dumps(data), count)
+        count += 1
+    return {"ok": True, "imported": count}
+
+
+@app.post("/api/tables/import-csv-new")
+async def api_import_csv_new_table(file: UploadFile, universe_id: int = 1):
+    import csv, io, json
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename")
+    content = (await file.read()).decode("utf-8-sig")
+    reader = csv.DictReader(io.StringIO(content))
+    fieldnames = reader.fieldnames or []
+    if not fieldnames:
+        raise HTTPException(status_code=400, detail="CSV has no headers")
+    # Infer column types from first row
+    first_rows = []
+    for i, row in enumerate(reader):
+        first_rows.append(row)
+        if i >= 20:
+            break
+    columns = []
+    for fn in fieldnames:
+        ctype = "string"
+        sample_vals = [r.get(fn, "") for r in first_rows if r.get(fn, "")]
+        if sample_vals:
+            if all(v.lower() in ("true", "false", "1", "0", "yes", "no") for v in sample_vals):
+                ctype = "boolean"
+            else:
+                try:
+                    for v in sample_vals:
+                        float(v)
+                    ctype = "number"
+                except ValueError:
+                    pass
+        columns.append({"name": fn, "type": ctype})
+    title = file.filename.rsplit(".", 1)[0] if "." in file.filename else file.filename
+    t = create_table(title, json.dumps(columns), universe_id=universe_id)
+    # Re-read for all rows
+    all_reader = csv.DictReader(io.StringIO(content))
+    col_map = {c["name"]: c["type"] for c in columns}
+    count = 0
+    for csv_row in all_reader:
+        data = {}
+        for key, val in csv_row.items():
+            if key not in col_map:
+                continue
+            ctype = col_map[key]
+            if ctype == "number":
+                try:
+                    data[key] = float(val) if val else 0
+                except ValueError:
+                    data[key] = 0
+            elif ctype == "boolean":
+                data[key] = val.lower() in ("true", "1", "yes") if val else False
+            else:
+                data[key] = val or ""
+        create_table_row(t.id, json.dumps(data), count)
+        count += 1
+    return {"ok": True, "table_id": t.id, "title": t.title, "columns": len(columns), "rows": count}
 
 
 # ── Search ────────────────────────────────────────────────────────────────

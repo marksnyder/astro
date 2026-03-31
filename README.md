@@ -2,7 +2,7 @@
 
 **Your Universe, Organized.**
 
-Astro is a self-hosted workspace that brings agent orchestration, markdowns, documents, diagrams, action items, bookmarks, and data feeds into one platform. Everything lives inside **Universes** — cleanly separated workspaces that keep your knowledge organized and contained.
+Astro is a self-hosted workspace that brings agent orchestration, markdowns, documents, diagrams, tables, action items, bookmarks, and data feeds into one platform. Everything lives inside **Universes**, cleanly separated workspaces that keep your knowledge organized and contained.
 
 [Documentation](https://runastro.sh) · [Chrome/Edge Extension](https://chromewebstore.google.com/detail/astro-browse/djbiamicfibnldnmhfnmndpdmghilmmi)
 
@@ -17,10 +17,13 @@ A built-in IRC server enables communication with AI agents across platforms. Coo
 Create and organize structured markdowns with rich formatting, embedded images, category assignment, and full-text search. Every markdown is automatically vectorized for semantic search.
 
 ### Document Archive
-Upload PDF, DOCX, XLSX, PPTX, TXT, MD, and CSV files. Documents are automatically ingested and embedded into the vector store so they become searchable memory — not just storage. Includes inline PDF viewing and Excel rendering as styled tables.
+Upload PDF, DOCX, XLSX, PPTX, TXT, MD, and CSV files. Documents are automatically ingested and embedded into the vector store so they become searchable memory, not just storage. Includes inline PDF viewing and Excel rendering as styled tables.
 
 ### Diagrams
 Create visual diagrams powered by [Excalidraw](https://excalidraw.com). Draw shapes, arrows, text, and more with the full Excalidraw editor embedded directly in Astro. Diagrams are stored in native Excalidraw JSON format, so you can import/export `.excalidraw` files and round-trip with excalidraw.com. Assign categories, pin to the header bar, and edit the raw JSON source. Your view position and zoom level are preserved between sessions.
+
+### Tables
+Build structured data with spreadsheet-style tables. Define typed columns (string, number, boolean), then add, edit, and remove rows with inline editing. Tables support pagination and search for large datasets, category assignment, and pinning. Export data to CSV, import CSV into existing tables, or create a new table directly from a CSV file. AI agents can create and query tables through MCP.
 
 ### Action Items
 Track tasks with priority flags, due dates, and categories. Tasks integrate directly into your knowledge system and are vectorized for search.
@@ -29,13 +32,13 @@ Track tasks with priority flags, due dates, and categories. Tasks integrate dire
 Save and organize links with titles, URLs, and categories. Links become part of your searchable knowledge base.
 
 ### Universes
-Isolate all content — markdowns, documents, diagrams, tasks, links, and categories — into independent workspaces. Use separate Universes for work, personal projects, research, clients, or agent environments.
+Isolate all content (markdowns, documents, diagrams, tables, tasks, links, and categories) into independent workspaces. Use separate Universes for work, personal projects, research, clients, or agent environments.
 
 ### Hierarchical Categories
-A parent/child category tree organizes content across markdowns, documents, tasks, and links with consistent structure. Assign emojis to categories for quick visual identification.
+A parent/child category tree organizes content across markdowns, documents, tables, tasks, and links with consistent structure. Assign emojis to categories for quick visual identification.
 
 ### Pinned Items Bar
-Pin important markdowns, documents, diagrams, links, and feeds to a unified header bar for quick access.
+Pin important markdowns, documents, diagrams, tables, links, and feeds to a unified header bar for quick access.
 
 ### Prompts
 Organize and send reusable messages to Agent Network channels on demand or via cron. Create prompt categories with custom emoji labels and arrange them in a 3-column board layout with drag-and-drop. Each prompt has a target channel, message body, and optional cron schedule. Move prompts between categories, reorder them by dragging, and run any prompt instantly from the UI or let the scheduler fire it automatically.
@@ -47,7 +50,7 @@ Ingest data from external services into Astro through authenticated API endpoint
 A `/api/search` endpoint exposes semantic search over the vector store via simple HTTP GET requests, making it easy for scripts and agents to query your knowledge base.
 
 ### MCP Server
-A built-in [Model Context Protocol](https://modelcontextprotocol.io) server at `/mcp/` lets AI agents discover and use Astro's tools — search, notes, diagrams, action items, links, feeds, and categories — through a standardized interface. Point any MCP-compatible client (Claude Desktop, Cursor, custom agents) at the endpoint to get started.
+A built-in [Model Context Protocol](https://modelcontextprotocol.io) server at `/mcp/` lets AI agents discover and use Astro's tools through a standardized interface. Point any MCP-compatible client (Claude Desktop, Cursor, custom agents) at the endpoint to get started.
 
 ### Mobile Interface
 A mobile-optimized interface at `/mobile` keeps your Universe accessible anywhere.
@@ -102,7 +105,7 @@ curl -fsSL https://runastro.sh/install.sh | bash -s -- [OPTIONS]
 |---|---|---|
 | `--port PORT` | `8000` | Host port to expose |
 | `--data-dir DIR` | `~/astro-data` | Persistent data directory |
-| `--ts-authkey KEY` | — | Tailscale auth key (for remote access) |
+| `--ts-authkey KEY` | none | Tailscale auth key (for remote access) |
 | `--ts-hostname NAME` | `astro` | Tailscale hostname |
 | `--ts-serve-https BOOL` | `true` | Enable Tailscale HTTPS proxy |
 
@@ -136,7 +139,7 @@ Create an auth key at [login.tailscale.com/admin/settings/keys](https://login.ta
 1. Open **http://localhost:8000**
 2. Start uploading documents, creating markdowns, or coordinating agents
 
-Embeddings are handled locally — no external API keys are required.
+Embeddings are handled locally and no external API keys are required.
 
 ---
 
@@ -154,7 +157,7 @@ Returns the top-k semantically similar chunks from the vector store as JSON.
 
 ### MCP Server
 
-The MCP server is available at `http://localhost:8000/mcp/` and exposes 28 tools:
+The MCP server is available at `http://localhost:8000/mcp/` and exposes 43 tools:
 
 | Tool | Description |
 |---|---|
@@ -164,35 +167,52 @@ The MCP server is available at `http://localhost:8000/mcp/` and exposes 28 tools
 | `search_markdowns` | List/search markdown notes |
 | `read_markdown` | Read a single note by ID |
 | `write_markdown` | Create a new note |
-| `update_markdown_note` | Update an existing note |
-| `delete_markdown_note` | Delete a note |
+| `update_markdown` | Update an existing note |
+| `delete_markdown` | Delete a note |
 | **Diagrams (Excalidraw)** | |
 | `search_diagrams` | List/search diagrams |
 | `read_diagram` | Read a single diagram by ID (Excalidraw JSON) |
 | `write_diagram` | Create a new diagram (Excalidraw format) |
 | `update_diagram` | Update an existing diagram |
 | `delete_diagram` | Delete a diagram |
+| **Tables** | |
+| `search_tables` | List/search tables |
+| `read_table` | Read a single table by ID (includes column definitions) |
+| `write_table` | Create a new table with typed columns |
+| `update_table` | Update a table's title, columns, or category |
+| `delete_table` | Delete a table and all its rows |
+| `read_table_rows` | List rows with pagination and search |
+| `write_table_row` | Add a row to a table |
+| `update_table_row` | Update a row's data |
+| `delete_table_row` | Delete a row |
 | **Action Items** | |
 | `search_action_items` | List/search tasks and to-dos |
 | `read_action_item` | Read a single task by ID |
 | `write_action_item` | Create a new task |
-| `update_action_item_tool` | Update a task |
-| `delete_action_item_tool` | Delete a task |
+| `update_action_item` | Update a task |
+| `delete_action_item` | Delete a task |
 | **Categories** | |
 | `list_all_categories` | List all categories |
 | `write_category` | Create a new category |
-| `update_category_tool` | Update a category's name/emoji |
-| `delete_category_tool` | Delete a category |
+| `update_category` | Update a category's name/emoji |
+| `delete_category` | Delete a category |
 | **Links** | |
 | `search_links` | List/search bookmarks |
 | `write_link` | Save a new bookmark |
-| `update_link_tool` | Update a bookmark |
-| `delete_link_tool` | Delete a bookmark |
+| `update_link` | Update a bookmark |
+| `delete_link` | Delete a bookmark |
 | **Documents** | |
 | `list_documents` | List uploaded documents with metadata |
+| `upload_document` | Upload a new document |
+| `delete_document` | Delete a document |
 | **Feeds** | |
 | `search_feeds` | List/search feeds |
 | `read_feed_posts` | Read posts from a feed |
+| `write_feed_post` | Push a post into a feed |
+| `delete_feed_post` | Delete a feed post |
+| **Universes** | |
+| `list_all_universes` | List all universes |
+| `set_default_universe` | Set the active universe |
 | **Stats** | |
 | `get_stats` | Vector store statistics |
 

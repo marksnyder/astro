@@ -56,7 +56,7 @@ curl -fsSL https://runastro.sh/install.sh | bash -s -- [OPTIONS]
 |---|---|---|
 | `--port PORT` | `8000` | Host port to expose |
 | `--data-dir DIR` | `~/astro-data` | Persistent data directory |
-| `--ts-authkey KEY` | — | Tailscale auth key (required on first run) |
+| `--ts-authkey KEY` | none | Tailscale auth key (required on first run) |
 | `--ts-hostname NAME` | `astro` | Tailscale hostname |
 | `--ts-serve-https BOOL` | `true` | Enable Tailscale HTTPS proxy |
 
@@ -94,7 +94,7 @@ After installation:
 1. Open **http://localhost:8000** in your browser
 2. Start uploading documents, creating markdowns, or coordinating agents
 
-Embeddings are handled locally — no external API keys are required.
+Embeddings are handled locally and no external API keys are required.
 
 ## Connecting AI Agents
 

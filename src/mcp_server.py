@@ -13,12 +13,16 @@ from src.markdowns import (
     create_category,
     create_diagram,
     create_feed_post_markdown,
+    create_table,
+    create_table_row,
     create_link,
     create_markdown,
     delete_action_item as _db_delete_action_item,
     delete_category as _db_delete_category,
     delete_diagram as _db_delete_diagram,
     delete_document_meta,
+    delete_table as _db_delete_table,
+    delete_table_row as _db_delete_table_row,
     delete_feed_post as _db_delete_feed_post,
     delete_link as _db_delete_link,
     delete_markdown as _db_delete_markdown,
@@ -28,6 +32,8 @@ from src.markdowns import (
     get_action_item,
     get_all_document_meta,
     get_diagram,
+    get_table,
+    get_table_row,
     get_feed,
     get_link,
     get_markdown,
@@ -37,18 +43,24 @@ from src.markdowns import (
     list_categories,
     list_diagrams,
     list_feed_posts,
+    list_table_rows,
+    list_tables,
     list_feeds,
     list_links,
     list_markdowns,
     list_universes,
     markdown_to_dict,
     set_document_universe,
+    table_row_to_dict,
+    table_to_dict,
     set_setting,
     universe_to_dict,
     update_action_item as _db_update_action_item,
     update_category as _db_update_category,
     update_diagram as _db_update_diagram,
     update_link as _db_update_link,
+    update_table as _db_update_table,
+    update_table_row as _db_update_table_row,
     update_markdown as _db_update_markdown,
 )
 from src.ingest import load_document as _load_document, chunk_documents as _chunk_documents
@@ -542,6 +554,102 @@ def delete_diagram(diagram_id: int) -> str:
     """Permanently delete a diagram by ID."""
     if not _db_delete_diagram(diagram_id):
         return "Diagram not found"
+    return "Deleted"
+
+
+# ── Tables ────────────────────────────────────────────────────────────────
+
+
+@mcp.tool
+def search_tables(
+    query: str = "", category_id: int | None = None, universe_id: int | None = None
+) -> list[dict]:
+    """List or search the user's data tables. Tables are spreadsheet-like
+    structures with typed columns (string, number, boolean) and rows of data.
+    Returns id, title, columns (JSON), category, and timestamps."""
+    uid = universe_id if universe_id is not None else _default_universe()
+    return [table_to_dict(t) for t in list_tables(query, category_id, uid)]
+
+
+@mcp.tool
+def read_table(table_id: int) -> dict | str:
+    """Read a single table by ID. Returns the table metadata including
+    columns definition (JSON array of {name, type} objects)."""
+    t = get_table(table_id)
+    if t is None:
+        return "Table not found"
+    return table_to_dict(t)
+
+
+@mcp.tool
+def write_table(
+    title: str,
+    columns: str = '[]',
+    category_id: int | None = None,
+    universe_id: int | None = None,
+) -> dict:
+    """Create a new data table. The columns parameter is a JSON string array
+    of column definitions, e.g. '[{"name":"Name","type":"string"},{"name":"Age","type":"number"},{"name":"Active","type":"boolean"}]'.
+    Supported column types: string, number, boolean."""
+    uid = universe_id if universe_id is not None else _default_universe()
+    t = create_table(title, columns, category_id, uid)
+    return table_to_dict(t)
+
+
+@mcp.tool
+def update_table(
+    table_id: int, title: str, columns: str, category_id: int | None = None
+) -> dict | str:
+    """Update a table's title, columns, or category. All fields are replaced."""
+    t = _db_update_table(table_id, title, columns, category_id)
+    if t is None:
+        return "Table not found"
+    return table_to_dict(t)
+
+
+@mcp.tool
+def delete_table(table_id: int) -> str:
+    """Permanently delete a table and all its rows by ID."""
+    if not _db_delete_table(table_id):
+        return "Table not found"
+    return "Deleted"
+
+
+@mcp.tool
+def read_table_rows(
+    table_id: int, search: str = "", page: int = 1, page_size: int = 50
+) -> dict:
+    """Read rows from a table. Supports pagination and text search.
+    Each row has an id, data (JSON object with column values), and sort_order."""
+    rows, total = list_table_rows(table_id, search, page, page_size)
+    return {"rows": [table_row_to_dict(r) for r in rows], "total": total}
+
+
+@mcp.tool
+def write_table_row(table_id: int, data: str = "{}") -> dict | str:
+    """Add a new row to a table. The data parameter is a JSON string with
+    column name/value pairs, e.g. '{"Name":"Alice","Age":30,"Active":true}'."""
+    t = get_table(table_id)
+    if not t:
+        return "Table not found"
+    row = create_table_row(table_id, data)
+    return table_row_to_dict(row)
+
+
+@mcp.tool
+def update_table_row(row_id: int, data: str) -> dict | str:
+    """Update an existing table row. The data parameter replaces the current row data."""
+    row = _db_update_table_row(row_id, data)
+    if row is None:
+        return "Row not found"
+    return table_row_to_dict(row)
+
+
+@mcp.tool
+def delete_table_row(row_id: int) -> str:
+    """Permanently delete a table row by ID."""
+    if not _db_delete_table_row(row_id):
+        return "Row not found"
     return "Deleted"
 
 

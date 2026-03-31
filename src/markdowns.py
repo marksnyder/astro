@@ -200,6 +200,7 @@ def delete_universe(uid: int) -> bool:
     conn.execute("DELETE FROM links WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM action_items WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM diagrams WHERE universe_id = ?", (uid,))
+    conn.execute("DELETE FROM tables_ WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM document_meta WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM categories WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM universes WHERE id = ?", (uid,))
@@ -1577,6 +1578,27 @@ class Diagram:
     universe_id: int = 1
 
 
+@dataclass
+class Table:
+    id: int | None
+    title: str
+    columns: str  # JSON string: [{"name": "col1", "type": "string"}, ...]
+    category_id: int | None
+    pinned: bool
+    created_at: str
+    updated_at: str
+    universe_id: int = 1
+
+
+@dataclass
+class TableRow:
+    id: int | None
+    table_id: int
+    data: str  # JSON string: {"col1": "value1", ...}
+    sort_order: int
+    created_at: str
+
+
 def _row_to_diagram(row: sqlite3.Row) -> Diagram:
     return Diagram(
         id=row["id"],
@@ -1673,3 +1695,191 @@ def list_pinned_diagrams(universe_id: int | None = None) -> list[Diagram]:
 
 def diagram_to_dict(d: Diagram) -> dict:
     return asdict(d)
+
+
+# ── Tables CRUD ──────────────────────────────────────────────────────────
+
+
+def _row_to_table(row: sqlite3.Row) -> Table:
+    return Table(
+        id=row["id"], title=row["title"], columns=row["columns"],
+        category_id=row["category_id"], pinned=bool(row["pinned"]),
+        created_at=row["created_at"], updated_at=row["updated_at"],
+        universe_id=row["universe_id"],
+    )
+
+
+def _row_to_table_row(row: sqlite3.Row) -> TableRow:
+    return TableRow(
+        id=row["id"], table_id=row["table_id"], data=row["data"],
+        sort_order=row["sort_order"], created_at=row["created_at"],
+    )
+
+
+def list_tables(query: str = "", category_id: int | None = None, universe_id: int | None = None) -> list[Table]:
+    conn = _get_conn()
+    sql = "SELECT * FROM tables_"
+    conditions = []
+    params: list = []
+    if universe_id is not None:
+        conditions.append("universe_id = ?")
+        params.append(universe_id)
+    if category_id is not None:
+        conditions.append("category_id = ?")
+        params.append(category_id)
+    if query:
+        conditions.append("title LIKE ?")
+        params.append(f"%{query}%")
+    if conditions:
+        sql += " WHERE " + " AND ".join(conditions)
+    sql += " ORDER BY pinned DESC, updated_at DESC"
+    rows = conn.execute(sql, params).fetchall()
+    conn.close()
+    return [_row_to_table(r) for r in rows]
+
+
+def get_table(table_id: int) -> Table | None:
+    conn = _get_conn()
+    row = conn.execute("SELECT * FROM tables_ WHERE id = ?", (table_id,)).fetchone()
+    conn.close()
+    return _row_to_table(row) if row else None
+
+
+def create_table(title: str, columns: str = "[]", category_id: int | None = None, universe_id: int = 1) -> Table:
+    now = _now()
+    conn = _get_conn()
+    cur = conn.execute(
+        "INSERT INTO tables_ (title, columns, category_id, universe_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (title, columns, category_id, universe_id, now, now),
+    )
+    conn.commit()
+    tid = cur.lastrowid
+    conn.close()
+    return Table(id=tid, title=title, columns=columns, category_id=category_id, pinned=False, created_at=now, updated_at=now, universe_id=universe_id)
+
+
+def update_table(table_id: int, title: str, columns: str, category_id: int | None = None) -> Table | None:
+    now = _now()
+    conn = _get_conn()
+    cur = conn.execute(
+        "UPDATE tables_ SET title = ?, columns = ?, category_id = ?, updated_at = ? WHERE id = ?",
+        (title, columns, category_id, now, table_id),
+    )
+    conn.commit()
+    if cur.rowcount == 0:
+        conn.close()
+        return None
+    row = conn.execute("SELECT * FROM tables_ WHERE id = ?", (table_id,)).fetchone()
+    conn.close()
+    return _row_to_table(row)
+
+
+def delete_table(table_id: int) -> bool:
+    conn = _get_conn()
+    conn.execute("DELETE FROM table_rows WHERE table_id = ?", (table_id,))
+    cur = conn.execute("DELETE FROM tables_ WHERE id = ?", (table_id,))
+    conn.commit()
+    conn.close()
+    return cur.rowcount > 0
+
+
+def set_table_pinned(table_id: int, pinned: bool) -> bool:
+    conn = _get_conn()
+    cur = conn.execute("UPDATE tables_ SET pinned = ? WHERE id = ?", (int(pinned), table_id))
+    conn.commit()
+    conn.close()
+    return cur.rowcount > 0
+
+
+def list_pinned_tables(universe_id: int | None = None) -> list[Table]:
+    conn = _get_conn()
+    if universe_id is not None:
+        rows = conn.execute("SELECT * FROM tables_ WHERE pinned = 1 AND universe_id = ? ORDER BY title", (universe_id,)).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM tables_ WHERE pinned = 1 ORDER BY title").fetchall()
+    conn.close()
+    return [_row_to_table(r) for r in rows]
+
+
+def table_to_dict(t: Table) -> dict:
+    return asdict(t)
+
+
+# ── Table rows CRUD ──────────────────────────────────────────────────────
+
+
+def list_table_rows(table_id: int, search: str = "", page: int = 1, page_size: int = 50) -> tuple[list[TableRow], int]:
+    conn = _get_conn()
+    base = "FROM table_rows WHERE table_id = ?"
+    params: list = [table_id]
+    if search:
+        base += " AND data LIKE ?"
+        params.append(f"%{search}%")
+    total = conn.execute(f"SELECT COUNT(*) {base}", params).fetchone()[0]
+    offset = (page - 1) * page_size
+    rows = conn.execute(
+        f"SELECT * {base} ORDER BY sort_order, id LIMIT ? OFFSET ?",
+        params + [page_size, offset],
+    ).fetchall()
+    conn.close()
+    return [_row_to_table_row(r) for r in rows], total
+
+
+def get_table_row(row_id: int) -> TableRow | None:
+    conn = _get_conn()
+    row = conn.execute("SELECT * FROM table_rows WHERE id = ?", (row_id,)).fetchone()
+    conn.close()
+    return _row_to_table_row(row) if row else None
+
+
+def create_table_row(table_id: int, data: str = "{}", sort_order: int = 0) -> TableRow:
+    now = _now()
+    conn = _get_conn()
+    cur = conn.execute(
+        "INSERT INTO table_rows (table_id, data, sort_order, created_at) VALUES (?, ?, ?, ?)",
+        (table_id, data, sort_order, now),
+    )
+    conn.commit()
+    # Touch parent table updated_at
+    conn.execute("UPDATE tables_ SET updated_at = ? WHERE id = ?", (now, table_id))
+    conn.commit()
+    rid = cur.lastrowid
+    conn.close()
+    return TableRow(id=rid, table_id=table_id, data=data, sort_order=sort_order, created_at=now)
+
+
+def update_table_row(row_id: int, data: str, sort_order: int | None = None) -> TableRow | None:
+    conn = _get_conn()
+    row = conn.execute("SELECT * FROM table_rows WHERE id = ?", (row_id,)).fetchone()
+    if not row:
+        conn.close()
+        return None
+    new_order = sort_order if sort_order is not None else row["sort_order"]
+    conn.execute(
+        "UPDATE table_rows SET data = ?, sort_order = ? WHERE id = ?",
+        (data, new_order, row_id),
+    )
+    now = _now()
+    conn.execute("UPDATE tables_ SET updated_at = ? WHERE id = ?", (now, row["table_id"]))
+    conn.commit()
+    updated = conn.execute("SELECT * FROM table_rows WHERE id = ?", (row_id,)).fetchone()
+    conn.close()
+    return _row_to_table_row(updated)
+
+
+def delete_table_row(row_id: int) -> bool:
+    conn = _get_conn()
+    row = conn.execute("SELECT table_id FROM table_rows WHERE id = ?", (row_id,)).fetchone()
+    if not row:
+        conn.close()
+        return False
+    conn.execute("DELETE FROM table_rows WHERE id = ?", (row_id,))
+    now = _now()
+    conn.execute("UPDATE tables_ SET updated_at = ? WHERE id = ?", (now, row["table_id"]))
+    conn.commit()
+    conn.close()
+    return True
+
+
+def table_row_to_dict(r: TableRow) -> dict:
+    return asdict(r)

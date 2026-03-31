@@ -289,11 +289,66 @@ img { max-width: 100%; height: auto; }
   font-size: 1.05rem;
 }
 
-.pillars-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1.5rem;
+.carousel-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  position: relative;
 }
+
+.carousel-track-container {
+  flex: 1;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.carousel-track {
+  display: flex;
+  gap: 24px;
+  transition: transform .45s cubic-bezier(.4, 0, .2, 1);
+}
+
+.carousel-btn {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s, opacity .2s;
+  z-index: 2;
+}
+
+.carousel-btn:hover {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.carousel-dots {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 2rem;
+}
+
+.carousel-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: background .2s, border-color .2s, transform .2s;
+}
+
+.carousel-dot:hover { border-color: var(--accent); transform: scale(1.25); }
+.carousel-dot.active { background: var(--accent); border-color: var(--accent); }
 
 .pillar {
   background: var(--bg-surface);
@@ -301,10 +356,11 @@ img { max-width: 100%; height: auto; }
   border-radius: var(--radius);
   padding: 2rem;
   transition: border-color .2s, transform .2s;
+  flex-shrink: 0;
 }
 
 .pillar:hover {
-  border-color: var(--border);
+  border-color: var(--accent);
 }
 
 .pillar-icon {
@@ -902,7 +958,8 @@ img { max-width: 100%; height: auto; }
   .hero-description { font-size: 1rem; }
   .hero-logo { width: 100px; height: 100px; }
 
-  .pillars-grid { grid-template-columns: 1fr; }
+  .carousel-btn { width: 36px; height: 36px; }
+  .carousel-wrapper { gap: .5rem; }
 
   .highlight-inner { grid-template-columns: 1fr; gap: 2rem; }
 

@@ -38,8 +38,8 @@ layout: default
     <h2>What Is Astro?</h2>
     <p class="what-is-lead">
       Astro is an AI operating system for managing information, agents, prompts,
-      tasks, and data feeds &mdash; alongside markdowns, documents, and links.
-      Everything lives inside <strong>Universes</strong> &mdash;
+      tasks, and data feeds alongside markdowns, documents, and links.
+      Everything lives inside <strong>Universes</strong>,
       cleanly separated workspaces where structure keeps you organized while agents
       accelerate how you work.
     </p>
@@ -70,133 +70,211 @@ layout: default
   <div class="pillars-inner">
     <div class="pillars-heading">
       <h2>Core Features</h2>
-      <p>One system to run agents, prompts, and knowledge &mdash; with structure and retrieval built in.</p>
+      <p>One system to run agents, prompts, and knowledge, with structure and retrieval built in.</p>
     </div>
-    <div class="pillars-grid">
-      <div class="pillar">
-        <div class="pillar-icon">
-          <!-- search / vector -->
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <div class="carousel-wrapper">
+      <button class="carousel-btn carousel-prev" onclick="carouselMove(-1)" aria-label="Previous feature">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div class="carousel-track-container">
+        <div class="carousel-track" id="featureTrack">
+          <div class="pillar">
+            <div class="pillar-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </div>
+            <h3>Vector Store</h3>
+            <p>
+              All markdowns, documents, and action items are automatically embedded
+              into a local ChromaDB vector store using CPU-based embeddings.
+              No API keys required. Semantic search across your entire knowledge base.
+            </p>
+          </div>
+          <div class="pillar">
+            <div class="pillar-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </div>
+            <h3>Markdowns</h3>
+            <p>
+              Create and organize structured markdowns with rich formatting, embedded images,
+              category assignment, and full-text search. Every markdown is included in
+              AI retrieval context automatically.
+            </p>
+          </div>
+          <div class="pillar">
+            <div class="pillar-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+            </div>
+            <h3>Documents</h3>
+            <p>
+              Upload PDF, DOCX, XLSX, PPTX, TXT, MD, and CSV files. Documents are
+              automatically ingested and embedded so they become queryable memory,
+              not just storage.
+            </p>
+          </div>
+          <div class="pillar">
+            <div class="pillar-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="10" y1="6.5" x2="14" y2="6.5"/><line x1="17.5" y1="10" x2="17.5" y2="14"/><line x1="6.5" y1="10" x2="6.5" y2="14"/></svg>
+            </div>
+            <h3>Diagrams</h3>
+            <p>
+              Create and edit visual diagrams powered by
+              <a href="https://excalidraw.com" style="color: inherit; text-decoration: underline;">Excalidraw</a>.
+              Draw shapes, arrows, and freehand sketches with a full embedded editor.
+              Import and export <code>.excalidraw</code> files, and let AI agents
+              create diagrams programmatically via MCP.
+            </p>
+          </div>
+          <div class="pillar">
+            <div class="pillar-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+            </div>
+            <h3>Tables</h3>
+            <p>
+              Build structured data with spreadsheet-style tables. Define typed
+              columns (text, number, boolean), manage rows with inline editing,
+              and import or export CSV. Full MCP integration lets agents create
+              and query tables programmatically.
+            </p>
+          </div>
+          <div class="pillar">
+            <div class="pillar-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            </div>
+            <h3>Action Items</h3>
+            <p>
+              Track tasks with priority flags, due dates, and categories. Tasks
+              integrate directly into your knowledge system and are included in
+              AI retrieval.
+            </p>
+          </div>
+          <div class="pillar">
+            <div class="pillar-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <h3>Bookmarks</h3>
+            <p>
+              Save and organize links inside your Universe with titles, URLs, and
+              categories. Links become part of your searchable knowledge base.
+            </p>
+          </div>
+          <div class="pillar">
+            <div class="pillar-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>
+            </div>
+            <h3>Agent Network</h3>
+            <p>
+              A built-in IRC server enables communication with AI agents across
+              platforms. Coordinate agents, communicate across systems, and integrate
+              with external AI platforms from one central hub.
+            </p>
+          </div>
+          <div class="pillar">
+            <div class="pillar-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <h3>Prompts</h3>
+            <p>
+              Organize reusable message templates in a visual board with custom
+              categories and emoji labels. Drag-and-drop prompts between categories,
+              schedule with cron, or run on demand.
+            </p>
+          </div>
+          <div class="pillar">
+            <div class="pillar-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
+            </div>
+            <h3>Feeds</h3>
+            <p>
+              Ingest data from external services through authenticated API endpoints.
+              Push markdown or files into a timeline view. Ideal for CI reports,
+              monitoring alerts, and automated agent output.
+            </p>
+          </div>
+          <div class="pillar">
+            <div class="pillar-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6"/><path d="M6 8h12"/><path d="M8 8v4a4 4 0 0 0 8 0V8"/><path d="M12 16v6"/></svg>
+            </div>
+            <h3>MCP Server</h3>
+            <p>
+              A built-in <a href="https://modelcontextprotocol.io" style="color: inherit; text-decoration: underline;">Model Context Protocol</a>
+              server exposes 43 tools covering search, notes, tables, diagrams,
+              tasks, categories, links, documents, and feeds. Any
+              MCP-compatible AI agent can read, write, and search your knowledge base.
+            </p>
+          </div>
         </div>
-        <h3>Vector Store</h3>
-        <p>
-          All markdowns, documents, and action items are automatically embedded
-          into a local ChromaDB vector store using CPU-based embeddings &mdash;
-          no API keys required. Semantic search across your entire knowledge base.
-        </p>
       </div>
-      <div class="pillar">
-        <div class="pillar-icon">
-          <!-- pencil / edit -->
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        </div>
-        <h3>Markdowns</h3>
-        <p>
-          Create and organize structured markdowns with rich formatting, embedded images,
-          category assignment, and full-text search. Every markdown is included in
-          AI retrieval context automatically.
-        </p>
-      </div>
-      <div class="pillar">
-        <div class="pillar-icon">
-          <!-- file stack / archive -->
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
-        </div>
-        <h3>Documents</h3>
-        <p>
-          Upload PDF, DOCX, XLSX, PPTX, TXT, MD, and CSV files. Documents are
-          automatically ingested and embedded so they become queryable memory
-          &mdash; not just storage.
-        </p>
-      </div>
-      <div class="pillar">
-        <div class="pillar-icon">
-          <!-- checklist / checkbox -->
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-        </div>
-        <h3>Action Items</h3>
-        <p>
-          Track tasks with priority flags, due dates, and categories. Tasks
-          integrate directly into your knowledge system and are included in
-          AI retrieval.
-        </p>
-      </div>
-      <div class="pillar">
-        <div class="pillar-icon">
-          <!-- bookmark -->
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-        </div>
-        <h3>Bookmarks</h3>
-        <p>
-          Save and organize links inside your Universe with titles, URLs, and
-          categories. Links become part of your searchable knowledge base.
-        </p>
-      </div>
-      <div class="pillar">
-        <div class="pillar-icon">
-          <!-- bot / agent -->
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>
-        </div>
-        <h3>Agent Network</h3>
-        <p>
-          A built-in IRC server enables communication with AI agents across
-          platforms. Coordinate agents, communicate across systems, and integrate
-          with external AI platforms from one central hub.
-        </p>
-      </div>
-      <div class="pillar">
-        <div class="pillar-icon">
-          <!-- clock / schedule -->
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        </div>
-        <h3>Prompts</h3>
-        <p>
-          Organize reusable message templates in a visual board with custom
-          categories and emoji labels. Drag-and-drop prompts between categories,
-          schedule with cron, or run on demand.
-        </p>
-      </div>
-      <div class="pillar">
-        <div class="pillar-icon">
-          <!-- rss / feed -->
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
-        </div>
-        <h3>Feeds</h3>
-        <p>
-          Ingest data from external services through authenticated API endpoints.
-          Push markdown or files into a timeline view &mdash; ideal for CI reports,
-          monitoring alerts, and automated agent output.
-        </p>
-      </div>
-      <div class="pillar">
-        <div class="pillar-icon">
-          <!-- plug / MCP -->
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6"/><path d="M6 8h12"/><path d="M8 8v4a4 4 0 0 0 8 0V8"/><path d="M12 16v6"/></svg>
-        </div>
-        <h3>MCP Server</h3>
-        <p>
-          A built-in <a href="https://modelcontextprotocol.io" style="color: inherit; text-decoration: underline;">Model Context Protocol</a>
-          server exposes 23 tools &mdash; search, notes, tasks, categories,
-          links, documents, and feeds &mdash; so any MCP-compatible AI agent
-          can read, write, and search your knowledge base.
-        </p>
-      </div>
-      <div class="pillar">
-        <div class="pillar-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="10" y1="6.5" x2="14" y2="6.5"/><line x1="17.5" y1="10" x2="17.5" y2="14"/><line x1="6.5" y1="10" x2="6.5" y2="14"/></svg>
-        </div>
-        <h3>Diagrams</h3>
-        <p>
-          Create and edit visual diagrams powered by
-          <a href="https://excalidraw.com" style="color: inherit; text-decoration: underline;">Excalidraw</a>.
-          Draw shapes, arrows, and freehand sketches with a full embedded editor.
-          Import and export <code>.excalidraw</code> files, and let AI agents
-          create diagrams programmatically via MCP.
-        </p>
-      </div>
+      <button class="carousel-btn carousel-next" onclick="carouselMove(1)" aria-label="Next feature">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
     </div>
+    <div class="carousel-dots" id="carouselDots"></div>
   </div>
 </section>
+
+<script>
+(function() {
+  var track = document.getElementById('featureTrack');
+  var dots = document.getElementById('carouselDots');
+  var slides = track.querySelectorAll('.pillar');
+  var idx = 0;
+  var perView = 2;
+  var maxIdx = 0;
+  var autoTimer = null;
+
+  function calcPerView() {
+    perView = window.innerWidth <= 768 ? 1 : 2;
+    maxIdx = Math.max(0, slides.length - perView);
+    if (idx > maxIdx) idx = maxIdx;
+  }
+
+  function buildDots() {
+    dots.innerHTML = '';
+    var pages = maxIdx + 1;
+    for (var i = 0; i < pages; i++) {
+      var d = document.createElement('button');
+      d.className = 'carousel-dot' + (i === idx ? ' active' : '');
+      d.setAttribute('aria-label', 'Go to slide ' + (i + 1));
+      d.onclick = (function(n) { return function() { idx = n; update(); resetAuto(); }; })(i);
+      dots.appendChild(d);
+    }
+  }
+
+  function update() {
+    var gap = 24;
+    var containerW = track.parentElement.offsetWidth;
+    var slideW = (containerW - gap * (perView - 1)) / perView;
+    slides.forEach(function(s) { s.style.minWidth = slideW + 'px'; s.style.maxWidth = slideW + 'px'; });
+    track.style.transform = 'translateX(-' + (idx * (slideW + gap)) + 'px)';
+    var prevBtn = document.querySelector('.carousel-prev');
+    var nextBtn = document.querySelector('.carousel-next');
+    if (prevBtn) prevBtn.style.opacity = idx === 0 ? '.3' : '1';
+    if (nextBtn) nextBtn.style.opacity = idx >= maxIdx ? '.3' : '1';
+    buildDots();
+  }
+
+  function resetAuto() {
+    clearInterval(autoTimer);
+    autoTimer = setInterval(function() { idx = idx >= maxIdx ? 0 : idx + 1; update(); }, 6000);
+  }
+
+  window.carouselMove = function(dir) {
+    idx = Math.max(0, Math.min(maxIdx, idx + dir));
+    update();
+    resetAuto();
+  };
+
+  calcPerView(); update(); resetAuto();
+  window.addEventListener('resize', function() { calcPerView(); update(); });
+
+  var startX = 0;
+  track.addEventListener('touchstart', function(e) { startX = e.touches[0].clientX; }, { passive: true });
+  track.addEventListener('touchend', function(e) {
+    var dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 40) { carouselMove(dx < 0 ? 1 : -1); }
+  }, { passive: true });
+})();
+</script>
 
 {% if site.data.videos.size > 0 %}
 <section class="videos-section">
@@ -254,7 +332,7 @@ layout: default
       <p>
         Structure is how you and your agents stay aligned. A hierarchical category
         tree organizes markdowns, documents, tasks, and links with consistent layout.
-        Pin important items to a unified header bar for quick access &mdash; whether
+        Pin important items to a unified header bar for quick access, whether
         you are working solo or routing output from agents and feeds.
       </p>
       <p>

@@ -2,7 +2,7 @@
 # ──────────────────────────────────────────────────────────────
 # Astro Installer
 #
-# One-liner (interactive — prompts for Tailscale):
+# One-liner (interactive, prompts for Tailscale):
 #   curl -fsSL https://raw.githubusercontent.com/marksnyder/astro/main/install.sh | bash
 #
 # Non-interactive / with options:
@@ -10,11 +10,11 @@
 #   curl -fsSL ... | bash -s -- --ts-authkey tskey-auth-...
 #
 # Environment variables (alternative to flags):
-#   PORT              — Host port (default: 8000)
-#   ASTRO_DATA_DIR    — Persistent data directory (default: ~/astro-data)
-#   TS_AUTHKEY        — Tailscale auth key (required on first run)
-#   TS_HOSTNAME       — Tailscale hostname (default: astro)
-#   TS_SERVE_HTTPS    — Enable Tailscale HTTPS proxy (default: true)
+#   PORT              Host port (default: 8000)
+#   ASTRO_DATA_DIR    Persistent data directory (default: ~/astro-data)
+#   TS_AUTHKEY        Tailscale auth key (required on first run)
+#   TS_HOSTNAME       Tailscale hostname (default: astro)
+#   TS_SERVE_HTTPS    Enable Tailscale HTTPS proxy (default: true)
 # ──────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -110,7 +110,7 @@ if [ "$USE_TAILSCALE" = "yes" ]; then
 
     if [ -z "$TS_AUTHKEY" ]; then
         if [ "$HAS_TS_STATE" = true ]; then
-            echo "==> Found existing Tailscale state — will reconnect automatically."
+            echo "==> Found existing Tailscale state, will reconnect automatically."
         else
             if [ -t 0 ]; then
                 TTY_IN=/dev/stdin

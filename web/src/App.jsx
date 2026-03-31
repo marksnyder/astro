@@ -6,6 +6,7 @@ import LinksPanel from './LinksPanel'
 import ActionItemsPanel from './ActionItemsPanel'
 import FeedsPanel, { PostTimeline } from './FeedsPanel'
 import DiagramsPanel, { DiagramEditorView } from './DiagramsPanel'
+import TablesPanel, { TableEditorView } from './TablesPanel'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import CategoryTree, { EmojiPopover } from './CategoryTree'
@@ -1381,6 +1382,7 @@ function App() {
   const [editMarkdownRequest, setEditMarkdownRequest] = useState(null)
   const [markdownRefreshKey, setMarkdownRefreshKey] = useState(0)
   const [diagramRefreshKey, setDiagramRefreshKey] = useState(0)
+  const [tableRefreshKey, setTableRefreshKey] = useState(0)
   const [openFeedRequest, setOpenFeedRequest] = useState(null)
 
   const [tabs, setTabs] = useState([
@@ -1862,6 +1864,19 @@ function App() {
     setActiveTabId(tabId)
   }, [])
 
+  const openTableTab = useCallback((table) => {
+    const key = table._new ? 'new' : table.id
+    const tabId = `table-${key}`
+    setTabs(prev => {
+      const existing = prev.find(t => t.id === tabId)
+      if (existing) {
+        return prev.map(t => t.id === tabId ? { ...t, data: table, title: table.title || 'Untitled Table' } : t)
+      }
+      return [...prev, { id: tabId, type: 'table', title: table.title || 'Untitled Table', closable: true, data: table }]
+    })
+    setActiveTabId(tabId)
+  }, [])
+
   const closeTab = useCallback((tabId) => {
     setTabs(prev => prev.filter(t => t.id !== tabId))
     setActiveTabId(prev => prev === tabId ? 'irc' : prev)
@@ -2160,7 +2175,7 @@ function App() {
             </button>
           )}
         </div>
-        {(pinnedItems.markdowns.length > 0 || pinnedItems.documents.length > 0 || pinnedItems.links?.length > 0 || pinnedItems.feed_categories?.length > 0 || pinnedItems.diagrams?.length > 0) && (
+        {(pinnedItems.markdowns.length > 0 || pinnedItems.documents.length > 0 || pinnedItems.links?.length > 0 || pinnedItems.feed_categories?.length > 0 || pinnedItems.diagrams?.length > 0 || pinnedItems.tables?.length > 0) && (
           <div className="pinned-bar">
             {pinnedItems.markdowns.map((n) => (
               <button key={`n-${n.id}`} className="pinned-chip pinned-markdown" onClick={() => { setSidebarTab('markdowns'); setEditMarkdownRequest(n); }} title={n.title || 'Untitled'}>
@@ -2208,6 +2223,14 @@ function App() {
                   <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
                 </svg>
                 <span className="pinned-chip-label">{d.title || 'Untitled'}</span>
+              </button>
+            ))}
+            {(pinnedItems.tables || []).map((t) => (
+              <button key={`tb-${t.id}`} className="pinned-chip pinned-diagram" onClick={() => { setSidebarTab('tables'); openTableTab(t) }} title={t.title || 'Untitled Table'}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/>
+                </svg>
+                <span className="pinned-chip-label">{t.title || 'Untitled'}</span>
               </button>
             ))}
           </div>
@@ -2286,6 +2309,11 @@ function App() {
                 <rect x="14" y="3" width="7" height="7" />
                 <rect x="14" y="14" width="7" height="7" />
                 <rect x="3" y="14" width="7" height="7" />
+              </svg>
+            </button>
+            <button className={`rail-tab ${sidebarTab === 'tables' ? 'active' : ''}`} onClick={() => setSidebarTab('tables')} title="Tables">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/>
               </svg>
             </button>
             <div className="rail-sep" />
@@ -2379,6 +2407,15 @@ function App() {
               onPinChange={fetchPinned}
               onEditDiagram={(d) => openDiagramTab(d._new ? { ...d, _key: 'new' } : d)}
               refreshKey={diagramRefreshKey}
+            />
+          )}
+          {sidebarTab === 'tables' && (
+            <TablesPanel
+              categories={categories}
+              universeId={currentUniverseId}
+              onPinChange={fetchPinned}
+              onEditTable={(t) => openTableTab(t._new ? { ...t, _key: 'new' } : t)}
+              refreshKey={tableRefreshKey}
             />
           )}
           {sidebarTab === 'actions' && (
@@ -2484,6 +2521,16 @@ function App() {
                   ))
                 }
                 if (closed) closeTab(activeTab.id)
+              }}
+            />
+          ) : activeTab.type === 'table' && activeTab.data ? (
+            <TableEditorView
+              key={activeTab.id}
+              table={activeTab.data}
+              categories={categories}
+              onSaved={() => {
+                setTableRefreshKey(k => k + 1)
+                fetchPinned()
               }}
             />
           ) : activeTab.type === 'feed' && activeTab.data ? (
