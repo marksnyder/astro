@@ -195,7 +195,7 @@ function LinkPicker({ actionItemId, links, onLinksChange }) {
 
 /* ── Main panel ──────────────────────────────────────────────────── */
 
-function ActionItemsPanel({ categories, onOpenMarkdown, universeId }) {
+function ActionItemsPanel({ categories, onOpenMarkdown, universeId, onLoaded }) {
   const [items, setItems] = useState([])
   const [search, setSearch] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
@@ -221,6 +221,7 @@ function ActionItemsPanel({ categories, onOpenMarkdown, universeId }) {
       .then(res => res.json())
       .then(data => setItems(data))
       .catch(() => {})
+      .finally(() => onLoaded?.())
   }
 
   useEffect(() => { fetchItems() }, [universeId])

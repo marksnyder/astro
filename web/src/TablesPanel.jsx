@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
 
-function TablesPanel({ categories, universeId, onPinChange, onEditTable, refreshKey }) {
+function TablesPanel({ categories, universeId, onPinChange, onEditTable, refreshKey, onLoaded }) {
   const [tables, setTables] = useState([])
   const [search, setSearch] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
@@ -19,6 +19,7 @@ function TablesPanel({ categories, universeId, onPinChange, onEditTable, refresh
       .then(r => r.json())
       .then(setTables)
       .catch(() => {})
+      .finally(() => onLoaded?.())
   }, [search, selectedCategoryId, universeId])
 
   useEffect(() => { fetchTables() }, [universeId])

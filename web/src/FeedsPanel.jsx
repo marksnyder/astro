@@ -20,7 +20,7 @@ function Sparkline({ data, width = 80, height = 20 }) {
   )
 }
 
-function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOpenFeedRequestHandled, onViewPosts, unreadCounts, recent7dCounts }) {
+function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOpenFeedRequestHandled, onViewPosts, unreadCounts, recent7dCounts, onLoaded }) {
   const [feeds, setFeeds] = useState([])
   const [search, setSearch] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
@@ -43,6 +43,7 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
       .then(r => r.json())
       .then(setFeeds)
       .catch(() => {})
+      .finally(() => onLoaded?.())
   }
 
   useEffect(() => { fetchFeeds() }, [universeId])

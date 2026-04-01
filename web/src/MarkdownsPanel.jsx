@@ -781,7 +781,7 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
   )
 }
 
-function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMarkdownRequestHandled, universeId, onEditMarkdown, refreshKey }) {
+function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMarkdownRequestHandled, universeId, onEditMarkdown, refreshKey, onLoaded }) {
   const [markdowns, setMarkdowns] = useState([])
   const [search, setSearch] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
@@ -800,6 +800,7 @@ function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMa
       .then(res => res.json())
       .then(data => setMarkdowns(data))
       .catch(() => {})
+      .finally(() => onLoaded?.())
   }
 
   const fetchLinkedIds = () => {

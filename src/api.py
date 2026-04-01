@@ -18,17 +18,18 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from src.backup import create_backup, restore_backup
 from src.ingest import SUPPORTED_EXTENSIONS, chunk_documents, load_document
 from src.markdowns import (
     FEED_FILES_DIR,
     IMAGES_DIR,
+    agent_task_to_dict,
     action_item_link_to_dict,
     action_item_to_dict,
     add_action_item_link,
     add_markdown_image,
     category_to_dict,
     create_action_item,
+    create_agent_task,
     create_category,
     create_feed,
     create_feed_post_file,
@@ -39,6 +40,7 @@ from src.markdowns import (
     create_markdown,
     create_universe,
     delete_action_item,
+    delete_agent_task,
     delete_action_item_link,
     delete_all_markdown_images,
     delete_category,
@@ -52,6 +54,7 @@ from src.markdowns import (
     feed_post_to_dict,
     feed_to_dict,
     get_action_item,
+    get_agent_task,
     get_all_document_categories,
     get_all_document_meta,
     get_document_paths_for_category,
@@ -69,6 +72,7 @@ from src.markdowns import (
     get_universe_markdown_ids,
     list_action_item_links,
     list_action_items,
+    list_agent_tasks,
     list_feed_posts,
     list_feed_posts_by_category,
     mark_feed_posts_read,
@@ -99,22 +103,9 @@ from src.markdowns import (
     set_setting,
     universe_to_dict,
     update_action_item,
+    update_agent_task,
     update_link,
     update_markdown,
-    create_prompt,
-    delete_prompt,
-    get_prompt,
-    list_prompts,
-    mark_prompt_run,
-    prompt_to_dict,
-    update_prompt,
-    reorder_prompts,
-    create_prompt_category,
-    delete_prompt_category,
-    list_prompt_categories,
-    prompt_category_to_dict,
-    reorder_prompt_categories,
-    update_prompt_category,
     list_post_comments,
     create_post_comment,
     update_post_comment,
@@ -196,8 +187,8 @@ async def _lifespan(application):
     IRCClient.get()
     from src.irc_monitor import IRCMonitor
     IRCMonitor.get()
-    from src.irc_scheduler import IRCScheduler
-    IRCScheduler.get()
+    from src.agent_task_runner import AgentTaskRunner
+    AgentTaskRunner.get()
 
     async with _mcp_app.lifespan(application):
         yield
@@ -208,9 +199,9 @@ async def _lifespan(application):
     from src.irc_monitor import IRCMonitor as _IM
     if _IM._instance:
         _IM._instance.stop()
-    from src.irc_scheduler import IRCScheduler as _IS
-    if _IS._instance:
-        _IS._instance.stop()
+    from src.agent_task_runner import AgentTaskRunner as _ATR
+    if _ATR._instance is not None:
+        _ATR._instance.stop()
     if _ngircd_proc:
         _ngircd_proc.terminate()
         try:
@@ -426,186 +417,6 @@ def api_delete_universe(uid: int):
     if not delete_universe(uid):
         raise HTTPException(status_code=400, detail="Cannot delete the last universe")
     return {"ok": True}
-
-
-@app.post("/api/universes/{universe_id}/apply-template")
-def api_apply_template(universe_id: int, template: str = fastapi.Query(...)):
-    """Apply a template to a universe, creating sample categories, action items, and markdowns."""
-    u = get_universe(universe_id)
-    if not u:
-        raise HTTPException(404, "Universe not found")
-
-    templates = {
-        "software_engineer": {
-            "categories": [
-                {"name": "Projects", "emoji": "💻"},
-                {"name": "Learning", "emoji": "📚"},
-                {"name": "Infrastructure", "emoji": "🔧"},
-            ],
-            "action_items": [
-                {"title": "Review pull requests for current sprint", "hot": True, "category": "Projects"},
-                {"title": "Set up CI/CD pipeline for new service", "category": "Infrastructure"},
-            ],
-            "markdowns": [
-                {"title": "Architecture Decision Record Template", "body": "# ADR: [Title]\n\n## Status\nProposed\n\n## Context\nDescribe the context and problem statement.\n\n## Decision\nDescribe the decision made.\n\n## Consequences\nDescribe the resulting consequences.", "category": "Projects"},
-                {"title": "Weekly Standup Notes", "body": "# Week of [Date]\n\n## Completed\n- \n\n## In Progress\n- \n\n## Blockers\n- \n\n## Notes\n", "category": "Projects"},
-            ],
-        },
-        "health_wellness": {
-            "categories": [
-                {"name": "Fitness", "emoji": "💪"},
-                {"name": "Nutrition", "emoji": "🥗"},
-                {"name": "Mental Health", "emoji": "🧘"},
-            ],
-            "action_items": [
-                {"title": "Schedule annual physical exam", "hot": True, "category": "Fitness"},
-                {"title": "Try a new healthy recipe this week", "category": "Nutrition"},
-            ],
-            "markdowns": [
-                {"title": "Workout Plan", "body": "# Weekly Workout Plan\n\n## Monday - Upper Body\n- Push-ups: 3x15\n- Dumbbell rows: 3x12\n\n## Wednesday - Lower Body\n- Squats: 3x15\n- Lunges: 3x12\n\n## Friday - Cardio\n- 30 min run/walk\n- Stretching", "category": "Fitness"},
-                {"title": "Meal Prep Ideas", "body": "# Meal Prep\n\n## Breakfast\n- Overnight oats\n- Smoothie bowls\n\n## Lunch\n- Grain bowls\n- Wraps\n\n## Dinner\n- Sheet pan meals\n- Stir fry", "category": "Nutrition"},
-            ],
-        },
-        "researcher": {
-            "categories": [
-                {"name": "Papers", "emoji": "📄"},
-                {"name": "Experiments", "emoji": "🔬"},
-                {"name": "Literature Review", "emoji": "📖"},
-            ],
-            "action_items": [
-                {"title": "Submit paper draft to advisor for review", "hot": True, "category": "Papers"},
-                {"title": "Run baseline experiments for comparison", "category": "Experiments"},
-            ],
-            "markdowns": [
-                {"title": "Research Log", "body": "# Research Log\n\n## [Date]\n\n### Objective\n\n### Method\n\n### Results\n\n### Next Steps\n", "category": "Experiments"},
-                {"title": "Paper Reading Notes", "body": "# Paper: [Title]\n\n**Authors:** \n**Year:** \n**Venue:** \n\n## Summary\n\n## Key Contributions\n\n## Methodology\n\n## Relevant to my work because\n", "category": "Literature Review"},
-            ],
-        },
-        "journalist": {
-            "categories": [
-                {"name": "Stories", "emoji": "📰"},
-                {"name": "Sources", "emoji": "🗣️"},
-                {"name": "Deadlines", "emoji": "⏰"},
-            ],
-            "action_items": [
-                {"title": "Follow up with source for on-record quote", "hot": True, "category": "Sources"},
-                {"title": "Fact-check article statistics before publish", "category": "Stories"},
-            ],
-            "markdowns": [
-                {"title": "Story Pitch Template", "body": "# Story Pitch\n\n## Headline\n\n## Angle\n\n## Key Sources\n1. \n2. \n\n## Timeline\n\n## Why Now?\n", "category": "Stories"},
-                {"title": "Interview Prep", "body": "# Interview: [Subject]\n\n## Background\n\n## Key Questions\n1. \n2. \n3. \n\n## Follow-ups\n\n## Notes\n", "category": "Sources"},
-            ],
-        },
-        "parenting": {
-            "categories": [
-                {"name": "School", "emoji": "🎒"},
-                {"name": "Activities", "emoji": "⚽"},
-                {"name": "Health", "emoji": "🏥"},
-            ],
-            "action_items": [
-                {"title": "Schedule parent-teacher conference", "hot": True, "category": "School"},
-                {"title": "Sign up for summer camp registration", "category": "Activities"},
-            ],
-            "markdowns": [
-                {"title": "Weekly Family Schedule", "body": "# Family Schedule\n\n## Monday\n- \n\n## Tuesday\n- \n\n## Wednesday\n- \n\n## Thursday\n- \n\n## Friday\n- \n\n## Weekend\n- ", "category": "Activities"},
-                {"title": "Emergency Contacts", "body": "# Emergency Contacts\n\n- **Pediatrician:** \n- **School:** \n- **Dentist:** \n- **Allergist:** \n- **Emergency:** 911", "category": "Health"},
-            ],
-        },
-        "content_creator": {
-            "categories": [
-                {"name": "Ideas", "emoji": "💡"},
-                {"name": "Production", "emoji": "🎬"},
-                {"name": "Analytics", "emoji": "📊"},
-            ],
-            "action_items": [
-                {"title": "Film and edit this week's video", "hot": True, "category": "Production"},
-                {"title": "Research trending topics in niche", "category": "Ideas"},
-            ],
-            "markdowns": [
-                {"title": "Content Calendar", "body": "# Content Calendar\n\n## Week 1\n| Day | Platform | Topic | Status |\n|-----|----------|-------|--------|\n| Mon | YouTube | | Draft |\n| Wed | Blog | | Idea |\n| Fri | Social | | Planned |", "category": "Production"},
-                {"title": "Video Script Template", "body": "# Video: [Title]\n\n## Hook (0:00-0:30)\n\n## Intro (0:30-1:00)\n\n## Main Content\n### Point 1\n### Point 2\n### Point 3\n\n## CTA\n\n## Outro", "category": "Production"},
-            ],
-        },
-        "financial_goals": {
-            "categories": [
-                {"name": "Budget", "emoji": "💰"},
-                {"name": "Investments", "emoji": "📈"},
-                {"name": "Goals", "emoji": "🎯"},
-            ],
-            "action_items": [
-                {"title": "Review and update monthly budget", "hot": True, "category": "Budget"},
-                {"title": "Research index fund options for retirement account", "category": "Investments"},
-            ],
-            "markdowns": [
-                {"title": "Monthly Budget Tracker", "body": "# Budget - [Month]\n\n## Income\n- Salary: $\n- Side: $\n\n## Fixed Expenses\n- Rent/Mortgage: $\n- Utilities: $\n- Insurance: $\n\n## Variable\n- Groceries: $\n- Transport: $\n- Entertainment: $\n\n## Savings\n- Emergency: $\n- Retirement: $", "category": "Budget"},
-                {"title": "Financial Goals", "body": "# Financial Goals\n\n## Short-term (1 year)\n- [ ] Build 3-month emergency fund\n- [ ] Pay off credit card\n\n## Medium-term (5 years)\n- [ ] Down payment for house\n- [ ] Max retirement contributions\n\n## Long-term\n- [ ] Financial independence\n- [ ] Kids college fund", "category": "Goals"},
-            ],
-        },
-        "cooking": {
-            "categories": [
-                {"name": "Recipes", "emoji": "🍳"},
-                {"name": "Meal Plans", "emoji": "📋"},
-                {"name": "Shopping", "emoji": "🛒"},
-            ],
-            "action_items": [
-                {"title": "Try making homemade pasta this weekend", "hot": True, "category": "Recipes"},
-                {"title": "Organize spice rack and check expiry dates", "category": "Shopping"},
-            ],
-            "markdowns": [
-                {"title": "Favorite Recipe Template", "body": "# [Recipe Name]\n\n**Prep Time:** min\n**Cook Time:** min\n**Servings:** \n\n## Ingredients\n- \n\n## Instructions\n1. \n\n## Notes\n", "category": "Recipes"},
-                {"title": "Weekly Meal Plan", "body": "# Meal Plan - Week of [Date]\n\n| Day | Breakfast | Lunch | Dinner |\n|-----|-----------|-------|--------|\n| Mon | | | |\n| Tue | | | |\n| Wed | | | |\n| Thu | | | |\n| Fri | | | |\n| Sat | | | |\n| Sun | | | |", "category": "Meal Plans"},
-            ],
-        },
-        "event_planning": {
-            "categories": [
-                {"name": "Venues", "emoji": "🏛️"},
-                {"name": "Vendors", "emoji": "🤝"},
-                {"name": "Timeline", "emoji": "📅"},
-            ],
-            "action_items": [
-                {"title": "Confirm venue booking and deposit", "hot": True, "category": "Venues"},
-                {"title": "Get quotes from three catering companies", "category": "Vendors"},
-            ],
-            "markdowns": [
-                {"title": "Event Checklist", "body": "# Event: [Name]\n**Date:** \n**Location:** \n\n## 3 Months Before\n- [ ] Book venue\n- [ ] Hire caterer\n- [ ] Send save-the-dates\n\n## 1 Month Before\n- [ ] Confirm vendors\n- [ ] Finalize menu\n- [ ] Send invitations\n\n## 1 Week Before\n- [ ] Final headcount\n- [ ] Confirm timeline\n- [ ] Prepare materials", "category": "Timeline"},
-                {"title": "Vendor Contact List", "body": "# Vendors\n\n## Catering\n- **Name:** \n- **Contact:** \n- **Quote:** $\n\n## Photography\n- **Name:** \n- **Contact:** \n- **Quote:** $\n\n## Music/DJ\n- **Name:** \n- **Contact:** \n- **Quote:** $", "category": "Vendors"},
-            ],
-        },
-        "career_development": {
-            "categories": [
-                {"name": "Skills", "emoji": "🎓"},
-                {"name": "Networking", "emoji": "🤝"},
-                {"name": "Applications", "emoji": "📝"},
-            ],
-            "action_items": [
-                {"title": "Update resume with recent accomplishments", "hot": True, "category": "Applications"},
-                {"title": "Complete online course module this week", "category": "Skills"},
-            ],
-            "markdowns": [
-                {"title": "Career Goals", "body": "# Career Development Plan\n\n## Current Position\n\n## Target Position\n\n## Skills Gap\n- [ ] \n- [ ] \n\n## Action Plan\n1. \n2. \n3. \n\n## Timeline\n- 3 months: \n- 6 months: \n- 1 year: ", "category": "Skills"},
-                {"title": "Networking Log", "body": "# Networking\n\n## [Date] - [Person/Event]\n- **Met:** \n- **Discussed:** \n- **Follow-up:** \n- **LinkedIn:** ", "category": "Networking"},
-            ],
-        },
-    }
-
-    tmpl = templates.get(template)
-    if not tmpl:
-        raise HTTPException(400, f"Unknown template: {template}")
-
-    cat_map = {}
-    for cat_data in tmpl["categories"]:
-        cat = create_category(cat_data["name"], None, universe_id, cat_data.get("emoji"))
-        cat_map[cat_data["name"]] = cat.id
-
-    for ai_data in tmpl["action_items"]:
-        cat_id = cat_map.get(ai_data.get("category"))
-        create_action_item(ai_data["title"], ai_data.get("hot", False), ai_data.get("due_date"), cat_id, universe_id)
-
-    for md_data in tmpl["markdowns"]:
-        cat_id = cat_map.get(md_data.get("category"))
-        create_markdown(md_data["title"], md_data["body"], cat_id, universe_id)
-
-    return {"ok": True, "categories": len(tmpl["categories"]), "action_items": len(tmpl["action_items"]), "markdowns": len(tmpl["markdowns"])}
 
 
 # ── Categories ────────────────────────────────────────────────────────────
@@ -1136,6 +947,121 @@ def api_linked_targets():
     return get_linked_targets()
 
 
+# ── Agent Tasks ────────────────────────────────────────────────────────────
+
+
+class AgentTaskRequest(BaseModel):
+    title: str
+    markdown_id: int
+    channel: str
+    universe_id: int = 1
+    schedule_mode: str = "manual"  # manual | cron | once
+    cron_expr: str = ""
+    run_at: str | None = None
+    enabled: bool = True
+
+
+def _validate_agent_task_markdown(markdown_id: int, universe_id: int) -> None:
+    m = get_markdown(markdown_id)
+    if not m:
+        raise HTTPException(status_code=404, detail="Markdown not found")
+    if m.universe_id != universe_id:
+        raise HTTPException(status_code=400, detail="Markdown must belong to the selected universe")
+
+
+def _normalize_channel(ch: str) -> str:
+    ch = ch.strip()
+    if not ch.startswith("#"):
+        ch = "#" + ch
+    return ch
+
+
+@app.get("/api/agent-tasks")
+def api_list_agent_tasks(universe_id: Optional[int] = None):
+    tasks = list_agent_tasks(universe_id=universe_id)
+    out = []
+    for t in tasks:
+        md = get_markdown(t.markdown_id)
+        out.append(agent_task_to_dict(t, md.title if md else None))
+    return out
+
+
+@app.post("/api/agent-tasks", status_code=201)
+def api_create_agent_task(req: AgentTaskRequest):
+    if req.schedule_mode not in ("manual", "cron", "once"):
+        raise HTTPException(status_code=400, detail="Invalid schedule_mode")
+    if req.schedule_mode == "cron" and not (req.cron_expr or "").strip():
+        raise HTTPException(status_code=400, detail="cron_expr required for cron schedule")
+    if req.schedule_mode == "once" and not (req.run_at or "").strip():
+        raise HTTPException(status_code=400, detail="run_at required for one-time schedule")
+    _validate_agent_task_markdown(req.markdown_id, req.universe_id)
+    ch = _normalize_channel(req.channel)
+    t = create_agent_task(
+        title=req.title,
+        markdown_id=req.markdown_id,
+        channel=ch,
+        universe_id=req.universe_id,
+        schedule_mode=req.schedule_mode,
+        cron_expr=(req.cron_expr or "").strip() or None,
+        run_at=(req.run_at or "").strip() or None,
+        enabled=req.enabled,
+    )
+    md = get_markdown(t.markdown_id)
+    return agent_task_to_dict(t, md.title if md else None)
+
+
+@app.put("/api/agent-tasks/{task_id}")
+def api_update_agent_task(task_id: int, req: AgentTaskRequest):
+    if req.schedule_mode not in ("manual", "cron", "once"):
+        raise HTTPException(status_code=400, detail="Invalid schedule_mode")
+    if req.schedule_mode == "cron" and not (req.cron_expr or "").strip():
+        raise HTTPException(status_code=400, detail="cron_expr required for cron schedule")
+    if req.schedule_mode == "once" and not (req.run_at or "").strip():
+        raise HTTPException(status_code=400, detail="run_at required for one-time schedule")
+    _validate_agent_task_markdown(req.markdown_id, req.universe_id)
+    ch = _normalize_channel(req.channel)
+    t = update_agent_task(
+        task_id,
+        title=req.title,
+        markdown_id=req.markdown_id,
+        channel=ch,
+        universe_id=req.universe_id,
+        schedule_mode=req.schedule_mode,
+        cron_expr=(req.cron_expr or "").strip() or None,
+        run_at=(req.run_at or "").strip() or None,
+        enabled=req.enabled,
+    )
+    if not t:
+        raise HTTPException(status_code=404, detail="Task not found")
+    md = get_markdown(t.markdown_id)
+    return agent_task_to_dict(t, md.title if md else None)
+
+
+@app.delete("/api/agent-tasks/{task_id}")
+def api_delete_agent_task(task_id: int):
+    if not delete_agent_task(task_id):
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"ok": True}
+
+
+@app.post("/api/agent-tasks/{task_id}/run")
+def api_run_agent_task_now(task_id: int):
+    from src.agent_task_runner import ChannelCooldownError, send_agent_task_message_now
+
+    try:
+        send_agent_task_message_now(task_id)
+        return {"ok": True}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except ChannelCooldownError as e:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Channel {e.channel} was sent to recently; wait {e.wait_seconds:.0f}s",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send: {e}")
+
+
 # ── App settings ──────────────────────────────────────────────────────────
 
 
@@ -1267,49 +1193,6 @@ def api_get_latest_version():
     except Exception as e:
         print(f"[Astro] WARNING: Version check failed: {e}")
         return {"current": current, "latest": current, "update_available": False, "build_id": build_id}
-
-
-# ── Backup & Restore ──────────────────────────────────────────────────────
-
-
-@app.get("/api/backup")
-def api_backup():
-    """Download a ZIP archive of all Astro data (DB, images, documents, vector store)."""
-    zip_path = create_backup()
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    return FileResponse(
-        zip_path,
-        filename=f"astro-backup-{ts}.zip",
-        media_type="application/zip",
-    )
-
-
-@app.post("/api/restore")
-async def api_restore(file: UploadFile):
-    """Restore Astro data from a backup ZIP archive.
-
-    This replaces the current database, images, documents, and vector store.
-    """
-    if not file.filename or not file.filename.endswith(".zip"):
-        raise HTTPException(status_code=400, detail="Please upload a .zip file")
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
-        shutil.copyfileobj(file.file, tmp)
-        tmp_path = Path(tmp.name)
-
-    try:
-        summary = restore_backup(tmp_path)
-    except Exception as e:
-        tmp_path.unlink(missing_ok=True)
-        raise HTTPException(status_code=400, detail=f"Invalid backup file: {e}")
-    finally:
-        tmp_path.unlink(missing_ok=True)
-
-    return {
-        "ok": True,
-        "restored": summary,
-        "message": "Restore complete (including vector store).",
-    }
 
 
 @app.post("/api/reindex")
@@ -1913,127 +1796,6 @@ async def ws_irc(ws: WebSocket):
             await ws.close()
         except Exception:
             pass
-
-
-# ── Prompts ────────────────────────────────────────────────────────────────
-
-
-class PromptRequest(BaseModel):
-    channel: str
-    message: str
-    cron_expr: str = ""
-    title: str = ""
-    category_id: int | None = None
-    sort_order: int = 0
-
-
-@app.get("/api/prompts")
-def api_list_prompts():
-    return [prompt_to_dict(p) for p in list_prompts()]
-
-
-@app.post("/api/prompts", status_code=201)
-def api_create_prompt(req: PromptRequest):
-    channel = req.channel.strip()
-    if not channel.startswith("#"):
-        channel = "#" + channel
-    p = create_prompt(channel, req.message, req.cron_expr.strip(), title=req.title.strip(), category_id=req.category_id, sort_order=req.sort_order)
-    return prompt_to_dict(p)
-
-
-class PromptReorderRequest(BaseModel):
-    ordering: list[dict]
-
-
-@app.put("/api/prompts/reorder")
-def api_reorder_prompts(req: PromptReorderRequest):
-    reorder_prompts(req.ordering)
-    return {"ok": True}
-
-
-@app.put("/api/prompts/{prompt_id}")
-def api_update_prompt(prompt_id: int, req: PromptRequest):
-    channel = req.channel.strip()
-    if not channel.startswith("#"):
-        channel = "#" + channel
-    p = update_prompt(prompt_id, channel, req.message, req.cron_expr.strip(), title=req.title.strip(), category_id=req.category_id, sort_order=req.sort_order)
-    if not p:
-        raise HTTPException(status_code=404, detail="Prompt not found")
-    return prompt_to_dict(p)
-
-
-@app.delete("/api/prompts/{prompt_id}")
-def api_delete_prompt(prompt_id: int):
-    if not delete_prompt(prompt_id):
-        raise HTTPException(status_code=404, detail="Prompt not found")
-    return {"ok": True}
-
-
-@app.post("/api/prompts/{prompt_id}/run")
-def api_run_prompt(prompt_id: int):
-    p = get_prompt(prompt_id)
-    if not p:
-        raise HTTPException(status_code=404, detail="Prompt not found")
-    from src.irc_scheduler import IRCScheduler, ChannelCooldownError
-    sched = IRCScheduler.get()
-    try:
-        sched._send_message(p.channel, p.message)
-        mark_prompt_run(prompt_id)
-        return {"ok": True}
-    except ChannelCooldownError as e:
-        raise HTTPException(
-            status_code=429,
-            detail=f"Channel {p.channel} was sent to recently, wait {e.wait_seconds:.0f}s",
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to send: {e}")
-
-
-# ── Prompt Categories API ────────────────────────────────────────────────
-
-
-class PromptCategoryRequest(BaseModel):
-    name: str
-    emoji: str = "📁"
-    col: int = 0
-    sort_order: int = 0
-
-
-class PromptCategoryReorderRequest(BaseModel):
-    ordering: list[dict]
-
-
-@app.get("/api/prompt-categories")
-def api_list_prompt_categories():
-    return [prompt_category_to_dict(c) for c in list_prompt_categories()]
-
-
-@app.post("/api/prompt-categories", status_code=201)
-def api_create_prompt_category(req: PromptCategoryRequest):
-    c = create_prompt_category(req.name.strip(), req.emoji.strip(), req.col, req.sort_order)
-    return prompt_category_to_dict(c)
-
-
-@app.put("/api/prompt-categories/reorder")
-def api_reorder_prompt_categories(req: PromptCategoryReorderRequest):
-    reorder_prompt_categories(req.ordering)
-    return {"ok": True}
-
-
-@app.put("/api/prompt-categories/{cat_id}")
-def api_update_prompt_category(cat_id: int, req: PromptCategoryRequest):
-    c = update_prompt_category(cat_id, req.name.strip(), req.emoji.strip(), req.col, req.sort_order)
-    if not c:
-        raise HTTPException(status_code=404, detail="Category not found")
-    return prompt_category_to_dict(c)
-
-
-@app.delete("/api/prompt-categories/{cat_id}")
-def api_delete_prompt_category(cat_id: int):
-    if not delete_prompt_category(cat_id):
-        raise HTTPException(status_code=404, detail="Category not found")
-    return {"ok": True}
-
 
 
 # ── Diagrams ──────────────────────────────────────────────────────────────

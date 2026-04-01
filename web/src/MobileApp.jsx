@@ -1460,7 +1460,6 @@ function MobileHelpView({ onClose }) {
       <div className="m-help-tabs">
         <button className={`m-help-tab ${section === 'irc' ? 'active' : ''}`} onClick={() => setSection('irc')}>IRC</button>
         <button className={`m-help-tab ${section === 'mcp' ? 'active' : ''}`} onClick={() => setSection('mcp')}>MCP</button>
-        <button className={`m-help-tab ${section === 'prompts' ? 'active' : ''}`} onClick={() => setSection('prompts')}>Prompts</button>
       </div>
       <div className="m-help-body">
         {section === 'irc' && (
@@ -1495,18 +1494,6 @@ function MobileHelpView({ onClose }) {
             <div className="m-help-code">
               <div className="m-help-code-title">mcp_config.json</div>
               <pre>{JSON.stringify({ mcpServers: { astro: { url: `${origin}/mcp` } } }, null, 2)}</pre>
-            </div>
-          </div>
-        )}
-        {section === 'prompts' && (
-          <div className="m-help-section">
-            <h3>Example Prompts</h3>
-            <p>Try these prompts with your AI agent:</p>
-            <div className="m-help-prompts">
-              <div className="m-help-prompt"><span className="m-help-num">1</span>Search my documents for information about [topic] and create a summary markdown</div>
-              <div className="m-help-prompt"><span className="m-help-num">2</span>Review the latest feed posts and create action items for anything urgent</div>
-              <div className="m-help-prompt"><span className="m-help-num">3</span>List all incomplete action items and generate a status report</div>
-              <div className="m-help-prompt"><span className="m-help-num">4</span>Create a new markdown with a project plan for [project name]</div>
             </div>
           </div>
         )}
@@ -1545,29 +1532,6 @@ function MobileApp() {
   const chatBaseInputRef = useRef('')
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
-  const [showPromptPicker, setShowPromptPicker] = useState(false)
-  const [mobilePrompts, setMobilePrompts] = useState([])
-  const [promptSearchQ, setPromptSearchQ] = useState('')
-  const [runningPromptId, setRunningPromptId] = useState(null)
-
-  const fetchMobilePrompts = () => {
-    fetch('/api/prompts').then(r => r.json()).then(setMobilePrompts).catch(() => {})
-  }
-
-  const openPromptPicker = () => {
-    fetchMobilePrompts()
-    setPromptSearchQ('')
-    setShowPromptPicker(true)
-  }
-
-  const runMobilePrompt = async (id) => {
-    setRunningPromptId(id)
-    try {
-      await fetch(`/api/prompts/${id}/run`, { method: 'POST' })
-    } catch {}
-    setRunningPromptId(null)
-    setShowPromptPicker(false)
-  }
 
   useEffect(() => {
     fetch('/api/settings/irc_channel').then(r => r.json()).then(d => { if (d.value) setIrcNick(d.value) }).catch(() => {})
@@ -2076,11 +2040,6 @@ function MobileApp() {
             {chatListening && <div className="mn-listening-bar">Listening...</div>}
             <footer className="m-input-area">
               <form className="m-input-form" onSubmit={handleSubmit}>
-                <button type="button" className="m-prompt-picker-btn" onClick={openPromptPicker} title="Run a prompt">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" /><polygon points="10 8 16 12 10 16 10 8" />
-                  </svg>
-                </button>
                 <button type="button" className={`m-chat-mic-btn ${chatListening ? 'active' : ''}`} onClick={toggleChatDictation}>
                   {chatListening ? (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>
@@ -2099,54 +2058,6 @@ function MobileApp() {
                 </button>
               </form>
             </footer>
-            {showPromptPicker && (
-              <div className="m-prompt-overlay" onClick={() => setShowPromptPicker(false)}>
-                <div className="m-prompt-sheet" onClick={e => e.stopPropagation()}>
-                  <div className="m-prompt-sheet-header">
-                    <span className="m-prompt-sheet-title">Run Prompt</span>
-                    <button className="m-prompt-sheet-close" onClick={() => setShowPromptPicker(false)}>
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                    </button>
-                  </div>
-                  <input
-                    className="m-prompt-sheet-search"
-                    placeholder="Search prompts..."
-                    value={promptSearchQ}
-                    onChange={e => setPromptSearchQ(e.target.value)}
-                    autoFocus
-                  />
-                  <div className="m-prompt-sheet-list">
-                    {mobilePrompts
-                      .filter(p => !promptSearchQ || (p.title || '').toLowerCase().includes(promptSearchQ.toLowerCase()))
-                      .map(p => (
-                        <button
-                          key={p.id}
-                          className="m-prompt-sheet-item"
-                          onClick={() => runMobilePrompt(p.id)}
-                          disabled={runningPromptId === p.id}
-                        >
-                          <div className="m-prompt-sheet-item-info">
-                            <span className="m-prompt-sheet-item-title">{p.title || 'Untitled'}</span>
-                            <span className="m-prompt-sheet-item-meta">
-                              {p.channel}
-                              {p.cron_expr ? ` \u00b7 ${p.cron_expr}` : ' \u00b7 On-demand'}
-                            </span>
-                          </div>
-                          <span className="m-prompt-sheet-run">
-                            {runningPromptId === p.id ? '...' : (
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3" /></svg>
-                            )}
-                          </span>
-                        </button>
-                      ))
-                    }
-                    {mobilePrompts.filter(p => !promptSearchQ || (p.title || '').toLowerCase().includes(promptSearchQ.toLowerCase())).length === 0 && (
-                      <div className="m-prompt-sheet-empty">{promptSearchQ ? 'No matching prompts' : 'No prompts yet'}</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
         {view === 'markdowns' && <MobileMarkdowns categories={categories} universeId={currentUniverseId} />}

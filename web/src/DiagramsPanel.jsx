@@ -337,7 +337,7 @@ export function DiagramEditorView({ diagram, categories, onClose, onSaved }) {
 
 /* ── Sidebar panel (list of diagrams) ─────────────────── */
 
-function DiagramsPanel({ categories, onPinChange, universeId, onEditDiagram, refreshKey }) {
+function DiagramsPanel({ categories, onPinChange, universeId, onEditDiagram, refreshKey, onLoaded }) {
   const [diagrams, setDiagrams] = useState([])
   const [search, setSearch] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
@@ -354,6 +354,7 @@ function DiagramsPanel({ categories, onPinChange, universeId, onEditDiagram, ref
       .then(res => res.json())
       .then(data => setDiagrams(data))
       .catch(() => {})
+      .finally(() => onLoaded?.())
   }
 
   useEffect(() => { fetchDiagrams() }, [universeId, refreshKey])

@@ -50,9 +50,9 @@ const EXT_ICONS = {
   ),
   md: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="#a78bfa" />
-      <polyline points="14 2 14 8 20 8" stroke="#a78bfa" />
-      <text x="12" y="17" textAnchor="middle" fill="#a78bfa" fontSize="6" fontWeight="bold" fontFamily="sans-serif" stroke="none">MD</text>
+  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="#3794ff" />
+  <polyline points="14 2 14 8 20 8" stroke="#3794ff" />
+  <text x="12" y="17" textAnchor="middle" fill="#3794ff" fontSize="6" fontWeight="bold" fontFamily="sans-serif" stroke="none">MD</text>
     </svg>
   ),
   csv: (
@@ -74,7 +74,7 @@ const EXT_ICONS = {
 EXT_ICONS.xls = EXT_ICONS.xlsx
 EXT_ICONS.doc = EXT_ICONS.docx
 
-function ArchivePanel({ categories, onPinChange, universeId }) {
+function ArchivePanel({ categories, onPinChange, universeId, onLoaded }) {
   const [docs, setDocs] = useState([])
   const [search, setSearch] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
@@ -98,6 +98,7 @@ function ArchivePanel({ categories, onPinChange, universeId }) {
       .then(res => res.json())
       .then(data => setDocs(data))
       .catch(() => {})
+      .finally(() => onLoaded?.())
   }
 
   const fetchLinkedPaths = () => {

@@ -4,7 +4,7 @@ title: Features
 subtitle: What your AI operating system includes
 ---
 
-These capabilities work together so you can manage information, agents, prompts, tasks, and feeds in one place. The sections below walk through each area in detail.
+These capabilities work together so you can manage information, agents, tasks, and feeds in one place. The sections below walk through each area in detail.
 
 ## AI Agent Network
 
@@ -264,22 +264,6 @@ Quickly search across markdowns, documents, and links. Find what you need instan
 ## Mobile-Optimized Interface
 
 Astro includes a mobile-friendly version at `/mobile`, built for access on the go. Your Universe stays accessible anywhere.
-
----
-
-## Prompts
-
-Prompts are how you orchestrate and schedule agent workflows: reusable message templates that send to Agent Network channels, organized in a visual board.
-
-- **Prompt categories**: create custom categories with emoji labels to group related prompts
-- **3-column board layout**: organize category containers across three columns with drag-and-drop
-- **Drag-and-drop reordering**: move prompts between categories and reorder within a category by dragging
-- **Target channel**: each prompt is tied to a specific IRC channel
-- **Message body**: write a single message that is automatically split into IRC-safe chunks behind the scenes
-- **Cron scheduling**: set a cron expression for recurring, automatic delivery
-- **On-demand execution**: run any prompt instantly from the desktop or mobile UI
-
-Together with cron and on-demand runs, prompts are your scheduling and orchestration surface: status checks, recurring agent runs, or one-shot instructions, all organized in a visual board you can customize.
 
 ---
 

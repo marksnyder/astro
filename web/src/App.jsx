@@ -7,6 +7,7 @@ import ActionItemsPanel from './ActionItemsPanel'
 import FeedsPanel, { PostTimeline } from './FeedsPanel'
 import DiagramsPanel, { DiagramEditorView } from './DiagramsPanel'
 import TablesPanel, { TableEditorView } from './TablesPanel'
+import AgentTasksPanel from './AgentTasksPanel'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import CategoryTree, { EmojiPopover } from './CategoryTree'
@@ -158,7 +159,6 @@ function QuickView({ item, onClose }) {
 
 function UniverseManager({ universes, currentId, onSwitch, onClose, onRefresh }) {
   const [newName, setNewName] = useState('')
-  const [selectedTemplate, setSelectedTemplate] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [editName, setEditName] = useState('')
 
@@ -172,11 +172,7 @@ function UniverseManager({ universes, currentId, onSwitch, onClose, onRefresh })
     })
     if (res.ok) {
       const created = await res.json()
-      if (selectedTemplate && created.id) {
-        await fetch(`/api/universes/${created.id}/apply-template?template=${selectedTemplate}`, { method: 'POST' })
-      }
       setNewName('')
-      setSelectedTemplate('')
       onRefresh()
       onSwitch(created.id)
     }
@@ -264,28 +260,7 @@ function UniverseManager({ universes, currentId, onSwitch, onClose, onRefresh })
                 onChange={e => setNewName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleCreate() }}
               />
-              <button className="markdown-save-btn" onClick={handleCreate} disabled={!newName.trim()}>Create</button>
-            </div>
-            <div className="universe-template-row">
-              <label className="universe-template-label">Template</label>
-              <select
-                className="prompt-form-input"
-                value={selectedTemplate}
-                onChange={e => setSelectedTemplate(e.target.value)}
-                style={{ flex: 1, fontSize: '0.85rem' }}
-              >
-                <option value="">Blank</option>
-                <option value="software_engineer">Software Engineer</option>
-                <option value="health_wellness">Health &amp; Wellness</option>
-                <option value="researcher">Researcher</option>
-                <option value="journalist">Journalist</option>
-                <option value="parenting">Parenting</option>
-                <option value="content_creator">Content Creator</option>
-                <option value="financial_goals">Financial Goals</option>
-                <option value="cooking">Cooking</option>
-                <option value="event_planning">Event Planning</option>
-                <option value="career_development">Career Development</option>
-              </select>
+              <button className="markdown-save-btn" onClick={handleCreate} disabled={!newName.trim()}>Create Blank</button>
             </div>
           </div>
         </div>
@@ -308,7 +283,6 @@ function HelpDialog({ onClose }) {
         <div className="help-tabs">
           <button className={`help-tab ${section === 'irc' ? 'active' : ''}`} onClick={() => setSection('irc')}>IRC Server</button>
           <button className={`help-tab ${section === 'mcp' ? 'active' : ''}`} onClick={() => setSection('mcp')}>MCP Integration</button>
-          <button className={`help-tab ${section === 'prompts' ? 'active' : ''}`} onClick={() => setSection('prompts')}>Example Prompts</button>
         </div>
 
         <div className="help-body">
@@ -352,23 +326,6 @@ function HelpDialog({ onClose }) {
                 <pre>{JSON.stringify({ mcpServers: { astro: { url: `${origin}/mcp` } } }, null, 2)}</pre>
               </div>
               <p className="help-note">The MCP server provides tools for managing action items, markdowns, documents, links, feeds, and IRC messaging.</p>
-            </div>
-          )}
-
-          {section === 'prompts' && (
-            <div className="help-section">
-              <h3>Example Prompts for AI Agents</h3>
-              <p>Once connected via MCP or IRC, try these prompts with your AI agent:</p>
-              <div className="help-prompt-list">
-                <div className="help-prompt-item">
-                  <span className="help-prompt-num">1</span>
-                  <span>&ldquo;Set up an IRC server on this machine from scratch. Install and configure InspIRCd (or ngircd if that&apos;s easier), create a basic config with a server name of {hostname}, set up a #astro channel, enable TLS on port 6667, and make sure it starts on boot. Walk me through any steps that need manual input.&rdquo; You can swap in specifics — your domain, preferred IRCd, channels you want, whether you need SASL auth, etc. The more detail you give upfront, the less back-and-forth.</span>
-                </div>
-                <div className="help-prompt-item">
-                  <span className="help-prompt-num">2</span>
-                  <span>&ldquo;Add MCP server {origin}/mcp. Please make sure this agent and any other agent has this skill loaded at all times and can use it even after a restart.&rdquo;</span>
-                </div>
-              </div>
             </div>
           )}
         </div>
@@ -466,61 +423,55 @@ function ApiKeyManager() {
   )
 }
 
-function SettingsDialog({ onClose, onRestored }) {
+function SettingsDialog({ onClose }) {
   const [status, setStatus] = useState(null) // { type: 'success'|'error'|'info', text: string }
-  const [busy, setBusy] = useState(false)
-  const [selectedFile, setSelectedFile] = useState(null)
   const [reindexing, setReindexing] = useState(false)
+  const [agentTaskTemplate, setAgentTaskTemplate] = useState('')
+  const [agentTaskBaseUrl, setAgentTaskBaseUrl] = useState('')
+  const [agentTaskSettingsLoading, setAgentTaskSettingsLoading] = useState(true)
+  const [agentTaskSaving, setAgentTaskSaving] = useState(false)
 
-  const handleBackup = async () => {
-    setBusy(true)
-    setStatus({ type: 'info', text: 'Creating backup...' })
-    try {
-      const res = await fetch('/api/backup')
-      if (!res.ok) throw new Error('Backup failed')
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      const disposition = res.headers.get('Content-Disposition') || ''
-      const match = disposition.match(/filename="?(.+?)"?$/)
-      a.download = match ? match[1] : 'astro-backup.zip'
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
-      setStatus({ type: 'success', text: 'Backup downloaded successfully.' })
-    } catch (e) {
-      setStatus({ type: 'error', text: `Backup failed: ${e.message}` })
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const handleRestore = async () => {
-    if (!selectedFile) return
-    if (!confirm('This will replace ALL current data (markdowns, documents, action items, links, etc.) with the backup. This cannot be undone. Continue?')) return
-    setBusy(true)
-    setStatus({ type: 'info', text: 'Restoring from backup...' })
-    try {
-      const form = new FormData()
-      form.append('file', selectedFile)
-      const res = await fetch('/api/restore', { method: 'POST', body: form })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.detail || 'Restore failed')
-      }
-      const data = await res.json()
-      setStatus({
-        type: 'success',
-        text: `Restore complete! DB: ${data.restored.db ? 'yes' : 'no'}, Images: ${data.restored.images}, Documents: ${data.restored.documents}, Vector store: ${data.restored.chroma ? 'yes' : 'no (use Rebuild Index)'}.`,
+  useEffect(() => {
+    let cancelled = false
+    setAgentTaskSettingsLoading(true)
+    Promise.all([
+      fetch('/api/settings/agent_task_message_template').then((r) => r.json()),
+      fetch('/api/settings/agent_task_base_url').then((r) => r.json()),
+    ])
+      .then(([t, b]) => {
+        if (cancelled) return
+        setAgentTaskTemplate((t && t.value) || '')
+        setAgentTaskBaseUrl((b && b.value) || '')
       })
-      setSelectedFile(null)
-      onRestored?.()
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setAgentTaskSettingsLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  const saveAgentTaskSettings = async () => {
+    setAgentTaskSaving(true)
+    setStatus(null)
+    try {
+      const [r1, r2] = await Promise.all([
+        fetch('/api/settings/agent_task_message_template', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: agentTaskTemplate }),
+        }),
+        fetch('/api/settings/agent_task_base_url', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: agentTaskBaseUrl }),
+        }),
+      ])
+      if (!r1.ok || !r2.ok) throw new Error('Failed to save')
+      setStatus({ type: 'success', text: 'Agent task IRC settings saved.' })
     } catch (e) {
-      setStatus({ type: 'error', text: `Restore failed: ${e.message}` })
+      setStatus({ type: 'error', text: e.message || 'Failed to save agent task settings' })
     } finally {
-      setBusy(false)
+      setAgentTaskSaving(false)
     }
   }
 
@@ -548,54 +499,9 @@ function SettingsDialog({ onClose, onRestored }) {
         <h2>Settings</h2>
 
         <div className="br-section">
-          <h3>Backup</h3>
-          <p>Download a complete snapshot of your Astro data.</p>
-          <button className="br-action-btn" onClick={handleBackup} disabled={busy || reindexing}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            {busy ? 'Working...' : 'Download Backup'}
-          </button>
-        </div>
-
-        <div className="br-divider" />
-
-        <div className="br-section">
-          <h3>Restore</h3>
-          <p>Upload a backup ZIP to replace all current data, including the search index.</p>
-          <div className="br-restore-row">
-            <label className="br-file-label">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="17 8 12 3 7 8" />
-                <line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
-              {selectedFile ? selectedFile.name : 'Choose ZIP file'}
-              <input
-                type="file"
-                accept=".zip"
-                onChange={e => setSelectedFile(e.target.files?.[0] || null)}
-                disabled={busy || reindexing}
-              />
-            </label>
-            <button
-              className="br-action-btn danger"
-              onClick={handleRestore}
-              disabled={!selectedFile || busy || reindexing}
-            >
-              {busy ? 'Restoring...' : 'Restore'}
-            </button>
-          </div>
-        </div>
-
-        <div className="br-divider" />
-
-        <div className="br-section">
           <h3>Rebuild Index</h3>
-          <p>Re-create the search index from existing data without restoring a backup.</p>
-          <button className="br-action-btn" onClick={handleReindex} disabled={busy || reindexing}>
+          <p>Re-create the search index from existing data.</p>
+          <button className="br-action-btn" onClick={handleReindex} disabled={reindexing}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="23 4 23 10 17 10" />
               <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
@@ -612,6 +518,41 @@ function SettingsDialog({ onClose, onRestored }) {
           <ApiKeyManager />
         </div>
 
+        <div className="br-divider" />
+
+        <div className="br-section">
+          <h3>Agent tasks (IRC)</h3>
+          <p>
+            Message template for tasks sent to the agent network as <code>astro-task-runner</code>.
+            Placeholders: <code>{'{markdown_id}'}</code>, <code>{'{markdown_title}'}</code>, <code>{'{markdown_body}'}</code>, <code>{'{read_url}'}</code> (same as <code>{'{markdown_read_url}'}</code>).
+          </p>
+          {agentTaskSettingsLoading ? (
+            <p className="br-subtitle">Loading…</p>
+          ) : (
+            <>
+              <label className="agent-task-settings-label">Template</label>
+              <textarea
+                className="agent-task-settings-textarea"
+                rows={10}
+                value={agentTaskTemplate}
+                onChange={(e) => setAgentTaskTemplate(e.target.value)}
+                placeholder="Leave empty to use the built-in default (instructions + read URL + body)."
+              />
+              <label className="agent-task-settings-label">Base URL for read links</label>
+              <input
+                className="prompt-form-input"
+                style={{ width: '100%', marginBottom: 12 }}
+                value={agentTaskBaseUrl}
+                onChange={(e) => setAgentTaskBaseUrl(e.target.value)}
+                placeholder="http://127.0.0.1:8000"
+              />
+              <button className="br-action-btn" type="button" onClick={saveAgentTaskSettings} disabled={agentTaskSaving}>
+                {agentTaskSaving ? 'Saving…' : 'Save agent task settings'}
+              </button>
+            </>
+          )}
+        </div>
+
         {status && (
           <div className={`br-status ${status.type}`}>
             {status.text}
@@ -624,46 +565,6 @@ function SettingsDialog({ onClose, onRestored }) {
       </div>
     </div>
   )
-}
-
-const MSG_CHUNK_LIMIT = 320
-
-function parseMessages(raw) {
-  if (!raw) return ['']
-  try {
-    const parsed = JSON.parse(raw)
-    if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(String)
-  } catch {}
-  return [raw]
-}
-
-function joinMessages(raw) {
-  if (!raw) return ''
-  try {
-    const parsed = JSON.parse(raw)
-    if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(String).join('\n')
-  } catch {}
-  return raw
-}
-
-function splitIntoChunks(text, limit) {
-  const cleaned = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
-  if (!cleaned) return []
-  if (cleaned.length <= limit) return [cleaned]
-  const chunks = []
-  let remaining = cleaned
-  while (remaining.length > 0) {
-    if (remaining.length <= limit) {
-      chunks.push(remaining)
-      break
-    }
-    let breakAt = remaining.lastIndexOf('\n', limit)
-    if (breakAt <= 0) breakAt = remaining.lastIndexOf(' ', limit)
-    if (breakAt <= 0) breakAt = limit
-    chunks.push(remaining.slice(0, breakAt).trimEnd())
-    remaining = remaining.slice(breakAt).replace(/^\n/, '').trimStart()
-  }
-  return chunks
 }
 
 const MCP_DIRECT_TEMPLATES = {
@@ -804,540 +705,6 @@ function McpToolLookup({ tool, onInsert, onClose }) {
   )
 }
 
-function PromptForm({ initial, channels, categories, onSave, onCancel }) {
-  const [title, setTitle] = useState(initial.title || '')
-  const [channel, setChannel] = useState(initial.channel || '#astro')
-  const [message, setMessage] = useState(() => joinMessages(initial.message))
-  const [cronExpr, setCronExpr] = useState(initial.cron_expr || '')
-  const [showSchedule, setShowSchedule] = useState(Boolean(initial.cron_expr))
-  const [categoryId, setCategoryId] = useState(initial.category_id ?? '')
-  const [showInsertMenu, setShowInsertMenu] = useState(false)
-  const [insertMenuPos, setInsertMenuPos] = useState(null)
-  const [mcpLookup, setMcpLookup] = useState(null)
-  const [universePicker, setUniversePicker] = useState(null)
-  const [previewMode, setPreviewMode] = useState(Boolean(initial.id))
-  const textareaRef = useRef(null)
-  const mcpBtnRef = useRef(null)
-
-  const insertText = (text) => {
-    const ta = textareaRef.current
-    if (ta) {
-      const start = ta.selectionStart
-      const newVal = message.slice(0, start) + text + message.slice(ta.selectionEnd)
-      setMessage(newVal)
-      setTimeout(() => { ta.focus(); const pos = start + text.length; ta.setSelectionRange(pos, pos) }, 0)
-    } else {
-      setMessage(prev => prev + text)
-    }
-  }
-
-  const mdInsert = (before, after = '') => {
-    const ta = textareaRef.current
-    if (!ta) return
-    const start = ta.selectionStart
-    const end = ta.selectionEnd
-    const selected = message.slice(start, end)
-    const replacement = before + (selected || 'text') + after
-    const newVal = message.slice(0, start) + replacement + message.slice(end)
-    setMessage(newVal)
-    setTimeout(() => {
-      ta.focus()
-      const cursorPos = selected ? start + replacement.length : start + before.length
-      ta.setSelectionRange(cursorPos, cursorPos + (selected ? 0 : 4))
-    }, 0)
-  }
-
-  const mdInsertLine = (prefix) => {
-    const ta = textareaRef.current
-    if (!ta) return
-    const start = ta.selectionStart
-    const lineStart = message.lastIndexOf('\n', start - 1) + 1
-    const newVal = message.slice(0, lineStart) + prefix + message.slice(lineStart)
-    setMessage(newVal)
-    setTimeout(() => {
-      ta.focus()
-      ta.setSelectionRange(lineStart + prefix.length, lineStart + prefix.length)
-    }, 0)
-  }
-
-  const mdInsertBlock = (block) => {
-    const ta = textareaRef.current
-    if (!ta) return
-    const start = ta.selectionStart
-    const needsNewline = start > 0 && message[start - 1] !== '\n' ? '\n' : ''
-    const newVal = message.slice(0, start) + needsNewline + block + '\n' + message.slice(start)
-    setMessage(newVal)
-    setTimeout(() => {
-      ta.focus()
-      const pos = start + needsNewline.length + block.length + 1
-      ta.setSelectionRange(pos, pos)
-    }, 0)
-  }
-
-  const handleMdTab = (e) => {
-    if (e.key === 'Tab') {
-      e.preventDefault()
-      const ta = textareaRef.current
-      const start = ta.selectionStart
-      const end = ta.selectionEnd
-      const newVal = message.slice(0, start) + '  ' + message.slice(end)
-      setMessage(newVal)
-      setTimeout(() => { ta.setSelectionRange(start + 2, start + 2) }, 0)
-    }
-  }
-
-  const chunks = splitIntoChunks(message, MSG_CHUNK_LIMIT)
-  const hasContent = message.trim().length > 0
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    if (!hasContent || !title.trim()) return
-    const msgPayload = JSON.stringify(chunks)
-    onSave({ id: initial.id, channel, message: msgPayload, cron_expr: showSchedule ? cronExpr.trim() : '', title: title.trim(), category_id: categoryId || null, sort_order: initial.sort_order || 0 })
-  }
-
-  const cronPresets = [
-    { label: 'Every minute', value: '* * * * *' },
-    { label: 'Every 5 min', value: '*/5 * * * *' },
-    { label: 'Every hour', value: '0 * * * *' },
-    { label: 'Daily 9am', value: '0 9 * * *' },
-    { label: 'Mon-Fri 9am', value: '0 9 * * 1-5' },
-    { label: 'Weekly Mon', value: '0 9 * * 1' },
-  ]
-
-  return (
-    <form className="prompt-form" onSubmit={handleSubmit}>
-      <div className="prompt-form-row">
-        <label>Title</label>
-        <input
-          className="prompt-form-input"
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          placeholder="Give this prompt a name..."
-          maxLength={100}
-        />
-      </div>
-      <div className="prompt-form-row">
-        <label>Channel</label>
-        <select value={channel} onChange={e => setChannel(e.target.value)} className="prompt-form-input">
-          {channels.filter(c => !c.name.startsWith('&')).map(c => (
-            <option key={c.name} value={c.name}>{c.name}</option>
-          ))}
-          {!channels.find(c => c.name === channel) && <option value={channel}>{channel}</option>}
-        </select>
-      </div>
-      <div className="prompt-form-row">
-        <label>Category</label>
-        <select value={categoryId} onChange={e => setCategoryId(e.target.value ? Number(e.target.value) : '')} className="prompt-form-input">
-          <option value="">Uncategorized</option>
-          {(categories || []).map(c => (
-            <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>
-          ))}
-        </select>
-      </div>
-      <div className="prompt-form-row">
-        <label className="prompt-schedule-toggle-label">
-          <input type="checkbox" checked={showSchedule} onChange={e => { setShowSchedule(e.target.checked); if (e.target.checked && !cronExpr) setCronExpr('0 9 * * *') }} />
-          Schedule (optional)
-        </label>
-        {showSchedule && (
-          <>
-            <input
-              className="prompt-form-input"
-              value={cronExpr}
-              onChange={e => setCronExpr(e.target.value)}
-              placeholder="* * * * *"
-              spellCheck={false}
-            />
-            <div className="prompt-cron-presets">
-              {cronPresets.map(p => (
-                <button key={p.value} type="button" className={`prompt-preset-btn ${cronExpr === p.value ? 'active' : ''}`} onClick={() => setCronExpr(p.value)}>{p.label}</button>
-              ))}
-            </div>
-            <div className="prompt-cron-hint">min hour day month weekday</div>
-          </>
-        )}
-        {!showSchedule && <div className="prompt-ondemand-hint">On-demand only — use Run to execute</div>}
-      </div>
-      <div className="prompt-form-row prompt-form-row-grow">
-        <div className="prompt-msg-label-row">
-          <label>Message</label>
-          <div className="prompt-preview-toggle">
-            <button type="button" className={`prompt-preview-toggle-btn ${previewMode ? 'active' : ''}`} onClick={() => setPreviewMode(true)}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              Preview
-            </button>
-            <button type="button" className={`prompt-preview-toggle-btn ${!previewMode ? 'active' : ''}`} onClick={() => setPreviewMode(false)}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              Edit
-            </button>
-          </div>
-        </div>
-        {previewMode ? (
-          <div className="markdown-preview markdown-body prompt-preview-body">
-            {message.trim() ? (
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}>{message}</ReactMarkdown>
-            ) : (
-              <span className="prompt-preview-empty">No message content yet.</span>
-            )}
-          </div>
-        ) : (
-          <div className="md-editor-wrapper prompt-editor-wrapper">
-            <div className="md-toolbar">
-              <div className="md-toolbar-group">
-                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsertLine('# ')} title="Heading 1">H1</button>
-                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsertLine('## ')} title="Heading 2">H2</button>
-                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsertLine('### ')} title="Heading 3">H3</button>
-              </div>
-              <div className="md-toolbar-sep" />
-              <div className="md-toolbar-group">
-                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsert('**', '**')} title="Bold"><strong>B</strong></button>
-                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsert('*', '*')} title="Italic"><em>I</em></button>
-                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsert('~~', '~~')} title="Strikethrough"><s>S</s></button>
-              </div>
-              <div className="md-toolbar-sep" />
-              <div className="md-toolbar-group">
-                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsert('`', '`')} title="Inline code">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-                </button>
-                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsertBlock('```\n\n```')} title="Code block">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="9 8 5 12 9 16"/><polyline points="15 8 19 12 15 16"/></svg>
-                </button>
-              </div>
-              <div className="md-toolbar-sep" />
-              <div className="md-toolbar-group">
-                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsertLine('- ')} title="Bullet list">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3" cy="6" r="1.5" fill="currentColor"/><circle cx="3" cy="12" r="1.5" fill="currentColor"/><circle cx="3" cy="18" r="1.5" fill="currentColor"/></svg>
-                </button>
-                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsertLine('1. ')} title="Numbered list">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><text x="1" y="8" fontSize="7" fill="currentColor" stroke="none" fontFamily="sans-serif">1</text><text x="1" y="14" fontSize="7" fill="currentColor" stroke="none" fontFamily="sans-serif">2</text><text x="1" y="20" fontSize="7" fill="currentColor" stroke="none" fontFamily="sans-serif">3</text></svg>
-                </button>
-                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsertLine('- [ ] ')} title="Task list">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="6" height="6" rx="1"/><line x1="12" y1="8" x2="21" y2="8"/><rect x="3" y="14" width="6" height="6" rx="1"/><line x1="12" y1="17" x2="21" y2="17"/></svg>
-                </button>
-              </div>
-              <div className="md-toolbar-sep" />
-              <div className="md-toolbar-group">
-                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsertLine('> ')} title="Blockquote">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="3" y1="4" x2="3" y2="20"/><line x1="8" y1="8" x2="21" y2="8"/><line x1="8" y1="16" x2="21" y2="16"/></svg>
-                </button>
-                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsert('[', '](url)')} title="Link">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                </button>
-                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsertBlock('---')} title="Horizontal rule">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="2" y1="12" x2="22" y2="12"/></svg>
-                </button>
-                <button type="button" className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => mdInsertBlock('| Header | Header |\n| ------ | ------ |\n| Cell   | Cell   |')} title="Table">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
-                </button>
-              </div>
-              <div className="md-toolbar-sep" />
-              <div className="md-toolbar-group" style={{ position: 'relative' }}>
-                <button ref={mcpBtnRef} type="button" className="md-toolbar-btn md-insert-btn" onMouseDown={e => e.preventDefault()} onClick={() => { if (!showInsertMenu && mcpBtnRef.current) { const r = mcpBtnRef.current.getBoundingClientRect(); const menuH = 400; const spaceBelow = window.innerHeight - r.bottom - 8; const top = spaceBelow >= menuH ? r.bottom + 4 : Math.max(8, r.top - menuH - 4); setInsertMenuPos({ top, left: Math.min(r.left, window.innerWidth - 240) }); } setShowInsertMenu(!showInsertMenu); }} title="Insert tool snippet">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-                  <span style={{ marginLeft: 2, fontSize: '11px' }}>MCP</span>
-                </button>
-                {showInsertMenu && insertMenuPos && (
-                  <div className="md-insert-menu" style={{ top: insertMenuPos.top, left: insertMenuPos.left }}>
-                    {[
-                      { type: 'direct', name: 'search' },
-                      { type: 'sep' },
-                      { type: 'direct', name: 'search_markdowns' }, { type: 'direct', name: 'write_markdown' },
-                      { type: 'lookup', name: 'read_markdown' }, { type: 'lookup', name: 'update_markdown' }, { type: 'lookup', name: 'delete_markdown' },
-                      { type: 'sep' },
-                      { type: 'direct', name: 'search_action_items' }, { type: 'direct', name: 'write_action_item' },
-                      { type: 'lookup', name: 'read_action_item' }, { type: 'lookup', name: 'update_action_item' }, { type: 'lookup', name: 'delete_action_item' },
-                      { type: 'sep' },
-                      { type: 'direct', name: 'list_all_categories' }, { type: 'direct', name: 'write_category' },
-                      { type: 'lookup', name: 'update_category' }, { type: 'lookup', name: 'delete_category' },
-                      { type: 'sep' },
-                      { type: 'direct', name: 'search_links' }, { type: 'direct', name: 'write_link' },
-                      { type: 'lookup', name: 'update_link' }, { type: 'lookup', name: 'delete_link' },
-                      { type: 'sep' },
-                      { type: 'direct', name: 'list_documents' }, { type: 'direct', name: 'upload_document' },
-                      { type: 'lookup', name: 'delete_document' },
-                      { type: 'sep' },
-                      { type: 'direct', name: 'search_feeds' }, { type: 'lookup', name: 'read_feed_posts' },
-                      { type: 'lookup', name: 'write_feed_post' }, { type: 'lookup', name: 'delete_feed_post' },
-                      { type: 'sep' },
-                      { type: 'direct', name: 'list_all_universes' }, { type: 'direct', name: 'set_default_universe' },
-                      { type: 'sep' },
-                      { type: 'direct', name: 'get_stats' },
-                    ].map((item, i) => item.type === 'sep' ? (
-                      <div key={`sep-${i}`} className="md-insert-menu-sep" />
-                    ) : item.type === 'lookup' ? (
-                      <div key={item.name} className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); setMcpLookup(item.name); }}>{item.name}</div>
-                    ) : (
-                      <div key={item.name} className="md-insert-menu-item" onClick={() => { setShowInsertMenu(false); if (UNIVERSE_TOOLS.has(item.name)) { setUniversePicker(item.name); } else { insertText(MCP_DIRECT_TEMPLATES[item.name]()); } }}>{item.name}</div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-            <textarea
-              ref={textareaRef}
-              className="md-textarea"
-              value={message}
-              onChange={e => setMessage(e.target.value)}
-              onKeyDown={handleMdTab}
-              placeholder="Write your prompt message..."
-              spellCheck
-            />
-          </div>
-        )}
-        {hasContent && (
-          <div className="prompt-chunk-info">
-            Will be sent as {chunks.length} message{chunks.length !== 1 ? 's' : ''} ({message.trim().length} chars, {MSG_CHUNK_LIMIT}/msg limit)
-          </div>
-        )}
-        {mcpLookup && <McpToolLookup tool={mcpLookup} onInsert={insertText} onClose={() => setMcpLookup(null)} />}
-        {universePicker && <McpUniversePicker tool={universePicker} onConfirm={(uid) => insertText(MCP_DIRECT_TEMPLATES[universePicker](uid))} onClose={() => setUniversePicker(null)} />}
-      </div>
-      <div className="prompt-form-actions">
-        <button type="submit" className="prompt-save-btn" disabled={!hasContent || !title.trim()}>
-          {initial.id ? 'Update' : 'Create'}
-        </button>
-        <button type="button" className="prompt-cancel-btn" onClick={onCancel}>Cancel</button>
-      </div>
-    </form>
-  )
-}
-
-function PromptItem({ s, onEdit, onClone, onDelete, onRun, onDragStart, onDragOver, onDrop }) {
-  const [running, setRunning] = useState(false)
-  const fullText = joinMessages(s.message)
-  const chunkCount = splitIntoChunks(fullText, MSG_CHUNK_LIMIT).length
-
-  const handleRun = async (e) => {
-    e.stopPropagation()
-    setRunning(true)
-    try { await onRun(s.id) } finally { setRunning(false) }
-  }
-
-  const isScheduled = s.cron_expr && s.cron_expr.trim()
-
-  return (
-    <div className="prompt-item" draggable onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData('prompt-id', String(s.id)); onDragStart?.(s.id) }}>
-      <div className="prompt-item-row1">
-        <span className="prompt-drag-handle">⠿</span>
-        <span className="prompt-title">{s.title || fullText.slice(0, 60)}</span>
-      </div>
-      <div className="prompt-item-row2" onMouseDown={e => e.stopPropagation()} onDragStart={e => e.preventDefault()}>
-        <span className="prompt-channel">{s.channel}</span>
-        {chunkCount > 1 && <span className="prompt-msg-badge">{chunkCount} msgs</span>}
-        {isScheduled ? (
-          <code className="prompt-cron">{s.cron_expr}</code>
-        ) : (
-          <span className="prompt-ondemand-badge">On-demand</span>
-        )}
-      </div>
-      <div className="prompt-item-row3" onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()} onDragStart={e => e.preventDefault()}>
-        <button className="prompt-inline-btn" onClick={() => onEdit(s)} title="Edit">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-          </svg>
-          Edit
-        </button>
-        <button className="prompt-inline-btn" onClick={() => onClone(s)} title="Clone">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-          </svg>
-          Clone
-        </button>
-        <button className="prompt-inline-btn run" onClick={handleRun} disabled={running} title="Run now">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polygon points="5 3 19 12 5 21 5 3" />
-          </svg>
-          Run
-        </button>
-        <button className="prompt-inline-btn delete" onClick={() => onDelete(s.id)} title="Delete">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-            <path d="M10 11v6" /><path d="M14 11v6" />
-          </svg>
-          Delete
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function PromptBoard({ categories, prompts, filterChannel, search, onEditPrompt, onClonePrompt, onDeletePrompt, onRunPrompt, onEditCategory, onDeleteCategory, onReorderCategories, onReorderPrompts, onAddPrompt }) {
-  const dragCatRef = useRef(null)
-  const dragPromptRef = useRef(null)
-  const dropTargetRef = useRef(null)
-
-  const filtered = prompts.filter(s =>
-    (!filterChannel || s.channel === filterChannel) &&
-    (!search || (s.title || '').toLowerCase().includes(search.toLowerCase()))
-  )
-
-  const cols = [0, 1, 2]
-  const catsByCol = {}
-  cols.forEach(c => { catsByCol[c] = categories.filter(cat => cat.col === c).sort((a, b) => a.sort_order - b.sort_order) })
-
-  const uncategorized = filtered.filter(p => !p.category_id || !categories.find(c => c.id === p.category_id))
-  const promptsByCat = {}
-  categories.forEach(c => { promptsByCat[c.id] = filtered.filter(p => p.category_id === c.id).sort((a, b) => a.sort_order - b.sort_order) })
-
-  const handleCatDragStart = (catId, e) => {
-    dragCatRef.current = catId
-    dragPromptRef.current = null
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('cat-id', String(catId))
-  }
-
-  const handleCatDrop = (targetCol, targetOrder, e) => {
-    e.preventDefault()
-    const draggedId = dragCatRef.current
-    if (draggedId == null) return
-    const allCats = [...categories]
-    const dragged = allCats.find(c => c.id === draggedId)
-    if (!dragged) return
-
-    const otherInCol = allCats.filter(c => c.col === targetCol && c.id !== draggedId).sort((a, b) => a.sort_order - b.sort_order)
-    otherInCol.splice(targetOrder, 0, { ...dragged, col: targetCol })
-    const ordering = otherInCol.map((c, i) => ({ id: c.id, col: targetCol, sort_order: i }))
-    allCats.filter(c => c.col !== targetCol && c.id !== draggedId).forEach(c => ordering.push({ id: c.id, col: c.col, sort_order: c.sort_order }))
-    onReorderCategories(ordering)
-    dragCatRef.current = null
-  }
-
-  const handlePromptDragStart = (promptId, e) => {
-    dragPromptRef.current = promptId
-    dragCatRef.current = null
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('prompt-id', String(promptId))
-  }
-
-  const handlePromptDropOnCat = (catId, targetOrder, e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    const draggedId = dragPromptRef.current
-    if (draggedId == null) return
-
-    const catPrompts = prompts.filter(p => p.category_id === catId && p.id !== draggedId).sort((a, b) => a.sort_order - b.sort_order)
-    catPrompts.splice(targetOrder, 0, prompts.find(p => p.id === draggedId))
-    const ordering = catPrompts.map((p, i) => ({ id: p.id, category_id: catId, sort_order: i }))
-    prompts.filter(p => p.category_id !== catId && p.id !== draggedId).forEach(p => ordering.push({ id: p.id, category_id: p.category_id, sort_order: p.sort_order }))
-    onReorderPrompts(ordering)
-    dragPromptRef.current = null
-  }
-
-  const handlePromptDropOnUncategorized = (targetOrder, e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    const draggedId = dragPromptRef.current
-    if (draggedId == null) return
-
-    const uncatPrompts = uncategorized.filter(p => p.id !== draggedId).sort((a, b) => a.sort_order - b.sort_order)
-    uncatPrompts.splice(targetOrder, 0, prompts.find(p => p.id === draggedId))
-    const ordering = uncatPrompts.map((p, i) => ({ id: p.id, category_id: null, sort_order: i }))
-    prompts.filter(p => p.category_id && categories.find(c => c.id === p.category_id) && p.id !== draggedId).forEach(p => ordering.push({ id: p.id, category_id: p.category_id, sort_order: p.sort_order }))
-    onReorderPrompts(ordering)
-    dragPromptRef.current = null
-  }
-
-  const renderCatContainer = (cat) => {
-    const catPrompts = promptsByCat[cat.id] || []
-    return (
-      <div
-        key={cat.id}
-        className="prompt-cat-container"
-        draggable
-        onDragStart={e => handleCatDragStart(cat.id, e)}
-        onDragOver={e => e.preventDefault()}
-        onDrop={e => {
-          if (dragCatRef.current != null) handleCatDrop(cat.col, cat.sort_order, e)
-        }}
-      >
-        <div className="prompt-cat-header">
-          <span className="prompt-cat-emoji">{cat.emoji}</span>
-          <span className="prompt-cat-name">{cat.name}</span>
-          <div className="prompt-cat-actions">
-            <button className="prompt-cat-action-btn" onClick={() => onEditCategory(cat)} title="Edit category">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </button>
-            <button className="prompt-cat-action-btn delete" onClick={() => onDeleteCategory(cat.id)} title="Delete category">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
-            </button>
-          </div>
-        </div>
-        <div className="prompt-cat-body" onDragOver={e => e.preventDefault()} onDrop={e => { if (dragPromptRef.current != null) handlePromptDropOnCat(cat.id, catPrompts.length, e) }}>
-          {catPrompts.length === 0 && (
-            <div className="prompt-cat-empty">
-              Drop prompts here
-            </div>
-          )}
-          {catPrompts.map((s, idx) => (
-            <div key={s.id} className="prompt-drop-zone" onDragOver={e => { e.preventDefault(); e.stopPropagation() }} onDrop={e => { e.stopPropagation(); handlePromptDropOnCat(cat.id, idx, e) }}>
-              <PromptItem
-                s={s}
-                onEdit={onEditPrompt}
-                onClone={onClonePrompt}
-                onDelete={onDeletePrompt}
-                onRun={onRunPrompt}
-                onDragStart={(id) => { dragPromptRef.current = id; dragCatRef.current = null }}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="prompt-board">
-      <div className="prompt-board-columns">
-        {cols.map(colIdx => (
-          <div
-            key={colIdx}
-            className="prompt-board-col"
-            onDragOver={e => e.preventDefault()}
-            onDrop={e => {
-              if (dragCatRef.current != null) handleCatDrop(colIdx, (catsByCol[colIdx] || []).length, e)
-            }}
-          >
-            {(catsByCol[colIdx] || []).map(cat => renderCatContainer(cat))}
-          </div>
-        ))}
-      </div>
-      {uncategorized.length > 0 && (
-        <div
-          className="prompt-cat-container prompt-cat-uncategorized"
-          onDragOver={e => e.preventDefault()}
-          onDrop={e => handlePromptDropOnUncategorized(uncategorized.length, e)}
-        >
-          <div className="prompt-cat-header">
-            <span className="prompt-cat-emoji">📋</span>
-            <span className="prompt-cat-name">Uncategorized</span>
-            <span className="prompt-cat-count">{uncategorized.length}</span>
-          </div>
-          <div className="prompt-cat-body" onDragOver={e => e.preventDefault()} onDrop={e => { if (dragPromptRef.current != null) handlePromptDropOnUncategorized(uncategorized.length, e) }}>
-            {uncategorized.map((s, idx) => (
-              <div key={s.id} className="prompt-drop-zone" onDragOver={e => { e.preventDefault(); e.stopPropagation() }} onDrop={e => { e.stopPropagation(); handlePromptDropOnUncategorized(idx, e) }}>
-                <PromptItem
-                  s={s}
-                  onEdit={onEditPrompt}
-                  onClone={onClonePrompt}
-                  onDelete={onDeletePrompt}
-                  onRun={onRunPrompt}
-                  onDragStart={(id) => { dragPromptRef.current = id; dragCatRef.current = null }}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {categories.length === 0 && uncategorized.length === 0 && (
-        <div className="prompt-empty">No prompts yet. Create a category and add some prompts!</div>
-      )}
-    </div>
-  )
-}
-
 function App() {
   const [input, setInput] = useState('')
   const [stats, setStats] = useState(null)
@@ -1361,16 +728,11 @@ function App() {
   const lastSeenTsRef = useRef({})
   const ircNickRef = useRef(ircNick)
   useEffect(() => { ircNickRef.current = ircNick }, [ircNick])
-  const [showPromptPanel, setShowPromptPanel] = useState(false)
-  const [prompts, setPrompts] = useState([])
-  const [promptEditing, setPromptEditing] = useState(null)
-  const [promptFilterChannel, setPromptFilterChannel] = useState('')
-  const [promptSearch, setPromptSearch] = useState('')
-  const [promptCategories, setPromptCategories] = useState([])
-  const [editingPromptCat, setEditingPromptCat] = useState(null)
   const [universes, setUniverses] = useState([])
   const [currentUniverseId, setCurrentUniverseId] = useState(null)
   const [sidebarTab, setSidebarTab] = useState('actions')
+  const [sidebarLoading, setSidebarLoading] = useState(false)
+  useEffect(() => { if (sidebarTab !== 'categories') setSidebarLoading(true) }, [sidebarTab])
   const [categories, setCategories] = useState([])
   const [selectedCategoryId, setSelectedCategoryId] = useState(null) // kept for CategoryTree (unused for filtering)
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -1387,6 +749,7 @@ function App() {
 
   const [tabs, setTabs] = useState([
     { id: 'irc', type: 'irc', title: 'Agent Network', closable: false },
+    { id: 'agent-tasks', type: 'agent-tasks', title: 'Agent Tasks', closable: false },
   ])
   const [activeTabId, setActiveTabId] = useState('irc')
   const [markdownViewMode, setMarkdownViewMode] = useState('edit')
@@ -1501,70 +864,6 @@ function App() {
       .then(r => r.json())
       .then(setIrcUsers)
       .catch(() => {})
-  }
-
-  const fetchPrompts = () => {
-    fetch('/api/prompts')
-      .then(r => r.json())
-      .then(setPrompts)
-      .catch(() => {})
-  }
-
-  const fetchPromptCategories = () => {
-    fetch('/api/prompt-categories')
-      .then(r => r.json())
-      .then(setPromptCategories)
-      .catch(() => {})
-  }
-
-  const savePromptCategory = async (data) => {
-    const method = data.id ? 'PUT' : 'POST'
-    const url = data.id ? `/api/prompt-categories/${data.id}` : '/api/prompt-categories'
-    await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
-    fetchPromptCategories()
-    setEditingPromptCat(null)
-  }
-
-  const deletePromptCategory = async (id) => {
-    if (!confirm('Delete this category? Prompts will become uncategorized.')) return
-    await fetch(`/api/prompt-categories/${id}`, { method: 'DELETE' })
-    fetchPromptCategories()
-    fetchPrompts()
-  }
-
-  const reorderPromptCategories = async (ordering) => {
-    await fetch('/api/prompt-categories/reorder', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ordering }) })
-    fetchPromptCategories()
-  }
-
-  const reorderPrompts = async (ordering) => {
-    await fetch('/api/prompts/reorder', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ordering }) })
-    fetchPrompts()
-  }
-
-  const savePrompt = async (data) => {
-    const method = data.id ? 'PUT' : 'POST'
-    const url = data.id ? `/api/prompts/${data.id}` : '/api/prompts'
-    await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
-    fetchPrompts()
-    setPromptEditing(null)
-  }
-
-  const deletePrompt = async (id) => {
-    if (!confirm('Delete this prompt?')) return
-    await fetch(`/api/prompts/${id}`, { method: 'DELETE' })
-    fetchPrompts()
-  }
-
-  const runPromptNow = async (id) => {
-    try {
-      await fetch(`/api/prompts/${id}/run`, { method: 'POST' })
-      fetchPrompts()
-    } catch {}
   }
 
   const hideChannel = (name) => {
@@ -2239,6 +1538,9 @@ function App() {
           {activeTab.type === 'irc' && (
             <span className="header-chat-label">Agent Network</span>
           )}
+          {activeTab.type === 'agent-tasks' && (
+            <span className="header-chat-label">Agent Tasks</span>
+          )}
           {activeTab.type === 'markdown' && (
             <div className="markdown-mode-toggle">
               <button className={`markdown-mode-btn ${markdownViewMode === 'edit' ? 'active' : ''}`} onClick={() => setMarkdownViewMode('edit')}>Edit</button>
@@ -2347,6 +1649,11 @@ function App() {
             </button>
           </div>
           <div className="sidebar-content">
+          {sidebarLoading && (
+            <div className="sidebar-spinner-overlay">
+              <div className="sidebar-spinner" />
+            </div>
+          )}
           {sidebarTab === 'categories' && (
             <div className="categories-panel">
               <div className="markdowns-header">
@@ -2372,6 +1679,7 @@ function App() {
               universeId={currentUniverseId}
               onEditMarkdown={(m) => openMarkdownTab(m._new ? { ...m, _key: 'new' } : m)}
               refreshKey={markdownRefreshKey}
+              onLoaded={() => setSidebarLoading(false)}
             />
           )}
           {sidebarTab === 'archive' && (
@@ -2379,6 +1687,7 @@ function App() {
               categories={categories}
               onPinChange={fetchPinned}
               universeId={currentUniverseId}
+              onLoaded={() => setSidebarLoading(false)}
             />
           )}
           {sidebarTab === 'links' && (
@@ -2386,6 +1695,7 @@ function App() {
               categories={categories}
               onPinChange={fetchPinned}
               universeId={currentUniverseId}
+              onLoaded={() => setSidebarLoading(false)}
             />
           )}
           {sidebarTab === 'feeds' && (
@@ -2398,6 +1708,7 @@ function App() {
               onViewPosts={(cat) => openFeedTab(cat)}
               unreadCounts={feedUnreadCounts}
               recent7dCounts={feedRecent7d}
+              onLoaded={() => setSidebarLoading(false)}
             />
           )}
           {sidebarTab === 'diagrams' && (
@@ -2407,6 +1718,7 @@ function App() {
               onPinChange={fetchPinned}
               onEditDiagram={(d) => openDiagramTab(d._new ? { ...d, _key: 'new' } : d)}
               refreshKey={diagramRefreshKey}
+              onLoaded={() => setSidebarLoading(false)}
             />
           )}
           {sidebarTab === 'tables' && (
@@ -2416,12 +1728,14 @@ function App() {
               onPinChange={fetchPinned}
               onEditTable={(t) => openTableTab(t._new ? { ...t, _key: 'new' } : t)}
               refreshKey={tableRefreshKey}
+              onLoaded={() => setSidebarLoading(false)}
             />
           )}
           {sidebarTab === 'actions' && (
             <ActionItemsPanel
               categories={categories}
               universeId={currentUniverseId}
+              onLoaded={() => setSidebarLoading(false)}
               onOpenMarkdown={(markdownId) => {
                 fetch(`/api/markdowns/${markdownId}`).then(r => {
                   if (!r.ok) return
@@ -2540,6 +1854,8 @@ function App() {
               onClose={() => { closeTab(activeTab.id); fetchUnreadCounts() }}
               onUnreadChange={fetchUnreadCounts}
             />
+          ) : activeTab.type === 'agent-tasks' ? (
+            <AgentTasksPanel universeId={currentUniverseId} />
           ) : activeTab.type === 'irc' ? (
             <div className="irc-layout">
               <div className="irc-channel-tabs">
@@ -2599,16 +1915,6 @@ function App() {
                     {hiddenChannels.length} hidden
                   </button>
                 )}
-                <button
-                  className="irc-channel-tab irc-prompt-tab"
-                  onClick={() => { setShowPromptPanel(true); fetchPrompts(); fetchPromptCategories() }}
-                  title="Prompts"
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
-                  </svg>
-                  Prompts
-                </button>
               </div>
               <div className="irc-chat-body">
                 <div className="chat-toolbar">
@@ -2736,12 +2042,6 @@ function App() {
       {showSettings && (
         <SettingsDialog
           onClose={() => setShowSettings(false)}
-          onRestored={() => {
-            fetchCategories()
-            fetchPinned()
-            fetchUnreadCounts()
-            fetch('/api/stats').then(r => r.json()).then(d => setStats(d)).catch(() => {})
-          }}
         />
       )}
       {showUniverseManager && (
@@ -2752,93 +2052,6 @@ function App() {
           onClose={() => setShowUniverseManager(false)}
           onRefresh={fetchUniverses}
         />
-      )}
-      {showPromptPanel && (
-        <div className="prompt-modal-overlay">
-          <div className="prompt-modal prompt-modal-board">
-            <div className="prompt-panel-header">
-              <h3>Prompts</h3>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <select className="prompt-filter-select" value={promptFilterChannel} onChange={e => setPromptFilterChannel(e.target.value)}>
-                  <option value="">All channels</option>
-                  {[...new Set(prompts.map(s => s.channel))].sort().map(ch => (
-                    <option key={ch} value={ch}>{ch}</option>
-                  ))}
-                </select>
-                <input
-                  className="prompt-search-input prompt-search-header"
-                  value={promptSearch}
-                  onChange={e => setPromptSearch(e.target.value)}
-                  placeholder="Search..."
-                />
-                <button className="prompt-add-btn" onClick={() => setEditingPromptCat({ name: '', emoji: '📁', col: 0, sort_order: promptCategories.length })}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                    <line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" />
-                  </svg>
-                  Category
-                </button>
-                <button className="prompt-add-btn" onClick={() => setPromptEditing({ channel: '#astro', message: '', cron_expr: '' })}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                  Prompt
-                </button>
-                <button className="quickview-close" onClick={() => { setShowPromptPanel(false); setPromptEditing(null); setEditingPromptCat(null); setPromptFilterChannel(''); setPromptSearch('') }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            {promptEditing ? (
-              <PromptForm
-                initial={promptEditing}
-                channels={ircChannels}
-                categories={promptCategories}
-                onSave={savePrompt}
-                onCancel={() => setPromptEditing(null)}
-              />
-            ) : editingPromptCat ? (
-              <form className="prompt-form" onSubmit={e => { e.preventDefault(); savePromptCategory(editingPromptCat) }}>
-                <div className="prompt-form-row">
-                  <label>Category Name</label>
-                  <input className="prompt-form-input" value={editingPromptCat.name} onChange={e => setEditingPromptCat(p => ({ ...p, name: e.target.value }))} placeholder="Category name..." maxLength={50} autoFocus />
-                </div>
-                <div className="prompt-form-row">
-                  <label>Emoji</label>
-                  <div className="prompt-cat-emoji-row emoji-trigger-lg">
-                    <EmojiPopover
-                      emoji={editingPromptCat.emoji}
-                      onSelect={(emoji) => setEditingPromptCat(p => ({ ...p, emoji }))}
-                      onClear={() => setEditingPromptCat(p => ({ ...p, emoji: '📁' }))}
-                    />
-                  </div>
-                </div>
-                <div className="prompt-form-actions">
-                  <button type="submit" className="prompt-save-btn" disabled={!editingPromptCat.name.trim()}>{editingPromptCat.id ? 'Update' : 'Create'}</button>
-                  <button type="button" className="prompt-cancel-btn" onClick={() => setEditingPromptCat(null)}>Cancel</button>
-                </div>
-              </form>
-            ) : (
-              <PromptBoard
-                categories={promptCategories}
-                prompts={prompts}
-                filterChannel={promptFilterChannel}
-                search={promptSearch}
-                onEditPrompt={setPromptEditing}
-                onClonePrompt={(p) => setPromptEditing({ ...p, id: undefined, title: `${p.title || ''} (copy)`.trim() })}
-                onDeletePrompt={deletePrompt}
-                onRunPrompt={runPromptNow}
-                onEditCategory={setEditingPromptCat}
-                onDeleteCategory={deletePromptCategory}
-                onReorderCategories={reorderPromptCategories}
-                onReorderPrompts={reorderPrompts}
-                onAddPrompt={(catId) => setPromptEditing({ channel: '#astro', message: '', cron_expr: '', category_id: catId || null })}
-              />
-            )}
-          </div>
-        </div>
       )}
       {showHiddenChannels && (
         <div className="quickview-overlay">

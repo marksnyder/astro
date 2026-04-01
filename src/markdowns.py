@@ -1369,200 +1369,6 @@ def post_comment_to_dict(c: PostComment) -> dict:
     return asdict(c)
 
 
-# ── Prompts CRUD ──────────────────────────────────────────────────────────
-
-
-@dataclass
-class Prompt:
-    id: int | None
-    title: str
-    channel: str
-    message: str
-    cron_expr: str
-    enabled: bool
-    created_at: str
-    updated_at: str
-    last_run_at: str | None
-    category_id: int | None = None
-    sort_order: int = 0
-
-
-def _row_to_prompt(row: sqlite3.Row) -> Prompt:
-    keys = row.keys()
-    return Prompt(
-        id=row["id"],
-        title=row["title"],
-        channel=row["channel"],
-        message=row["message"],
-        cron_expr=row["cron_expr"],
-        enabled=bool(row["enabled"]),
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
-        last_run_at=row["last_run_at"],
-        category_id=row["category_id"] if "category_id" in keys else None,
-        sort_order=row["sort_order"] if "sort_order" in keys else 0,
-    )
-
-
-def list_prompts() -> list[Prompt]:
-    conn = _get_conn()
-    rows = conn.execute("SELECT * FROM prompts ORDER BY sort_order, created_at DESC").fetchall()
-    conn.close()
-    return [_row_to_prompt(r) for r in rows]
-
-
-def get_prompt(prompt_id: int) -> Prompt | None:
-    conn = _get_conn()
-    row = conn.execute("SELECT * FROM prompts WHERE id = ?", (prompt_id,)).fetchone()
-    conn.close()
-    return _row_to_prompt(row) if row else None
-
-
-def create_prompt(channel: str, message: str, cron_expr: str = "", title: str = "", category_id: int | None = None, sort_order: int = 0) -> Prompt:
-    now = _now()
-    conn = _get_conn()
-    cur = conn.execute(
-        "INSERT INTO prompts (title, channel, message, cron_expr, enabled, created_at, updated_at, category_id, sort_order) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)",
-        (title, channel, message, cron_expr, now, now, category_id, sort_order),
-    )
-    conn.commit()
-    mid = cur.lastrowid
-    conn.close()
-    return get_prompt(mid)  # type: ignore[return-value]
-
-
-def update_prompt(prompt_id: int, channel: str, message: str, cron_expr: str = "", title: str = "", category_id: int | None = None, sort_order: int = 0) -> Prompt | None:
-    now = _now()
-    conn = _get_conn()
-    cur = conn.execute(
-        "UPDATE prompts SET title = ?, channel = ?, message = ?, cron_expr = ?, enabled = 1, updated_at = ?, category_id = ?, sort_order = ? WHERE id = ?",
-        (title, channel, message, cron_expr, now, category_id, sort_order, prompt_id),
-    )
-    conn.commit()
-    conn.close()
-    if cur.rowcount == 0:
-        return None
-    return get_prompt(prompt_id)
-
-
-def delete_prompt(prompt_id: int) -> bool:
-    conn = _get_conn()
-    cur = conn.execute("DELETE FROM prompts WHERE id = ?", (prompt_id,))
-    conn.commit()
-    conn.close()
-    return cur.rowcount > 0
-
-
-def mark_prompt_run(prompt_id: int) -> None:
-    now = _now()
-    conn = _get_conn()
-    conn.execute("UPDATE prompts SET last_run_at = ? WHERE id = ?", (now, prompt_id))
-    conn.commit()
-    conn.close()
-
-
-def prompt_to_dict(p: Prompt) -> dict:
-    return asdict(p)
-
-
-# ── Prompt Categories CRUD ───────────────────────────────────────────────
-
-
-@dataclass
-class PromptCategory:
-    id: int | None
-    name: str
-    emoji: str
-    col: int
-    sort_order: int
-
-
-def _row_to_prompt_category(row: sqlite3.Row) -> PromptCategory:
-    return PromptCategory(
-        id=row["id"],
-        name=row["name"],
-        emoji=row["emoji"],
-        col=row["col"],
-        sort_order=row["sort_order"],
-    )
-
-
-def list_prompt_categories() -> list[PromptCategory]:
-    conn = _get_conn()
-    rows = conn.execute("SELECT * FROM prompt_categories ORDER BY col, sort_order").fetchall()
-    conn.close()
-    return [_row_to_prompt_category(r) for r in rows]
-
-
-def get_prompt_category(cat_id: int) -> PromptCategory | None:
-    conn = _get_conn()
-    row = conn.execute("SELECT * FROM prompt_categories WHERE id = ?", (cat_id,)).fetchone()
-    conn.close()
-    return _row_to_prompt_category(row) if row else None
-
-
-def create_prompt_category(name: str, emoji: str = "📁", col: int = 0, sort_order: int = 0) -> PromptCategory:
-    conn = _get_conn()
-    cur = conn.execute(
-        "INSERT INTO prompt_categories (name, emoji, col, sort_order) VALUES (?, ?, ?, ?)",
-        (name, emoji, col, sort_order),
-    )
-    conn.commit()
-    cid = cur.lastrowid
-    conn.close()
-    return get_prompt_category(cid)  # type: ignore[return-value]
-
-
-def update_prompt_category(cat_id: int, name: str, emoji: str, col: int, sort_order: int) -> PromptCategory | None:
-    conn = _get_conn()
-    cur = conn.execute(
-        "UPDATE prompt_categories SET name = ?, emoji = ?, col = ?, sort_order = ? WHERE id = ?",
-        (name, emoji, col, sort_order, cat_id),
-    )
-    conn.commit()
-    conn.close()
-    if cur.rowcount == 0:
-        return None
-    return get_prompt_category(cat_id)
-
-
-def delete_prompt_category(cat_id: int) -> bool:
-    conn = _get_conn()
-    conn.execute("UPDATE prompts SET category_id = NULL WHERE category_id = ?", (cat_id,))
-    cur = conn.execute("DELETE FROM prompt_categories WHERE id = ?", (cat_id,))
-    conn.commit()
-    conn.close()
-    return cur.rowcount > 0
-
-
-def reorder_prompt_categories(ordering: list[dict]) -> None:
-    """Accept [{"id": 1, "col": 0, "sort_order": 0}, ...] and batch-update."""
-    conn = _get_conn()
-    for item in ordering:
-        conn.execute(
-            "UPDATE prompt_categories SET col = ?, sort_order = ? WHERE id = ?",
-            (item["col"], item["sort_order"], item["id"]),
-        )
-    conn.commit()
-    conn.close()
-
-
-def reorder_prompts(ordering: list[dict]) -> None:
-    """Accept [{"id": 1, "category_id": 2, "sort_order": 0}, ...] and batch-update."""
-    conn = _get_conn()
-    for item in ordering:
-        conn.execute(
-            "UPDATE prompts SET category_id = ?, sort_order = ? WHERE id = ?",
-            (item.get("category_id"), item["sort_order"], item["id"]),
-        )
-    conn.commit()
-    conn.close()
-
-
-def prompt_category_to_dict(c: PromptCategory) -> dict:
-    return asdict(c)
-
-
 # ── Diagrams CRUD ─────────────────────────────────────────────────────────
 
 
@@ -1883,3 +1689,208 @@ def delete_table_row(row_id: int) -> bool:
 
 def table_row_to_dict(r: TableRow) -> dict:
     return asdict(r)
+
+
+# ── Agent Tasks (IRC delivery of markdown instructions) ────────────────────
+
+
+@dataclass
+class AgentTask:
+    id: int | None
+    title: str
+    markdown_id: int
+    channel: str
+    universe_id: int
+    schedule_mode: str  # manual | cron | once
+    cron_expr: str | None
+    run_at: str | None
+    enabled: bool
+    last_run_at: str | None
+    created_at: str
+    updated_at: str
+
+
+def _row_to_agent_task(row: sqlite3.Row) -> AgentTask:
+    return AgentTask(
+        id=row["id"],
+        title=row["title"],
+        markdown_id=row["markdown_id"],
+        channel=row["channel"],
+        universe_id=row["universe_id"],
+        schedule_mode=row["schedule_mode"],
+        cron_expr=row["cron_expr"],
+        run_at=row["run_at"],
+        enabled=bool(row["enabled"]),
+        last_run_at=row["last_run_at"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )
+
+
+def _compute_next_run_preview(t: AgentTask) -> str | None:
+    """ISO timestamp of next scheduled execution, or None if not applicable."""
+    if not t.enabled:
+        return None
+    now = datetime.now(timezone.utc)
+    if t.schedule_mode == "manual":
+        return None
+    if t.schedule_mode == "once":
+        if not t.run_at:
+            return None
+        try:
+            dt = datetime.fromisoformat(t.run_at.replace("Z", "+00:00"))
+            if dt > now:
+                return t.run_at
+        except (ValueError, TypeError):
+            return None
+        return None
+    if t.schedule_mode == "cron" and t.cron_expr and t.cron_expr.strip():
+        try:
+            from croniter import croniter
+
+            if not croniter.is_valid(t.cron_expr.strip()):
+                return None
+            c = croniter(t.cron_expr.strip(), now)
+            nxt = c.get_next(datetime)
+            if nxt.tzinfo is None:
+                nxt = nxt.replace(tzinfo=timezone.utc)
+            return nxt.isoformat()
+        except Exception:
+            return None
+    return None
+
+
+def agent_task_to_dict(t: AgentTask, markdown_title: str | None = None) -> dict:
+    d = asdict(t)
+    d["next_run_at"] = _compute_next_run_preview(t)
+    d["markdown_title"] = markdown_title
+    return d
+
+
+def list_agent_tasks(universe_id: int | None = None) -> list[AgentTask]:
+    conn = _get_conn()
+    if universe_id is not None:
+        rows = conn.execute(
+            "SELECT * FROM agent_tasks WHERE universe_id = ? ORDER BY title COLLATE NOCASE",
+            (universe_id,),
+        ).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM agent_tasks ORDER BY title COLLATE NOCASE").fetchall()
+    conn.close()
+    return [_row_to_agent_task(r) for r in rows]
+
+
+def get_agent_task(task_id: int) -> AgentTask | None:
+    conn = _get_conn()
+    row = conn.execute("SELECT * FROM agent_tasks WHERE id = ?", (task_id,)).fetchone()
+    conn.close()
+    return _row_to_agent_task(row) if row else None
+
+
+def create_agent_task(
+    title: str,
+    markdown_id: int,
+    channel: str,
+    universe_id: int,
+    schedule_mode: str,
+    cron_expr: str | None = None,
+    run_at: str | None = None,
+    enabled: bool = True,
+) -> AgentTask:
+    now = _now()
+    conn = _get_conn()
+    cur = conn.execute(
+        """
+        INSERT INTO agent_tasks (
+            title, markdown_id, channel, universe_id, schedule_mode, cron_expr, run_at,
+            enabled, last_run_at, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+        """,
+        (
+            title.strip(),
+            markdown_id,
+            channel.strip(),
+            universe_id,
+            schedule_mode,
+            (cron_expr or "").strip() or None,
+            run_at,
+            int(enabled),
+            now,
+            now,
+        ),
+    )
+    conn.commit()
+    tid = cur.lastrowid
+    conn.close()
+    return get_agent_task(tid)  # type: ignore[return-value]
+
+
+def update_agent_task(
+    task_id: int,
+    title: str,
+    markdown_id: int,
+    channel: str,
+    universe_id: int,
+    schedule_mode: str,
+    cron_expr: str | None = None,
+    run_at: str | None = None,
+    enabled: bool = True,
+) -> AgentTask | None:
+    now = _now()
+    conn = _get_conn()
+    cur = conn.execute(
+        """
+        UPDATE agent_tasks SET
+            title = ?, markdown_id = ?, channel = ?, universe_id = ?,
+            schedule_mode = ?, cron_expr = ?, run_at = ?, enabled = ?, updated_at = ?
+        WHERE id = ?
+        """,
+        (
+            title.strip(),
+            markdown_id,
+            channel.strip(),
+            universe_id,
+            schedule_mode,
+            (cron_expr or "").strip() or None,
+            run_at,
+            int(enabled),
+            now,
+            task_id,
+        ),
+    )
+    conn.commit()
+    conn.close()
+    if cur.rowcount == 0:
+        return None
+    return get_agent_task(task_id)
+
+
+def delete_agent_task(task_id: int) -> bool:
+    conn = _get_conn()
+    cur = conn.execute("DELETE FROM agent_tasks WHERE id = ?", (task_id,))
+    conn.commit()
+    conn.close()
+    return cur.rowcount > 0
+
+
+def mark_agent_task_run(task_id: int) -> None:
+    """Record last run; if one-time schedule, clear it."""
+    now = _now()
+    conn = _get_conn()
+    row = conn.execute("SELECT schedule_mode FROM agent_tasks WHERE id = ?", (task_id,)).fetchone()
+    if not row:
+        conn.close()
+        return
+    mode = row["schedule_mode"]
+    if mode == "once":
+        conn.execute(
+            "UPDATE agent_tasks SET last_run_at = ?, schedule_mode = 'manual', run_at = NULL, updated_at = ? WHERE id = ?",
+            (now, now, task_id),
+        )
+    else:
+        conn.execute(
+            "UPDATE agent_tasks SET last_run_at = ?, updated_at = ? WHERE id = ?",
+            (now, now, task_id),
+        )
+    conn.commit()
+    conn.close()

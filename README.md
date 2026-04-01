@@ -40,9 +40,6 @@ A parent/child category tree organizes content across markdowns, documents, tabl
 ### Pinned Items Bar
 Pin important markdowns, documents, diagrams, tables, links, and feeds to a unified header bar for quick access.
 
-### Prompts
-Organize and send reusable messages to Agent Network channels on demand or via cron. Create prompt categories with custom emoji labels and arrange them in a 3-column board layout with drag-and-drop. Each prompt has a target channel, message body, and optional cron schedule. Move prompts between categories, reorder them by dragging, and run any prompt instantly from the UI or let the scheduler fire it automatically.
-
 ### Feeds
 Ingest data from external services into Astro through authenticated API endpoints. Each feed has its own API key and accepts markdown or file uploads via a simple HTTP POST. Incoming artifacts are stored in a timeline view, organized by category, with full search, pagination, and pinning support. Use feeds to pipe CI reports, monitoring alerts, automated summaries, or any external content into your workspace.
 

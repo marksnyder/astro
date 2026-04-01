@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
 
-function LinksPanel({ categories, onPinChange, universeId }) {
+function LinksPanel({ categories, onPinChange, universeId, onLoaded }) {
   const [links, setLinks] = useState([])
   const [search, setSearch] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
@@ -24,6 +24,7 @@ function LinksPanel({ categories, onPinChange, universeId }) {
       .then(res => res.json())
       .then(data => setLinks(data))
       .catch(() => {})
+      .finally(() => onLoaded?.())
   }
 
   useEffect(() => { fetchLinks() }, [universeId])
