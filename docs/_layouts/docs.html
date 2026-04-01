@@ -1,0 +1,21 @@
+---
+layout: default
+---
+<div class="docs-layout">
+  <aside class="docs-sidebar" aria-label="Documentation table of contents">
+    {% include docs-sidebar.html %}
+  </aside>
+  <div class="docs-main">
+    <div class="page-header">
+      <div class="page-header-inner">
+        <h1>{{ page.title }}</h1>
+        {% if page.subtitle %}<p class="page-subtitle">{{ page.subtitle }}</p>{% endif %}
+      </div>
+    </div>
+    <div class="page-content docs-page-content">
+      <div class="page-inner">
+        {{ content }}
+      </div>
+    </div>
+  </div>
+</div>

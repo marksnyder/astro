@@ -1,0 +1,49 @@
+pages:
+  - id: home
+    title: Docs home
+    path: /docs/
+  - id: agent-network
+    title: AI Agent Network
+    path: /docs/agent-network/
+  - id: agent-tasks
+    title: Agent Tasks
+    path: /docs/agent-tasks/
+  - id: vector-search
+    title: Vector search & stats
+    path: /docs/vector-search/
+  - id: markdowns
+    title: Markdowns
+    path: /docs/markdowns/
+  - id: documents
+    title: Document archive
+    path: /docs/documents/
+  - id: diagrams
+    title: Diagrams
+    path: /docs/diagrams/
+  - id: tables
+    title: Tables
+    path: /docs/tables/
+  - id: action-items
+    title: Action items
+    path: /docs/action-items/
+  - id: bookmarks
+    title: Bookmarks
+    path: /docs/bookmarks/
+  - id: universes
+    title: Universes
+    path: /docs/universes/
+  - id: categories
+    title: Categories
+    path: /docs/categories/
+  - id: pinned-items
+    title: Pinned items
+    path: /docs/pinned-items/
+  - id: unified-search
+    title: Unified search (UI)
+    path: /docs/unified-search/
+  - id: mobile
+    title: Mobile interface
+    path: /docs/mobile/
+  - id: feeds
+    title: Feeds
+    path: /docs/feeds/

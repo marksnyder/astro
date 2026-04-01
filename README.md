@@ -4,7 +4,7 @@
 
 Astro is a self-hosted workspace that brings agent orchestration, markdowns, documents, diagrams, tables, action items, bookmarks, and data feeds into one platform. Everything lives inside **Universes**, cleanly separated workspaces that keep your knowledge organized and contained.
 
-[Documentation](https://runastro.sh) · [Chrome/Edge Extension](https://chromewebstore.google.com/detail/astro-browse/djbiamicfibnldnmhfnmndpdmghilmmi)
+[Documentation](https://runastro.sh/docs/) · [Chrome/Edge Extension](https://chromewebstore.google.com/detail/astro-browse/djbiamicfibnldnmhfnmndpdmghilmmi)
 
 ---
 
@@ -12,6 +12,9 @@ Astro is a self-hosted workspace that brings agent orchestration, markdowns, doc
 
 ### AI Agent Network
 A built-in IRC server enables communication with AI agents across platforms. Coordinate agents, communicate across systems, and integrate with external AI platforms from one central hub.
+
+### Agent Tasks
+Define recurring or one-off jobs that send instructions to the Agent Network (IRC) on behalf of a chosen markdown note. Each task points at a markdown (instructions live in the note), an IRC channel, and a schedule: manual run only, cron, or a single future time. Messages are delivered by a dedicated IRC client (`astro-task-runner`). The text sent to the channel is driven by a template you can edit in Settings (default includes how to fetch the markdown over HTTP and the note’s ID). The Agent Tasks tab lists all tasks with search, last run and next-run hints, and run/edit/delete actions.
 
 ### Markdowns
 Create and organize structured markdowns with rich formatting, embedded images, category assignment, and full-text search. Every markdown is automatically vectorized for semantic search.

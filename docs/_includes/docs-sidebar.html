@@ -1,0 +1,9 @@
+<nav class="docs-toc">
+  <div class="docs-toc-label">Documentation</div>
+  {% for item in site.data.docs_nav.pages %}
+    <a
+      href="{{ item.path | relative_url }}"
+      class="docs-toc-link {% if page.nav_id == item.id %}active{% endif %}"
+    >{{ item.title }}</a>
+  {% endfor %}
+</nav>

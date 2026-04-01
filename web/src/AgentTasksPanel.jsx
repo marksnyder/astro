@@ -401,8 +401,8 @@ export default function AgentTasksPanel({ universeId }) {
       </div>
 
       {modalOpen && (
-        <div className="markdown-modal-overlay" onClick={closeModal}>
-          <div className="agent-task-modal-box" onClick={(e) => e.stopPropagation()}>
+        <div className="markdown-modal-overlay">
+          <div className="agent-task-modal-box">
             <div className="markdown-modal-header">
               <span className="markdown-modal-title">{editingId ? 'Edit task' : 'New task'}</span>
               <button type="button" className="quickview-close" onClick={closeModal} aria-label="Close">
