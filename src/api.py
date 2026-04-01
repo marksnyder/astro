@@ -1072,7 +1072,12 @@ class SettingRequest(BaseModel):
 
 @app.get("/api/settings/{key}")
 def api_get_setting(key: str):
-    return {"key": key, "value": get_setting(key)}
+    out: dict = {"key": key, "value": get_setting(key) or ""}
+    if key == "agent_task_message_template":
+        from src.agent_task_runner import DEFAULT_AGENT_TASK_TEMPLATE
+
+        out["default_value"] = DEFAULT_AGENT_TASK_TEMPLATE
+    return out
 
 
 @app.put("/api/settings/{key}")

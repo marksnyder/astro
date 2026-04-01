@@ -40,4 +40,15 @@ Tasks reference a markdown by ID; the markdown’s universe must match the task�
 
 ## MCP tools
 
-Agent Tasks do not add dedicated MCP tools. Recipients typically use **`read_markdown`** (see [Markdowns](/docs/markdowns/)) after following the link or instructions in the IRC message. Configure the template so agents know which `markdown_id` to pass.
+These tools manage tasks from any MCP client. They mirror the HTTP API: the markdown you attach must belong to the task’s universe.
+
+| Tool | Purpose |
+|------|---------|
+| `list_agent_tasks` | List tasks (optional `universe_id` filter) |
+| `read_agent_task` | Read one task by ID |
+| `write_agent_task` | Create a task (title, markdown, channel, schedule, and so on) |
+| `update_agent_task` | Replace an existing task |
+| `delete_agent_task` | Delete a task |
+| `run_agent_task_now` | Send a task to IRC immediately (respects enable flag and channel cooldown) |
+
+Recipients on IRC still follow the message template; they often call **`read_markdown`** (see [Markdowns](/docs/markdowns/)) using the `markdown_id` from the rendered message. Configure the template so agents know how to fetch the full note.

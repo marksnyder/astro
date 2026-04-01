@@ -24,18 +24,11 @@ CHECK_INTERVAL = 30
 CHANNEL_COOLDOWN = 60
 
 
-DEFAULT_AGENT_TASK_TEMPLATE = """Follow these instructions from the knowledge base.
-
-**{markdown_title}** (markdown_id: {markdown_id})
-
-Read the full markdown via HTTP GET (include your API key if configured):
-{read_url}
-
-You can also use the `read_markdown` MCP tool with markdown_id={markdown_id}.
-
----
-{markdown_body}
-"""
+DEFAULT_AGENT_TASK_TEMPLATE = (
+    "Spin up a subagent that downloads markdown from here {read_url} and execute the "
+    "instructions contained within it. Confirm when the sub agent is running and give me "
+    "an occasional update if it runs long."
+)
 
 
 class ChannelCooldownError(Exception):

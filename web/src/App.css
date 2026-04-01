@@ -7086,6 +7086,59 @@
   color: #e53e3e;
 }
 
+.agent-task-cron-input {
+  font-family: ui-monospace, 'Cascadia Code', 'SF Mono', Consolas, monospace;
+  font-size: 13px;
+}
+
+.agent-task-cron-hint {
+  margin: -4px 0 0;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.agent-task-cron-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agent-task-cron-presets-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.agent-task-cron-presets-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.agent-task-cron-preset-btn {
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  line-height: 1.35;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.agent-task-cron-preset-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(55, 148, 255, 0.08);
+}
+
 .agent-task-form-actions {
   display: flex;
   justify-content: flex-end;
@@ -7106,6 +7159,26 @@
 
 .agent-task-settings-label:first-of-type {
   margin-top: 0;
+}
+
+.agent-task-template-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.agent-task-template-header .agent-task-settings-label {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.agent-task-template-reset-btn {
+  flex-shrink: 0;
+  font-size: 12px;
+  padding: 6px 12px;
 }
 
 .agent-task-settings-textarea {

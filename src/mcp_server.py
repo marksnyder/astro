@@ -8,6 +8,7 @@ from pathlib import Path
 
 from src.markdowns import (
     action_item_to_dict,
+    agent_task_to_dict,
     category_to_dict,
     create_action_item,
     create_category,
@@ -17,6 +18,7 @@ from src.markdowns import (
     create_table_row,
     create_link,
     create_markdown,
+    create_agent_task as _db_create_agent_task,
     delete_action_item as _db_delete_action_item,
     delete_category as _db_delete_category,
     delete_diagram as _db_delete_diagram,
@@ -26,6 +28,7 @@ from src.markdowns import (
     delete_feed_post as _db_delete_feed_post,
     delete_link as _db_delete_link,
     delete_markdown as _db_delete_markdown,
+    delete_agent_task as _db_delete_agent_task,
     diagram_to_dict,
     feed_post_to_dict,
     feed_to_dict,
@@ -36,6 +39,7 @@ from src.markdowns import (
     get_table_row,
     get_feed,
     get_link,
+    get_agent_task as _db_get_agent_task,
     get_markdown,
     get_setting,
     link_to_dict,
@@ -47,6 +51,7 @@ from src.markdowns import (
     list_tables,
     list_feeds,
     list_links,
+    list_agent_tasks as _db_list_agent_tasks,
     list_markdowns,
     list_universes,
     markdown_to_dict,
@@ -62,7 +67,9 @@ from src.markdowns import (
     update_table as _db_update_table,
     update_table_row as _db_update_table_row,
     update_markdown as _db_update_markdown,
+    update_agent_task as _db_update_agent_task,
 )
+from src.agent_task_runner import ChannelCooldownError, send_agent_task_message_now
 from src.ingest import load_document as _load_document, chunk_documents as _chunk_documents
 from src.store import (
     add_documents as _add_documents,
@@ -88,6 +95,23 @@ def _default_universe() -> int:
     except ValueError:
         return 1
 
+
+def _normalize_irc_channel(ch: str) -> str:
+    ch = ch.strip()
+    if not ch.startswith("#"):
+        ch = "#" + ch
+    return ch
+
+
+def _agent_task_markdown_error(markdown_id: int, universe_id: int) -> str | None:
+    m = get_markdown(markdown_id)
+    if not m:
+        return "Markdown not found"
+    if m.universe_id != universe_id:
+        return "Markdown must belong to the given universe_id"
+    return None
+
+
 mcp = FastMCP(
     name="Astro",
     instructions=(
@@ -100,7 +124,9 @@ mcp = FastMCP(
         "Call list_universes to see available universes and "
         "set_default_universe to change the default. Diagrams use the "
         "Excalidraw format (https://excalidraw.com) — see write_diagram "
-        "for schema details."
+        "for schema details. Agent tasks send markdown instructions to IRC "
+        "as astro-task-runner; use list_agent_tasks, write_agent_task, and "
+        "run_agent_task_now to manage them."
     ),
 )
 
@@ -651,6 +677,141 @@ def delete_table_row(row_id: int) -> str:
     if not _db_delete_table_row(row_id):
         return "Row not found"
     return "Deleted"
+
+
+# ── Agent tasks (IRC) ─────────────────────────────────────────────────────
+
+
+@mcp.tool
+def list_agent_tasks(universe_id: int | None = None) -> list[dict]:
+    """List agent tasks: scheduled or manual jobs that send a markdown's
+    content to an IRC channel as the astro-task-runner bot. When
+    universe_id is set, only tasks whose markdown belongs to that universe
+    are returned; when omitted, all tasks are listed."""
+    tasks = _db_list_agent_tasks(universe_id)
+    out: list[dict] = []
+    for t in tasks:
+        md = get_markdown(t.markdown_id)
+        out.append(agent_task_to_dict(t, md.title if md else None))
+    return out
+
+
+@mcp.tool
+def read_agent_task(task_id: int) -> dict | str:
+    """Read one agent task by ID (title, markdown, channel, schedule, etc.)."""
+    t = _db_get_agent_task(task_id)
+    if t is None:
+        return "Task not found"
+    md = get_markdown(t.markdown_id)
+    return agent_task_to_dict(t, md.title if md else None)
+
+
+@mcp.tool
+def write_agent_task(
+    title: str,
+    markdown_id: int,
+    channel: str,
+    universe_id: int | None = None,
+    schedule_mode: str = "manual",
+    cron_expr: str = "",
+    run_at: str | None = None,
+    enabled: bool = True,
+) -> dict | str:
+    """Create an agent task. The task delivers instructions from the given
+    markdown to an IRC channel. schedule_mode: manual (only when run with
+    run_agent_task_now), cron (cron_expr required, five fields, UTC), or once
+    (run_at ISO time required). The markdown must belong to universe_id."""
+    uid = universe_id if universe_id is not None else _default_universe()
+    err = _agent_task_markdown_error(markdown_id, uid)
+    if err:
+        return err
+    if schedule_mode not in ("manual", "cron", "once"):
+        return "schedule_mode must be manual, cron, or once"
+    if schedule_mode == "cron" and not (cron_expr or "").strip():
+        return "cron_expr is required for cron schedule"
+    if schedule_mode == "once" and not (run_at or "").strip():
+        return "run_at is required for one-time schedule"
+    run_at_val = ((run_at or "").strip() or None) if schedule_mode == "once" else None
+    cron_val = ((cron_expr or "").strip() or None) if schedule_mode == "cron" else None
+    ch = _normalize_irc_channel(channel)
+    t = _db_create_agent_task(
+        (title or "").strip() or "Untitled task",
+        markdown_id,
+        ch,
+        uid,
+        schedule_mode,
+        cron_val,
+        run_at_val,
+        enabled,
+    )
+    md = get_markdown(t.markdown_id)
+    return agent_task_to_dict(t, md.title if md else None)
+
+
+@mcp.tool
+def update_agent_task(
+    task_id: int,
+    title: str,
+    markdown_id: int,
+    channel: str,
+    universe_id: int | None = None,
+    schedule_mode: str = "manual",
+    cron_expr: str = "",
+    run_at: str | None = None,
+    enabled: bool = True,
+) -> dict | str:
+    """Replace an existing agent task. Same rules as write_agent_task."""
+    uid = universe_id if universe_id is not None else _default_universe()
+    err = _agent_task_markdown_error(markdown_id, uid)
+    if err:
+        return err
+    if schedule_mode not in ("manual", "cron", "once"):
+        return "schedule_mode must be manual, cron, or once"
+    if schedule_mode == "cron" and not (cron_expr or "").strip():
+        return "cron_expr is required for cron schedule"
+    if schedule_mode == "once" and not (run_at or "").strip():
+        return "run_at is required for one-time schedule"
+    run_at_val = ((run_at or "").strip() or None) if schedule_mode == "once" else None
+    cron_val = ((cron_expr or "").strip() or None) if schedule_mode == "cron" else None
+    ch = _normalize_irc_channel(channel)
+    t = _db_update_agent_task(
+        task_id,
+        (title or "").strip() or "Untitled task",
+        markdown_id,
+        ch,
+        uid,
+        schedule_mode,
+        cron_val,
+        run_at_val,
+        enabled,
+    )
+    if t is None:
+        return "Task not found"
+    md = get_markdown(t.markdown_id)
+    return agent_task_to_dict(t, md.title if md else None)
+
+
+@mcp.tool
+def delete_agent_task(task_id: int) -> str:
+    """Permanently delete an agent task by ID."""
+    if not _db_delete_agent_task(task_id):
+        return "Task not found"
+    return "Deleted"
+
+
+@mcp.tool
+def run_agent_task_now(task_id: int) -> dict | str:
+    """Send an agent task to IRC immediately (same as the Run button in the UI).
+    Fails if the task is disabled, markdown is missing, or the channel is on cooldown."""
+    try:
+        send_agent_task_message_now(task_id)
+    except ValueError as e:
+        return str(e)
+    except ChannelCooldownError as e:
+        return (
+            f"Channel {e.channel} on cooldown; wait about {e.wait_seconds:.0f}s"
+        )
+    return {"ok": True, "task_id": task_id}
 
 
 # ── Stats ─────────────────────────────────────────────────────────────────

@@ -12,6 +12,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import CategoryTree, { EmojiPopover } from './CategoryTree'
 import BACKGROUNDS from './backgrounds'
+import { DEFAULT_AGENT_TASK_MESSAGE_TEMPLATE } from './agentTaskDefaults'
 
 const _originalFetch = window.fetch
 window.fetch = function(url, opts = {}) {
@@ -426,7 +427,8 @@ function ApiKeyManager() {
 function SettingsDialog({ onClose }) {
   const [status, setStatus] = useState(null) // { type: 'success'|'error'|'info', text: string }
   const [reindexing, setReindexing] = useState(false)
-  const [agentTaskTemplate, setAgentTaskTemplate] = useState('')
+  const [agentTaskTemplate, setAgentTaskTemplate] = useState(DEFAULT_AGENT_TASK_MESSAGE_TEMPLATE)
+  const [defaultAgentTaskTemplate, setDefaultAgentTaskTemplate] = useState(DEFAULT_AGENT_TASK_MESSAGE_TEMPLATE)
   const [agentTaskBaseUrl, setAgentTaskBaseUrl] = useState('')
   const [agentTaskSettingsLoading, setAgentTaskSettingsLoading] = useState(true)
   const [agentTaskSaving, setAgentTaskSaving] = useState(false)
@@ -440,7 +442,10 @@ function SettingsDialog({ onClose }) {
     ])
       .then(([t, b]) => {
         if (cancelled) return
-        setAgentTaskTemplate((t && t.value) || '')
+        const def = (t && t.default_value) || DEFAULT_AGENT_TASK_MESSAGE_TEMPLATE
+        setDefaultAgentTaskTemplate(def)
+        const stored = (t && t.value) || ''
+        setAgentTaskTemplate(stored.trim() ? stored : def)
         setAgentTaskBaseUrl((b && b.value) || '')
       })
       .catch(() => {})
@@ -450,15 +455,36 @@ function SettingsDialog({ onClose }) {
     return () => { cancelled = true }
   }, [])
 
+  const resetAgentTaskTemplate = async () => {
+    setAgentTaskSaving(true)
+    setStatus(null)
+    try {
+      const r = await fetch('/api/settings/agent_task_message_template', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: '' }),
+      })
+      if (!r.ok) throw new Error('Failed to reset template')
+      setAgentTaskTemplate(defaultAgentTaskTemplate)
+      setStatus({ type: 'success', text: 'Agent task template reset to default.' })
+    } catch (e) {
+      setStatus({ type: 'error', text: e.message || 'Failed to reset template' })
+    } finally {
+      setAgentTaskSaving(false)
+    }
+  }
+
   const saveAgentTaskSettings = async () => {
     setAgentTaskSaving(true)
     setStatus(null)
     try {
+      const templateToStore =
+        agentTaskTemplate === defaultAgentTaskTemplate ? '' : agentTaskTemplate
       const [r1, r2] = await Promise.all([
         fetch('/api/settings/agent_task_message_template', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ value: agentTaskTemplate }),
+          body: JSON.stringify({ value: templateToStore }),
         }),
         fetch('/api/settings/agent_task_base_url', {
           method: 'PUT',
@@ -530,13 +556,22 @@ function SettingsDialog({ onClose }) {
             <p className="br-subtitle">Loading…</p>
           ) : (
             <>
-              <label className="agent-task-settings-label">Template</label>
+              <div className="agent-task-template-header">
+                <label className="agent-task-settings-label">Template</label>
+                <button
+                  type="button"
+                  className="br-action-btn agent-task-template-reset-btn"
+                  onClick={resetAgentTaskTemplate}
+                  disabled={agentTaskSaving || agentTaskSettingsLoading}
+                >
+                  Reset to default
+                </button>
+              </div>
               <textarea
                 className="agent-task-settings-textarea"
                 rows={10}
                 value={agentTaskTemplate}
                 onChange={(e) => setAgentTaskTemplate(e.target.value)}
-                placeholder="Leave empty to use the built-in default (instructions + read URL + body)."
               />
               <label className="agent-task-settings-label">Base URL for read links</label>
               <input

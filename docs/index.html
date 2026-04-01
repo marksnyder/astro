@@ -174,8 +174,10 @@ layout: default
             <p>
               Point tasks at a markdown note and an IRC channel: run on demand, on a cron schedule,
               or once at a future time. Instructions are sent through a dedicated runner with a
-              configurable template (default includes API read URL and markdown ID). Manage everything
-              from a dedicated tab with search and run history.
+              configurable template (default includes API read URL and markdown ID). Manage tasks in
+              the app or via MCP: <code>list_agent_tasks</code>, <code>read_agent_task</code>,
+              <code>write_agent_task</code>, <code>update_agent_task</code>, <code>delete_agent_task</code>,
+              and <code>run_agent_task_now</code>.
             </p>
           </div>
           <div class="pillar">
@@ -196,8 +198,8 @@ layout: default
             <h3>MCP Server</h3>
             <p>
               A built in <a href="https://modelcontextprotocol.io" style="color: inherit; text-decoration: underline;">Model Context Protocol</a>
-              server exposes 43 tools covering search, notes, tables, diagrams,
-              tasks, categories, links, documents, and feeds. Any
+              server exposes 49 tools covering search, notes, tables, diagrams,
+              tasks, categories, links, documents, feeds, and agent tasks. Any
               MCP-compatible AI agent can read, write, and search your knowledge base.
             </p>
           </div>
@@ -334,8 +336,8 @@ layout: default
         Use feeds to pipe CI output, alerts, or agent output into timelines humans and models can read.
       </p>
       <p>
-        Unified search surfaces memory instantly. The mobile interface
-        keeps chat, notes, tasks, and library at hand when you operate or debug agents.
+        Feeds and agent tasks connect external signals and scheduled prompts to the same
+        knowledge base your agents already use.
       </p>
       <a href="{{ '/docs/' | relative_url }}" class="btn btn-primary" style="margin-top: .5rem;">Browse Docs</a>
     </div>
@@ -356,24 +358,6 @@ layout: default
         <div>
           <strong>Pinned items bar</strong>
           <p>Markdowns, documents, and links in one header strip.</p>
-        </div>
-      </div>
-      <div class="org-feature">
-        <div class="org-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        </div>
-        <div>
-          <strong>Unified Search</strong>
-          <p>Search across markdowns, documents, and links.</p>
-        </div>
-      </div>
-      <div class="org-feature">
-        <div class="org-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-        </div>
-        <div>
-          <strong>Mobile Interface</strong>
-          <p>Full access on the go at <code>/mobile</code>.</p>
         </div>
       </div>
     </div>

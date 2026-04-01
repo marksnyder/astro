@@ -36,6 +36,17 @@ function scheduleSummary(t) {
   return t.schedule_mode
 }
 
+/** Five-field crontab (minute hour day month weekday). Server evaluates with UTC. */
+const CRON_PRESETS = [
+  { label: 'Every 15 minutes', expr: '*/15 * * * *' },
+  { label: 'Every hour at :00 UTC', expr: '0 * * * *' },
+  { label: 'Every day at 9:00 UTC', expr: '0 9 * * *' },
+  { label: 'Every day at midnight UTC', expr: '0 0 * * *' },
+  { label: 'Weekdays at 9:00 UTC (Mon–Fri)', expr: '0 9 * * 1-5' },
+  { label: 'Every Monday at 9:00 UTC', expr: '0 9 * * 1' },
+  { label: '1st of month at midnight UTC', expr: '0 0 1 * *' },
+]
+
 const emptyForm = () => ({
   title: '',
   markdown_id: '',
@@ -48,7 +59,22 @@ const emptyForm = () => ({
   enabled: true,
 })
 
-export default function AgentTasksPanel({ universeId }) {
+/** Body for PUT /api/agent-tasks/:id (full replace; matches desktop save rules). */
+function buildAgentTaskPutBody(t, enabled) {
+  const mode = t.schedule_mode || 'manual'
+  return {
+    title: (t.title || '').trim() || 'Untitled task',
+    markdown_id: Number(t.markdown_id),
+    channel: t.channel || '#astro',
+    universe_id: Number(t.universe_id),
+    schedule_mode: mode,
+    cron_expr: mode === 'cron' ? (t.cron_expr || '').trim() : '',
+    run_at: mode === 'once' ? (t.run_at || '') : null,
+    enabled,
+  }
+}
+
+export default function AgentTasksPanel({ universeId, mobileReadOnly = false }) {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -58,6 +84,7 @@ export default function AgentTasksPanel({ universeId }) {
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [runningId, setRunningId] = useState(null)
+  const [togglingId, setTogglingId] = useState(null)
   const [formError, setFormError] = useState(null)
   const [mdPickerQuery, setMdPickerQuery] = useState('')
   const [mdPickerResults, setMdPickerResults] = useState([])
@@ -301,23 +328,58 @@ export default function AgentTasksPanel({ universeId }) {
     }
   }
 
+  const toggleTaskEnabled = async (t) => {
+    if (togglingId != null) return
+    setTogglingId(t.id)
+    try {
+      const res = await fetch(`/api/agent-tasks/${t.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildAgentTaskPutBody(t, !t.enabled)),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        const d = err.detail
+        const msg =
+          typeof d === 'string'
+            ? d
+            : Array.isArray(d)
+              ? d.map((x) => x.msg || x).join(', ')
+              : res.statusText
+        window.alert(msg || 'Update failed')
+        return
+      }
+      loadTasks(true)
+    } catch (e) {
+      window.alert(e.message || 'Update failed')
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
   return (
-    <div className="agent-tasks-panel">
+    <div className={`agent-tasks-panel${mobileReadOnly ? ' agent-tasks-panel--mobile' : ''}`}>
       <div className="markdowns-header">
         <span className="markdowns-header-title">Agent Tasks</span>
-        <button type="button" className="markdowns-add-btn" onClick={openAdd} title="Add task">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-        </button>
+        {!mobileReadOnly && (
+          <button type="button" className="markdowns-add-btn" onClick={openAdd} title="Add task">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
+        )}
       </div>
       <div className="markdowns-search">
         <input
           className="markdowns-search-input"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by title, markdown, universe, channel, schedule…"
+          placeholder={
+            mobileReadOnly
+              ? 'Search tasks…'
+              : 'Search by title, markdown, universe, channel, schedule…'
+          }
         />
       </div>
       {loadError && (
@@ -336,8 +398,74 @@ export default function AgentTasksPanel({ universeId }) {
             {loadError && tasks.length === 0
               ? 'Could not load tasks.'
               : tasks.length === 0
-                ? 'No tasks yet. Add one to send markdown instructions to IRC as astro-task-runner.'
+                ? mobileReadOnly
+                  ? 'No tasks yet. Create and edit tasks on the desktop app.'
+                  : 'No tasks yet. Add one to send markdown instructions to IRC as astro-task-runner.'
                 : 'No tasks match your search.'}
+          </div>
+        ) : mobileReadOnly ? (
+          <div className="agent-tasks-mobile-list">
+            {filtered.map((t) => {
+              const isCurrentUniverse =
+                universeId != null && Number(t.universe_id) === Number(universeId)
+              return (
+                <div
+                  key={t.id}
+                  className={`agent-tasks-mobile-card${isCurrentUniverse ? ' agent-tasks-mobile-card--current-universe' : ''}`}
+                >
+                  <div className="agent-tasks-mobile-card-head">
+                    <span className="agent-tasks-mobile-card-title">{t.title || 'Untitled'}</span>
+                    <button
+                      type="button"
+                      className={`agent-tasks-mobile-switch ${t.enabled ? 'on' : 'off'}`}
+                      role="switch"
+                      aria-checked={t.enabled}
+                      aria-label={t.enabled ? 'Enabled, tap to disable' : 'Disabled, tap to enable'}
+                      disabled={togglingId === t.id}
+                      onClick={() => toggleTaskEnabled(t)}
+                    />
+                  </div>
+                  <p className="agent-tasks-mobile-md" title={t.markdown_title || ''}>
+                    {t.markdown_title || `#${t.markdown_id}`}
+                  </p>
+                  <dl className="agent-tasks-mobile-dl">
+                    <div>
+                      <dt>Universe</dt>
+                      <dd>
+                        {universesById[t.universe_id] ||
+                          (t.universe_id != null ? `Universe ${t.universe_id}` : '—')}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Channel</dt>
+                      <dd>
+                        <code className="agent-tasks-channel">{t.channel}</code>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Schedule</dt>
+                      <dd>{scheduleSummary(t)}</dd>
+                    </div>
+                    <div>
+                      <dt>Last run</dt>
+                      <dd>{fmtTs(t.last_run_at)}</dd>
+                    </div>
+                    <div>
+                      <dt>Next run</dt>
+                      <dd>{fmtTs(t.next_run_at)}</dd>
+                    </div>
+                  </dl>
+                  <button
+                    type="button"
+                    className="agent-tasks-mobile-run"
+                    disabled={runningId === t.id || !t.enabled}
+                    onClick={() => runTask(t.id)}
+                  >
+                    {runningId === t.id ? 'Running…' : !t.enabled ? 'Disabled' : 'Run now'}
+                  </button>
+                </div>
+              )
+            })}
           </div>
         ) : (
           <table className="agent-tasks-table">
@@ -400,7 +528,7 @@ export default function AgentTasksPanel({ universeId }) {
         )}
       </div>
 
-      {modalOpen && (
+      {!mobileReadOnly && modalOpen && (
         <div className="markdown-modal-overlay">
           <div className="agent-task-modal-box">
             <div className="markdown-modal-header">
@@ -497,15 +625,38 @@ export default function AgentTasksPanel({ universeId }) {
                 </select>
               </label>
               {form.schedule_mode === 'cron' && (
-                <label className="agent-task-label">
-                  Cron expression
-                  <input
-                    className="prompt-form-input"
-                    value={form.cron_expr}
-                    onChange={(e) => setForm((f) => ({ ...f, cron_expr: e.target.value }))}
-                    placeholder="0 9 * * *"
-                  />
-                </label>
+                <>
+                  <label className="agent-task-label">
+                    Cron expression
+                    <input
+                      className="prompt-form-input agent-task-cron-input"
+                      value={form.cron_expr}
+                      onChange={(e) => setForm((f) => ({ ...f, cron_expr: e.target.value }))}
+                      placeholder="0 9 * * *"
+                      spellCheck={false}
+                      autoComplete="off"
+                    />
+                  </label>
+                  <p className="agent-task-cron-hint">
+                    Five fields: minute, hour, day of month, month, weekday. The scheduler uses UTC.
+                  </p>
+                  <div className="agent-task-cron-presets">
+                    <span className="agent-task-cron-presets-title">Presets</span>
+                    <div className="agent-task-cron-presets-grid">
+                      {CRON_PRESETS.map((p) => (
+                        <button
+                          key={p.expr}
+                          type="button"
+                          className="agent-task-cron-preset-btn"
+                          onClick={() => setForm((f) => ({ ...f, cron_expr: p.expr }))}
+                          title={p.expr}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
               )}
               {form.schedule_mode === 'once' && (
                 <label className="agent-task-label">
