@@ -1150,15 +1150,25 @@ function App() {
     setActiveTabId(tabId)
   }, [])
 
-  const openDiagramTab = useCallback((diagram) => {
-    const key = diagram._new ? 'new' : diagram.id
+  const openDiagramTab = useCallback(async (diagram) => {
+    let d = diagram
+    if (!diagram._new && diagram.id != null && (diagram.data === undefined || diagram.data === null)) {
+      try {
+        const res = await fetch(`/api/diagrams/${diagram.id}`)
+        if (!res.ok) return
+        d = await res.json()
+      } catch {
+        return
+      }
+    }
+    const key = d._new ? 'new' : d.id
     const tabId = `diagram-${key}`
     setTabs(prev => {
       const existing = prev.find(t => t.id === tabId)
       if (existing) {
-        return prev.map(t => t.id === tabId ? { ...t, data: diagram, title: diagram.title || 'Untitled Diagram' } : t)
+        return prev.map(t => t.id === tabId ? { ...t, data: d, title: d.title || 'Untitled Diagram' } : t)
       }
-      return [...prev, { id: tabId, type: 'diagram', title: diagram.title || 'Untitled Diagram', closable: true, data: diagram }]
+      return [...prev, { id: tabId, type: 'diagram', title: d.title || 'Untitled Diagram', closable: true, data: d }]
     })
     setActiveTabId(tabId)
   }, [])

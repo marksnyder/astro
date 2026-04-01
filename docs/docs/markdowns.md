@@ -6,7 +6,7 @@ nav_id: markdowns
 permalink: /docs/markdowns/
 ---
 
-Create and organize structured markdowns.
+Create structured markdowns for human and agent workflows: instructions, specs, and memory that MCP and search can retrieve.
 
 - Title + body
 - Category assignment

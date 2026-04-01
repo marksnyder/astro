@@ -5,12 +5,12 @@ layout: default
 <section class="hero">
   <div class="hero-inner">
     <img src="{{ '/assets/img/logo.png' | relative_url }}" alt="Astro" class="hero-logo">
-    <p class="hero-tagline">Your AI Operating System.</p>
+    <p class="hero-tagline">Build apps on top of AI.</p>
     <div class="hero-actions">
       <a href="{{ '/install/' | relative_url }}" class="btn btn-primary">Get Started</a>
       <a href="{{ '/docs/' | relative_url }}" class="btn btn-outline">Explore Docs</a>
       <a href="https://chromewebstore.google.com/detail/astro-browse/djbiamicfibnldnmhfnmndpdmghilmmi" class="btn btn-outline btn-chrome">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -2px; margin-right: 6px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3a4.5 4.5 0 0 1 4.24 3H12a4.5 4.5 0 0 0-3.9 2.25L5.76 6.34A7.96 7.96 0 0 1 12 5zm-8 7c0-1.34.33-2.6.91-3.71L8.84 15A4.5 4.5 0 0 0 12 16.5c.42 0 .82-.06 1.21-.16l-2.34 4.05A8.01 8.01 0 0 1 4 12zm8 8c.34 0 .68-.02 1.01-.07L15.35 16A4.49 4.49 0 0 0 16.5 12c0-.6-.12-1.17-.33-1.7l4.05-2.07c.5 1.15.78 2.42.78 3.77 0 4.42-3.58 8-8 8zM12 15a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/></svg>Chrome/Edge Extension
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -2px; margin-right: 6px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3a4.5 4.5 0 0 1 4.24 3H12a4.5 4.5 0 0 0-3.9 2.25L5.76 6.34A7.96 7.96 0 0 1 12 5zm-8 7c0-1.34.33-2.6.91-3.71L8.84 15A4.5 4.5 0 0 0 12 16.5c.42 0 .82-.06 1.21-.16l-2.34 4.05A8.01 8.01 0 0 1 4 12zm8 8c.34 0 .68-.02 1.01-.07L15.35 16A4.49 4.49 0 0 0 16.5 12c0-.6-.12-1.17-.33-1.7l4.05-2.07c.5 1.15.78 2.42.78 3.77 0 4.42-3.58 8-8 8zM12 15a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/></svg>Chrome and Edge extension
       </a>
     </div>
     <div class="install-banner">
@@ -37,30 +37,28 @@ layout: default
   <div class="what-is-inner">
     <h2>What Is Astro?</h2>
     <p class="what-is-lead">
-      Astro is an AI operating system for managing information, agents,
-      tasks, and data feeds alongside markdowns, documents, and links.
-      Everything lives inside <strong>Universes</strong>,
-      cleanly separated workspaces where structure keeps you organized while agents
-      accelerate how you work.
+      Astro is a self hosted layer for <strong>building applications on top of AI</strong>:
+      agents, scheduled tasks, retrieval memory, tables, feeds, and a full MCP API so your models can read and write real data.
+      <strong>Universes</strong> separate projects so each app or team gets its own boundary without mixing agents or content.
     </p>
     <div class="what-is-points">
       <div class="what-is-point">
         <span class="what-is-icon wia-amber">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.87-3.13-7-7-7zM9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9v1z"/></svg>
         </span>
-        Manage Agents
+        Ship agent workflows
       </div>
       <div class="what-is-point">
         <span class="what-is-icon wia-purple">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 0 1 7.93 7H12V4.07A7.96 7.96 0 0 1 12 4z"/></svg>
         </span>
-        Organize Information
+        Memory and tools for models
       </div>
       <div class="what-is-point">
         <span class="what-is-icon wia-green">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M13 3v2.05A7.002 7.002 0 0 1 19 12c0 1.48-.46 2.85-1.24 3.99l1.45 1.45A8.96 8.96 0 0 0 21 12c0-4.63-3.5-8.44-8-8.95zM3 12c0-4.63 3.5-8.44 8-8.95V1l4 3-4 3V4.05A7.002 7.002 0 0 0 5 12c0 1.48.46 2.85 1.24 3.99L4.79 17.44A8.96 8.96 0 0 1 3 12zm9 9c-1.48 0-2.85-.46-3.99-1.24l-1.45 1.45A8.96 8.96 0 0 0 12 23c4.63 0 8.44-3.5 8.95-8H23l-3-4-3 4h2.05A7.002 7.002 0 0 1 12 21z"/></svg>
         </span>
-        Accelerate Productivity
+        One stack for humans and agents
       </div>
     </div>
   </div>
@@ -70,7 +68,7 @@ layout: default
   <div class="pillars-inner">
     <div class="pillars-heading">
       <h2>Core Features</h2>
-      <p>One system to run agents and knowledge, with structure and retrieval built in.</p>
+      <p>Agents, retrieval, MCP tools, and data planes in one place so you can ship AI backed experiences.</p>
     </div>
     <div class="carousel-wrapper">
       <button class="carousel-btn carousel-prev" onclick="carouselMove(-1)" aria-label="Previous feature">
@@ -85,7 +83,7 @@ layout: default
             <h3>Vector Store</h3>
             <p>
               All markdowns, documents, and action items are automatically embedded
-              into a local ChromaDB vector store using CPU-based embeddings.
+              into a local ChromaDB vector store using CPU based embeddings.
               No API keys required. Semantic search across your entire knowledge base.
             </p>
           </div>
@@ -95,8 +93,8 @@ layout: default
             </div>
             <h3>Markdowns</h3>
             <p>
-              Create and organize structured markdowns with rich formatting, embedded images,
-              category assignment, and full-text search. Every markdown is included in
+              Structured notes with rich formatting, embedded images,
+              categories, and full text search. Every markdown is included in
               AI retrieval context automatically.
             </p>
           </div>
@@ -130,7 +128,7 @@ layout: default
             </div>
             <h3>Tables</h3>
             <p>
-              Build structured data with spreadsheet-style tables. Define typed
+              Build structured data with spreadsheet style tables. Define typed
               columns (text, number, boolean), manage rows with inline editing,
               and import or export CSV. Full MCP integration lets agents create
               and query tables programmatically.
@@ -153,8 +151,8 @@ layout: default
             </div>
             <h3>Bookmarks</h3>
             <p>
-              Save and organize links inside your Universe with titles, URLs, and
-              categories. Links become part of your searchable knowledge base.
+              Save links with titles, URLs, and
+              categories. Links join your searchable knowledge base for humans and agents.
             </p>
           </div>
           <div class="pillar">
@@ -163,7 +161,7 @@ layout: default
             </div>
             <h3>Agent Network</h3>
             <p>
-              A built-in IRC server enables communication with AI agents across
+              A built in IRC server enables communication with AI agents across
               platforms. Coordinate agents, communicate across systems, and integrate
               with external AI platforms from one central hub.
             </p>
@@ -175,7 +173,7 @@ layout: default
             <h3>Agent Tasks</h3>
             <p>
               Point tasks at a markdown note and an IRC channel: run on demand, on a cron schedule,
-              or once at a future time. Instructions are sent as <code>astro-task-runner</code> with a
+              or once at a future time. Instructions are sent through a dedicated runner with a
               configurable template (default includes API read URL and markdown ID). Manage everything
               from a dedicated tab with search and run history.
             </p>
@@ -197,7 +195,7 @@ layout: default
             </div>
             <h3>MCP Server</h3>
             <p>
-              A built-in <a href="https://modelcontextprotocol.io" style="color: inherit; text-decoration: underline;">Model Context Protocol</a>
+              A built in <a href="https://modelcontextprotocol.io" style="color: inherit; text-decoration: underline;">Model Context Protocol</a>
               server exposes 43 tools covering search, notes, tables, diagrams,
               tasks, categories, links, documents, and feeds. Any
               MCP-compatible AI agent can read, write, and search your knowledge base.
@@ -329,17 +327,15 @@ layout: default
 <section class="highlight-section">
   <div class="highlight-inner">
     <div class="highlight-text">
-      <h2>Organization &amp; Structure</h2>
+      <h2>Structure for AI apps</h2>
       <p>
-        Structure is how you and your agents stay aligned. A hierarchical category
-        tree organizes markdowns, documents, tasks, and links with consistent layout.
-        Pin important items to a unified header bar for quick access, whether
-        you are working solo or routing output from agents and feeds.
+        Categories, pins, and feeds give your automations a consistent layout: the same
+        tree for markdowns, documents, tasks, and links, plus a header bar for what matters most.
+        Use feeds to pipe CI output, alerts, or agent output into timelines humans and models can read.
       </p>
       <p>
-        Unified search surfaces everything instantly. A mobile-optimized interface
-        keeps your Universe within reach whenever you need to steer agents or
-        review what they produced.
+        Unified search surfaces memory instantly. The mobile interface
+        keeps chat, notes, tasks, and library at hand when you operate or debug agents.
       </p>
       <a href="{{ '/docs/' | relative_url }}" class="btn btn-primary" style="margin-top: .5rem;">Browse Docs</a>
     </div>
@@ -349,8 +345,8 @@ layout: default
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
         </div>
         <div>
-          <strong>Hierarchical Categories</strong>
-          <p>Parent/child tree across all content types.</p>
+          <strong>Hierarchical categories</strong>
+          <p>Parent and child tree across content types.</p>
         </div>
       </div>
       <div class="org-feature">
@@ -358,7 +354,7 @@ layout: default
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
         </div>
         <div>
-          <strong>Pinned Items Bar</strong>
+          <strong>Pinned items bar</strong>
           <p>Markdowns, documents, and links in one header strip.</p>
         </div>
       </div>
@@ -387,14 +383,14 @@ layout: default
 <section class="cta-section">
   <h2>Get it Now</h2>
   <p>
-    An AI operating system for information, agents, and workflows. Clear separation of workspaces.<br>
-    One workspace. Many Universes. You stay organized as agents run alongside you.
+    An AI application stack: agents, memory, tools, and data in one self hosted install.<br>
+    One workspace. Many Universes. Build apps on top of AI, not only filing notes.
   </p>
   <div class="hero-actions">
     <a href="{{ '/install/' | relative_url }}" class="btn btn-primary">Install Astro</a>
     <a href="https://github.com/marksnyder/astro" class="btn btn-outline">View on GitHub</a>
     <a href="https://chromewebstore.google.com/detail/astro-browse/djbiamicfibnldnmhfnmndpdmghilmmi" class="btn btn-outline btn-chrome">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -2px; margin-right: 6px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3a4.5 4.5 0 0 1 4.24 3H12a4.5 4.5 0 0 0-3.9 2.25L5.76 6.34A7.96 7.96 0 0 1 12 5zm-8 7c0-1.34.33-2.6.91-3.71L8.84 15A4.5 4.5 0 0 0 12 16.5c.42 0 .82-.06 1.21-.16l-2.34 4.05A8.01 8.01 0 0 1 4 12zm8 8c.34 0 .68-.02 1.01-.07L15.35 16A4.49 4.49 0 0 0 16.5 12c0-.6-.12-1.17-.33-1.7l4.05-2.07c.5 1.15.78 2.42.78 3.77 0 4.42-3.58 8-8 8zM12 15a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/></svg>Chrome/Edge Extension
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -2px; margin-right: 6px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3a4.5 4.5 0 0 1 4.24 3H12a4.5 4.5 0 0 0-3.9 2.25L5.76 6.34A7.96 7.96 0 0 1 12 5zm-8 7c0-1.34.33-2.6.91-3.71L8.84 15A4.5 4.5 0 0 0 12 16.5c.42 0 .82-.06 1.21-.16l-2.34 4.05A8.01 8.01 0 0 1 4 12zm8 8c.34 0 .68-.02 1.01-.07L15.35 16A4.49 4.49 0 0 0 16.5 12c0-.6-.12-1.17-.33-1.7l4.05-2.07c.5 1.15.78 2.42.78 3.77 0 4.42-3.58 8-8 8zM12 15a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/></svg>Chrome and Edge extension
     </a>
   </div>
 </section>

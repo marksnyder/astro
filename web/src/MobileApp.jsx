@@ -1,8 +1,14 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { Excalidraw } from '@excalidraw/excalidraw'
+import '@excalidraw/excalidraw/index.css'
 import './MobileApp.css'
+import './App.css'
 import BACKGROUNDS from './backgrounds'
+import { parseDiagramData, EMPTY_DIAGRAM_JSON } from './diagramParse'
+import CategoryTree from './CategoryTree'
+import AgentTasksPanel from './AgentTasksPanel'
 
 const LOGO_URL = '/logo.png'
 
@@ -1442,6 +1448,440 @@ function MobileTables({ categories, universeId }) {
   )
 }
 
+// ── Read-only Library: Documents, Links, Diagrams ─────
+
+function formatDocSize(bytes) {
+  if (bytes == null || Number.isNaN(bytes)) return '—'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function openDocumentFile(doc) {
+  const viewable = ['pdf', 'xlsx', 'xls']
+  const endpoint = viewable.includes(doc.extension) ? 'view' : 'download'
+  window.open(`/api/documents/${endpoint}?path=${encodeURIComponent(doc.path)}`, '_blank', 'noopener,noreferrer')
+}
+
+function MobileLibraryHub({ onPick }) {
+  return (
+    <div className="m-library-hub">
+      <p className="m-library-hub-intro">Browse your universe. Editing is available on desktop.</p>
+      <button type="button" className="m-library-tile" onClick={() => onPick('documents')}>
+        <span className="m-library-tile-icon" aria-hidden>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="21 8 21 21 3 21 3 8" />
+            <rect x="1" y="3" width="22" height="5" />
+            <line x1="10" y1="12" x2="14" y2="12" />
+          </svg>
+        </span>
+        <span className="m-library-tile-text">
+          <span className="m-library-tile-title">Documents</span>
+          <span className="m-library-tile-desc">Open PDFs, spreadsheets, and uploads</span>
+        </span>
+        <svg className="m-library-tile-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
+      </button>
+      <button type="button" className="m-library-tile" onClick={() => onPick('links')}>
+        <span className="m-library-tile-icon" aria-hidden>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+          </svg>
+        </span>
+        <span className="m-library-tile-text">
+          <span className="m-library-tile-title">Links</span>
+          <span className="m-library-tile-desc">Saved bookmarks</span>
+        </span>
+        <svg className="m-library-tile-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
+      </button>
+      <button type="button" className="m-library-tile" onClick={() => onPick('diagrams')}>
+        <span className="m-library-tile-icon" aria-hidden>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+          </svg>
+        </span>
+        <span className="m-library-tile-text">
+          <span className="m-library-tile-title">Diagrams</span>
+          <span className="m-library-tile-desc">View Excalidraw boards (read-only)</span>
+        </span>
+        <svg className="m-library-tile-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
+      </button>
+    </div>
+  )
+}
+
+function MobileDocumentsReadonly({ categories, universeId, onBack }) {
+  const [docs, setDocs] = useState([])
+  const [search, setSearch] = useState('')
+  const [filterCatId, setFilterCatId] = useState(null)
+  const catMap = Object.fromEntries(categories.map(c => [c.id, c.name]))
+  const catEmojiMap = Object.fromEntries(categories.map(c => [c.id, c.emoji]))
+  const catLabel = (id) => { const e = catEmojiMap[id]; const n = catMap[id]; return e ? `${e} ${n}` : n }
+
+  const fetchDocs = useCallback(() => {
+    const params = new URLSearchParams()
+    if (search) params.set('q', search)
+    if (filterCatId !== null) params.set('category_id', filterCatId)
+    if (universeId) params.set('universe_id', universeId)
+    fetch(`/api/documents?${params}`)
+      .then(r => r.json())
+      .then(setDocs)
+      .catch(() => {})
+  }, [search, filterCatId, universeId])
+
+  useEffect(() => { fetchDocs() }, [universeId])
+  useEffect(() => {
+    const t = setTimeout(fetchDocs, 300)
+    return () => clearTimeout(t)
+  }, [search, filterCatId, universeId, fetchDocs])
+
+  const groups = useMemo(() => {
+    const g = {}
+    const order = []
+    for (const doc of docs) {
+      const key = doc.category_id ?? '__none__'
+      if (!g[key]) { g[key] = []; order.push(key) }
+      g[key].push(doc)
+    }
+    order.sort((a, b) => {
+      if (a === '__none__') return 1
+      if (b === '__none__') return -1
+      return (catMap[a] || '').localeCompare(catMap[b] || '')
+    })
+    return order.map(k => ({ key: k, items: g[k] }))
+  }, [docs, catMap])
+
+  return (
+    <div className="mn-list-view">
+      <div className="mn-view-header" style={{ borderBottom: '1px solid var(--border)' }}>
+        <button type="button" className="mn-back-btn" onClick={onBack} aria-label="Back">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+        </button>
+        <span className="mn-view-header-title">Documents</span>
+        <span style={{ flex: 1 }} />
+      </div>
+      <div className="mn-filter-bar">
+        <MobileCategorySelect categories={categories} value={filterCatId} onChange={setFilterCatId} />
+      </div>
+      <div className="mn-search-bar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+        <input className="mn-search-input" placeholder="Search documents..." value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+      <div className="mn-markdowns-list">
+        {docs.length === 0 ? (
+          <div className="mn-empty">{search || filterCatId != null ? 'No matching documents.' : 'No documents yet.'}</div>
+        ) : groups.map(({ key, items }) => (
+          <div key={String(key)} className="ma-group">
+            <div className="ma-group-header">
+              {key === '__none__' ? 'Uncategorized' : catLabel(key) || 'Unknown'}
+              <span className="ma-group-count">{items.length}</span>
+            </div>
+            {items.map(doc => (
+              <button
+                key={doc.path}
+                type="button"
+                className="mn-markdown-card"
+                style={{ width: '100%', border: 'none', background: 'none', font: 'inherit', textAlign: 'left', cursor: 'pointer' }}
+                onClick={() => openDocumentFile(doc)}
+              >
+                <div className="mn-markdown-title">{doc.name}</div>
+                <div className="mn-markdown-preview">{doc.extension?.toUpperCase() || '—'} · {formatDocSize(doc.size)}</div>
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function MobileLinksReadonly({ categories, universeId, onBack }) {
+  const [links, setLinks] = useState([])
+  const [search, setSearch] = useState('')
+  const [filterCatId, setFilterCatId] = useState(null)
+  const catMap = Object.fromEntries(categories.map(c => [c.id, c.name]))
+  const catEmojiMap = Object.fromEntries(categories.map(c => [c.id, c.emoji]))
+  const catLabel = (id) => { const e = catEmojiMap[id]; const n = catMap[id]; return e ? `${e} ${n}` : n }
+
+  const fetchLinks = useCallback(() => {
+    const params = new URLSearchParams()
+    if (search) params.set('q', search)
+    if (filterCatId !== null) params.set('category_id', filterCatId)
+    if (universeId) params.set('universe_id', universeId)
+    fetch(`/api/links?${params}`)
+      .then(r => r.json())
+      .then(setLinks)
+      .catch(() => {})
+  }, [search, filterCatId, universeId])
+
+  useEffect(() => { fetchLinks() }, [universeId])
+  useEffect(() => {
+    const t = setTimeout(fetchLinks, 300)
+    return () => clearTimeout(t)
+  }, [search, filterCatId, universeId, fetchLinks])
+
+  const groups = useMemo(() => {
+    const g = {}
+    const order = []
+    for (const link of links) {
+      const key = link.category_id ?? '__none__'
+      if (!g[key]) { g[key] = []; order.push(key) }
+      g[key].push(link)
+    }
+    order.sort((a, b) => {
+      if (a === '__none__') return 1
+      if (b === '__none__') return -1
+      return (catMap[a] || '').localeCompare(catMap[b] || '')
+    })
+    return order.map(k => ({ key: k, items: g[k] }))
+  }, [links, catMap])
+
+  return (
+    <div className="mn-list-view">
+      <div className="mn-view-header" style={{ borderBottom: '1px solid var(--border)' }}>
+        <button type="button" className="mn-back-btn" onClick={onBack} aria-label="Back">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+        </button>
+        <span className="mn-view-header-title">Links</span>
+        <span style={{ flex: 1 }} />
+      </div>
+      <div className="mn-filter-bar">
+        <MobileCategorySelect categories={categories} value={filterCatId} onChange={setFilterCatId} />
+      </div>
+      <div className="mn-search-bar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+        <input className="mn-search-input" placeholder="Search links..." value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+      <div className="mn-markdowns-list">
+        {links.length === 0 ? (
+          <div className="mn-empty">{search || filterCatId != null ? 'No matching links.' : 'No links yet.'}</div>
+        ) : groups.map(({ key, items }) => (
+          <div key={String(key)} className="ma-group">
+            <div className="ma-group-header">
+              {key === '__none__' ? 'Uncategorized' : catLabel(key) || 'Unknown'}
+              <span className="ma-group-count">{items.length}</span>
+            </div>
+            {items.map(link => (
+              <button
+                key={link.id}
+                type="button"
+                className="mn-markdown-card"
+                style={{ width: '100%', border: 'none', background: 'none', font: 'inherit', textAlign: 'left', cursor: 'pointer' }}
+                onClick={() => link.url && window.open(link.url, '_blank', 'noopener,noreferrer')}
+              >
+                <div className="mn-markdown-title">{link.title || link.url || 'Untitled'}</div>
+                <div className="mn-markdown-preview">{link.url}</div>
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function MobileDiagramReadonly({ title, dataJson, onBack }) {
+  const initialData = useMemo(() => {
+    const parsed = parseDiagramData(dataJson || EMPTY_DIAGRAM_JSON)
+    const hasSavedView = parsed.appState?.scrollX != null && parsed.appState?.scrollY != null
+    return {
+      elements: parsed.elements || [],
+      appState: { ...parsed.appState, theme: 'dark' },
+      files: parsed.files || {},
+      scrollToContent: !hasSavedView,
+    }
+  }, [dataJson])
+
+  return (
+    <div className="mn-view m-diagram-readonly-root">
+      <div className="mn-view-header" style={{ borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+        <button type="button" className="mn-back-btn" onClick={onBack} aria-label="Back">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+        </button>
+        <span className="mn-view-header-title">{title || 'Diagram'}</span>
+        <span style={{ flex: 1 }} />
+      </div>
+      <div className="m-excalidraw-mobile">
+        <Excalidraw
+          key={dataJson}
+          initialData={initialData}
+          viewModeEnabled
+          theme="dark"
+          UIOptions={{
+            canvasActions: {
+              loadScene: false,
+              export: false,
+              saveAsImage: false,
+              toggleTheme: false,
+            },
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function MobileDiagramsReadonly({ categories, universeId, onBack }) {
+  const [diagrams, setDiagrams] = useState([])
+  const [search, setSearch] = useState('')
+  const [filterCatId, setFilterCatId] = useState(null)
+  const [viewing, setViewing] = useState(null)
+  const catMap = Object.fromEntries(categories.map(c => [c.id, c.name]))
+  const catEmojiMap = Object.fromEntries(categories.map(c => [c.id, c.emoji]))
+  const catLabel = (id) => { const e = catEmojiMap[id]; const n = catMap[id]; return e ? `${e} ${n}` : n }
+
+  const fetchDiagrams = useCallback(() => {
+    const params = new URLSearchParams()
+    if (search) params.set('q', search)
+    if (filterCatId !== null) params.set('category_id', filterCatId)
+    if (universeId) params.set('universe_id', universeId)
+    fetch(`/api/diagrams?${params}`)
+      .then(r => r.json())
+      .then(setDiagrams)
+      .catch(() => {})
+  }, [search, filterCatId, universeId])
+
+  useEffect(() => { fetchDiagrams() }, [universeId])
+  useEffect(() => {
+    const t = setTimeout(fetchDiagrams, 300)
+    return () => clearTimeout(t)
+  }, [search, filterCatId, universeId, fetchDiagrams])
+
+  const openDiagram = async (d) => {
+    let full = d
+    if (d.data === undefined || d.data === null) {
+      try {
+        const res = await fetch(`/api/diagrams/${d.id}`)
+        if (!res.ok) return
+        full = await res.json()
+      } catch {
+        return
+      }
+    }
+    setViewing(full)
+  }
+
+  const groups = useMemo(() => {
+    const g = {}
+    const order = []
+    for (const diagram of diagrams) {
+      const key = diagram.category_id ?? '__none__'
+      if (!g[key]) { g[key] = []; order.push(key) }
+      g[key].push(diagram)
+    }
+    order.sort((a, b) => {
+      if (a === '__none__') return 1
+      if (b === '__none__') return -1
+      return (catMap[a] || '').localeCompare(catMap[b] || '')
+    })
+    return order.map(k => ({ key: k, items: g[k] }))
+  }, [diagrams, catMap])
+
+  if (viewing) {
+    return (
+      <MobileDiagramReadonly
+        title={viewing.title}
+        dataJson={viewing.data}
+        onBack={() => setViewing(null)}
+      />
+    )
+  }
+
+  return (
+    <div className="mn-list-view">
+      <div className="mn-view-header" style={{ borderBottom: '1px solid var(--border)' }}>
+        <button type="button" className="mn-back-btn" onClick={onBack} aria-label="Back">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+        </button>
+        <span className="mn-view-header-title">Diagrams</span>
+        <span style={{ flex: 1 }} />
+      </div>
+      <div className="mn-filter-bar">
+        <MobileCategorySelect categories={categories} value={filterCatId} onChange={setFilterCatId} />
+      </div>
+      <div className="mn-search-bar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+        <input className="mn-search-input" placeholder="Search diagrams..." value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+      <div className="mn-markdowns-list">
+        {diagrams.length === 0 ? (
+          <div className="mn-empty">{search || filterCatId != null ? 'No matching diagrams.' : 'No diagrams yet.'}</div>
+        ) : groups.map(({ key, items }) => (
+          <div key={String(key)} className="ma-group">
+            <div className="ma-group-header">
+              {key === '__none__' ? 'Uncategorized' : catLabel(key) || 'Unknown'}
+              <span className="ma-group-count">{items.length}</span>
+            </div>
+            {items.map(d => (
+              <button
+                key={d.id}
+                type="button"
+                className="mn-markdown-card"
+                style={{ width: '100%', border: 'none', background: 'none', font: 'inherit', textAlign: 'left', cursor: 'pointer' }}
+                onClick={() => openDiagram(d)}
+              >
+                <div className="mn-markdown-title">{d.title || 'Untitled'}</div>
+                {d.updated_at && <div className="mn-markdown-preview">{d.updated_at}</div>}
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function MobileCategories({ categories, universeId, onRefresh }) {
+  const handleCategoryAction = async (action, payload) => {
+    if (action === 'add') {
+      const name = payload.name || prompt('Category name:')
+      if (!name?.trim()) return
+      await fetch(`/api/categories?universe_id=${universeId || 1}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), parent_id: payload.parentId }),
+      })
+    } else if (action === 'rename') {
+      const cat = categories.find(c => c.id === payload.id)
+      await fetch(`/api/categories/${payload.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: payload.name, emoji: cat?.emoji || null }),
+      })
+    } else if (action === 'emoji') {
+      const cat = categories.find(c => c.id === payload.id)
+      await fetch(`/api/categories/${payload.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: cat?.name || '', emoji: payload.emoji }),
+      })
+    } else if (action === 'delete') {
+      if (!confirm(`Delete category "${payload.name}" and all its sub-categories?`)) return
+      await fetch(`/api/categories/${payload.id}`, { method: 'DELETE' })
+    }
+    onRefresh?.()
+  }
+
+  return (
+    <div className="m-category-panel mn-list-view">
+      <div className="markdowns-header m-category-panel-header">
+        <span className="markdowns-header-title">Categories</span>
+      </div>
+      <div className="m-category-tree-scroll">
+        <CategoryTree
+          categories={categories}
+          selectedId={null}
+          onSelect={() => {}}
+          onAdd={(parentId, name) => handleCategoryAction('add', { parentId, name })}
+          onRename={(id, name) => handleCategoryAction('rename', { id, name })}
+          onDelete={(id, name) => handleCategoryAction('delete', { id, name })}
+          onUpdateEmoji={(id, emoji) => handleCategoryAction('emoji', { id, emoji })}
+        />
+      </div>
+    </div>
+  )
+}
+
 // ── Main mobile app ───────────────────────────────────
 
 function MobileHelpView({ onClose }) {
@@ -1767,6 +2207,14 @@ function MobileApp() {
     fetch(`/api/categories${params}`).then(r => r.json()).then(setCategories).catch(() => {})
   }, [currentUniverseId])
 
+  const refreshCategories = useCallback(() => {
+    if (currentUniverseId === null) return
+    fetch(`/api/categories?universe_id=${currentUniverseId}`)
+      .then(r => r.json())
+      .then(setCategories)
+      .catch(() => {})
+  }, [currentUniverseId])
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
   }, [ircMessages])
@@ -1956,6 +2404,17 @@ function MobileApp() {
             Help &amp; Setup
           </button>
         </div>
+        <div className="m-menu-section">
+          <div className="m-menu-section-title">Library (read-only)</div>
+          <button className="m-menu-item" onClick={() => { setView('documents'); setMenuOpen(false) }}>Documents</button>
+          <button className="m-menu-item" onClick={() => { setView('links'); setMenuOpen(false) }}>Links</button>
+          <button className="m-menu-item" onClick={() => { setView('diagrams'); setMenuOpen(false) }}>Diagrams</button>
+        </div>
+        <div className="m-menu-section">
+          <div className="m-menu-section-title">Organize</div>
+          <button className="m-menu-item" onClick={() => { setView('categories'); setMenuOpen(false) }}>Categories</button>
+          <button className="m-menu-item" onClick={() => { setView('agent-tasks'); setMenuOpen(false) }}>Agent tasks</button>
+        </div>
       </nav>
 
       {/* Content area */}
@@ -2064,10 +2523,22 @@ function MobileApp() {
         {view === 'actions' && <MobileActions categories={categories} universeId={currentUniverseId} />}
         {view === 'feeds' && <MobileFeeds categories={categories} universeId={currentUniverseId} />}
         {view === 'tables' && <MobileTables categories={categories} universeId={currentUniverseId} />}
+        {view === 'library' && <MobileLibraryHub onPick={setView} />}
+        {view === 'documents' && <MobileDocumentsReadonly categories={categories} universeId={currentUniverseId} onBack={() => setView('library')} />}
+        {view === 'links' && <MobileLinksReadonly categories={categories} universeId={currentUniverseId} onBack={() => setView('library')} />}
+        {view === 'diagrams' && <MobileDiagramsReadonly categories={categories} universeId={currentUniverseId} onBack={() => setView('library')} />}
+        {view === 'categories' && (
+          <MobileCategories categories={categories} universeId={currentUniverseId} onRefresh={refreshCategories} />
+        )}
+        {view === 'agent-tasks' && (
+          <div className="m-agent-tasks-shell">
+            <AgentTasksPanel universeId={currentUniverseId} />
+          </div>
+        )}
       </div>
 
       {/* Bottom tab bar */}
-      <nav className="m-tab-bar">
+      <nav className="m-tab-bar m-tab-bar-scroll">
         <button className={`m-tab ${view === 'chat' ? 'active' : ''}`} onClick={() => setView('chat')}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
           <span>Chat</span>
@@ -2087,6 +2558,29 @@ function MobileApp() {
         <button className={`m-tab ${view === 'tables' ? 'active' : ''}`} onClick={() => setView('tables')}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
           <span>Tables</span>
+        </button>
+        <button className={`m-tab ${view === 'categories' ? 'active' : ''}`} onClick={() => setView('categories')}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+          </svg>
+          <span>Categories</span>
+        </button>
+        <button className={`m-tab ${view === 'agent-tasks' ? 'active' : ''}`} onClick={() => setView('agent-tasks')}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 11l3 3L22 4" />
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+          </svg>
+          <span>Tasks</span>
+        </button>
+        <button
+          className={`m-tab ${['library', 'documents', 'links', 'diagrams'].includes(view) ? 'active' : ''}`}
+          onClick={() => setView('library')}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+          </svg>
+          <span>Library</span>
         </button>
       </nav>
       {showHelp && <MobileHelpView onClose={() => setShowHelp(false)} />}

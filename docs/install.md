@@ -4,6 +4,8 @@ title: Installation
 subtitle: Get Astro running in under a minute
 ---
 
+Astro is **self hosted** software for **building apps on top of AI**: connect MCP clients, run agents, and store memory without handing your data to a third party host.
+
 ## Quick Start
 
 Make sure [Docker](https://docs.docker.com/get-docker/) is installed and running, then:

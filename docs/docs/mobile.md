@@ -1,12 +1,12 @@
 ---
 layout: docs
 title: Mobile interface
-subtitle: On-the-go access at /mobile
+subtitle: On the go access at /mobile
 nav_id: mobile
 permalink: /docs/mobile/
 ---
 
-Astro serves a **mobile-optimized** web app at **`/mobile`** so you can browse your universe, feeds, and core panels on a phone or tablet.
+Astro serves a **mobile optimized** web app at **`/mobile`** so you can use chat, notes, tasks, feeds, library, categories, and agent tasks on a phone or tablet against the same universe as desktop.
 
 ## HTTP API
 

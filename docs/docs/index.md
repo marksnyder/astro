@@ -8,7 +8,7 @@ permalink: /docs/
 
 Welcome to the Astro documentation. Use the **table of contents** on the left to open each topic. Every page describes the product feature and lists the **HTTP API** routes and **MCP tools** that relate to it.
 
-[MCP](https://modelcontextprotocol.io) (Model Context Protocol) is woven into each feature instead of a separate chapter: point any MCP-compatible client at your Astro instance’s `/mcp/` endpoint and use the tools listed on the relevant pages below.
+Astro is a **self hosted platform for building applications on top of AI**: agents, memory, tools, and data in one stack. [MCP](https://modelcontextprotocol.io) (Model Context Protocol) is woven into each feature instead of a separate chapter: point any MCP compatible client at your Astro instance’s `/mcp/` endpoint and use the tools listed on the relevant pages below.
 
 ## Browse by topic
 
@@ -28,4 +28,4 @@ Welcome to the Astro documentation. Use the **table of contents** on the left to
 - [Mobile interface](/docs/mobile/)
 - [Feeds](/docs/feeds/)
 
-The previous single-page “Features” overview now redirects here (`/docs/`).
+The previous single page “Features” overview now redirects here (`/docs/`).

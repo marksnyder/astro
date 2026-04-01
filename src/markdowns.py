@@ -1385,6 +1385,17 @@ class Diagram:
 
 
 @dataclass
+class DiagramSummary:
+    id: int
+    title: str
+    category_id: int | None
+    pinned: bool
+    created_at: str
+    updated_at: str
+    universe_id: int = 1
+
+
+@dataclass
 class Table:
     id: int | None
     title: str
@@ -1418,8 +1429,21 @@ def _row_to_diagram(row: sqlite3.Row) -> Diagram:
     )
 
 
-def list_diagrams(query: str = "", category_id: int | None = None, universe_id: int | None = None) -> list[Diagram]:
-    conn = _get_conn()
+def _row_to_diagram_summary(row: sqlite3.Row) -> DiagramSummary:
+    return DiagramSummary(
+        id=row["id"],
+        title=row["title"],
+        category_id=row["category_id"],
+        pinned=bool(row["pinned"]),
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+        universe_id=row["universe_id"],
+    )
+
+
+def _diagrams_list_where(
+    query: str = "", category_id: int | None = None, universe_id: int | None = None
+) -> tuple[str, list]:
     conditions: list[str] = []
     params: list = []
     if universe_id is not None:
@@ -1434,9 +1458,26 @@ def list_diagrams(query: str = "", category_id: int | None = None, universe_id: 
         conditions.append(f"category_id IN ({placeholders})")
         params.extend(ids)
     where = f" WHERE {' AND '.join(conditions)}" if conditions else ""
+    return where, params
+
+
+def list_diagrams(query: str = "", category_id: int | None = None, universe_id: int | None = None) -> list[Diagram]:
+    where, params = _diagrams_list_where(query, category_id, universe_id)
+    conn = _get_conn()
     rows = conn.execute(f"SELECT * FROM diagrams{where} ORDER BY updated_at DESC", params).fetchall()
     conn.close()
     return [_row_to_diagram(r) for r in rows]
+
+
+def list_diagram_summaries(query: str = "", category_id: int | None = None, universe_id: int | None = None) -> list[DiagramSummary]:
+    where, params = _diagrams_list_where(query, category_id, universe_id)
+    conn = _get_conn()
+    rows = conn.execute(
+        f"SELECT id, title, category_id, pinned, created_at, updated_at, universe_id FROM diagrams{where} ORDER BY updated_at DESC",
+        params,
+    ).fetchall()
+    conn.close()
+    return [_row_to_diagram_summary(r) for r in rows]
 
 
 def get_diagram(diagram_id: int) -> Diagram | None:
@@ -1489,17 +1530,26 @@ def set_diagram_pinned(diagram_id: int, pinned: bool) -> bool:
     return cur.rowcount > 0
 
 
-def list_pinned_diagrams(universe_id: int | None = None) -> list[Diagram]:
+def list_pinned_diagram_summaries(universe_id: int | None = None) -> list[DiagramSummary]:
     conn = _get_conn()
     if universe_id is not None:
-        rows = conn.execute("SELECT * FROM diagrams WHERE pinned = 1 AND universe_id = ? ORDER BY updated_at DESC", (universe_id,)).fetchall()
+        rows = conn.execute(
+            "SELECT id, title, category_id, pinned, created_at, updated_at, universe_id FROM diagrams WHERE pinned = 1 AND universe_id = ? ORDER BY updated_at DESC",
+            (universe_id,),
+        ).fetchall()
     else:
-        rows = conn.execute("SELECT * FROM diagrams WHERE pinned = 1 ORDER BY updated_at DESC").fetchall()
+        rows = conn.execute(
+            "SELECT id, title, category_id, pinned, created_at, updated_at, universe_id FROM diagrams WHERE pinned = 1 ORDER BY updated_at DESC"
+        ).fetchall()
     conn.close()
-    return [_row_to_diagram(r) for r in rows]
+    return [_row_to_diagram_summary(r) for r in rows]
 
 
 def diagram_to_dict(d: Diagram) -> dict:
+    return asdict(d)
+
+
+def diagram_summary_to_dict(d: DiagramSummary) -> dict:
     return asdict(d)
 
 

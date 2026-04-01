@@ -1,59 +1,61 @@
 # Astro
 
-**Your Universe, Organized.**
+**Build apps on top of AI.**
 
-Astro is a self-hosted workspace that brings agent orchestration, markdowns, documents, diagrams, tables, action items, bookmarks, and data feeds into one platform. Everything lives inside **Universes**, cleanly separated workspaces that keep your knowledge organized and contained.
+Astro is a self hosted platform for composing agent workflows, tools, and data around your models. It gives you an Agent Network (IRC), scheduled **Agent Tasks**, markdown and document memory, diagrams, tables, bookmarks, feeds, and a full **MCP** surface so you can ship AI backed experiences instead of only filing notes.
 
-[Documentation](https://runastro.sh/docs/) · [Chrome/Edge Extension](https://chromewebstore.google.com/detail/astro-browse/djbiamicfibnldnmhfnmndpdmghilmmi)
+Everything lives inside **Universes**: separate workspaces so each app or project keeps its own data and agents clean.
+
+[Documentation](https://runastro.sh/docs/) · [Chrome and Edge extension](https://chromewebstore.google.com/detail/astro-browse/djbiamicfibnldnmhfnmndpdmghilmmi)
 
 ---
 
 ## Features
 
 ### AI Agent Network
-A built-in IRC server enables communication with AI agents across platforms. Coordinate agents, communicate across systems, and integrate with external AI platforms from one central hub.
+A built in IRC server connects AI agents and tools. Coordinate runs, bridge systems, and plug in external AI services from one hub.
 
 ### Agent Tasks
-Define recurring or one-off jobs that send instructions to the Agent Network (IRC) on behalf of a chosen markdown note. Each task points at a markdown (instructions live in the note), an IRC channel, and a schedule: manual run only, cron, or a single future time. Messages are delivered by a dedicated IRC client (`astro-task-runner`). The text sent to the channel is driven by a template you can edit in Settings (default includes how to fetch the markdown over HTTP and the note’s ID). The Agent Tasks tab lists all tasks with search, last run and next-run hints, and run/edit/delete actions.
+Define recurring or single jobs that send instructions to the Agent Network on behalf of a markdown note. Each task picks a note (instructions live in the note), an IRC channel, and a schedule: manual run only, cron, or one future time. A dedicated IRC client delivers the message lines. The text is driven by a template in Settings (default includes how to fetch the markdown over HTTP and the note ID). The Agent Tasks tab lists tasks with search, last run and next run hints, and run, edit, and delete actions.
 
 ### Markdowns
-Create and organize structured markdowns with rich formatting, embedded images, category assignment, and full-text search. Every markdown is automatically vectorized for semantic search.
+Author structured markdown with rich formatting, images, categories, and full text search. Notes are vectorized for semantic retrieval and MCP access.
 
 ### Document Archive
-Upload PDF, DOCX, XLSX, PPTX, TXT, MD, and CSV files. Documents are automatically ingested and embedded into the vector store so they become searchable memory, not just storage. Includes inline PDF viewing and Excel rendering as styled tables.
+Upload PDF, DOCX, XLSX, PPTX, TXT, MD, and CSV files. Files are ingested and embedded so agents and search can use them as memory, not only as files. Includes inline PDF viewing and Excel style tables in the UI.
 
 ### Diagrams
-Create visual diagrams powered by [Excalidraw](https://excalidraw.com). Draw shapes, arrows, text, and more with the full Excalidraw editor embedded directly in Astro. Diagrams are stored in native Excalidraw JSON format, so you can import/export `.excalidraw` files and round-trip with excalidraw.com. Assign categories, pin to the header bar, and edit the raw JSON source. Your view position and zoom level are preserved between sessions.
+Visual diagrams with [Excalidraw](https://excalidraw.com). Draw in the embedded editor; store native JSON; import and export `.excalidraw` files. Categories, pins, and MCP let agents create or update diagrams.
 
 ### Tables
-Build structured data with spreadsheet-style tables. Define typed columns (string, number, boolean), then add, edit, and remove rows with inline editing. Tables support pagination and search for large datasets, category assignment, and pinning. Export data to CSV, import CSV into existing tables, or create a new table directly from a CSV file. AI agents can create and query tables through MCP.
+Typed columns (string, number, boolean), inline row editing, pagination, search, categories, CSV import and export, and MCP for agents to create and query data.
 
 ### Action Items
-Track tasks with priority flags, due dates, and categories. Tasks integrate directly into your knowledge system and are vectorized for search.
+Tasks with priorities, due dates, and categories, wired into search and agent context.
 
 ### Bookmarks
-Save and organize links with titles, URLs, and categories. Links become part of your searchable knowledge base.
+Titled links with categories, searchable and pinnable for quick agent and human access.
 
 ### Universes
-Isolate all content (markdowns, documents, diagrams, tables, tasks, links, and categories) into independent workspaces. Use separate Universes for work, personal projects, research, clients, or agent environments.
+Isolate content and categories per project, client, or environment so each AI app or team has a clear boundary.
 
 ### Hierarchical Categories
-A parent/child category tree organizes content across markdowns, documents, tables, tasks, and links with consistent structure. Assign emojis to categories for quick visual identification.
+Parent and child categories across markdowns, documents, tables, tasks, and links. Optional emojis for quick scanning.
 
 ### Pinned Items Bar
-Pin important markdowns, documents, diagrams, tables, links, and feeds to a unified header bar for quick access.
+Pin markdowns, documents, diagrams, tables, links, and feeds to the header for fast access while building or operating workflows.
 
 ### Feeds
-Ingest data from external services into Astro through authenticated API endpoints. Each feed has its own API key and accepts markdown or file uploads via a simple HTTP POST. Incoming artifacts are stored in a timeline view, organized by category, with full search, pagination, and pinning support. Use feeds to pipe CI reports, monitoring alerts, automated summaries, or any external content into your workspace.
+HTTP endpoints with per feed API keys: post markdown or files into timelines. Pipe CI output, alerts, or agent artifacts into Astro for humans and models to consume.
 
 ### Vector Search API
-A `/api/search` endpoint exposes semantic search over the vector store via simple HTTP GET requests, making it easy for scripts and agents to query your knowledge base.
+`GET /api/search` exposes semantic search for scripts and services you wrap around AI.
 
 ### MCP Server
-A built-in [Model Context Protocol](https://modelcontextprotocol.io) server at `/mcp/` lets AI agents discover and use Astro's tools through a standardized interface. Point any MCP-compatible client (Claude Desktop, Cursor, custom agents) at the endpoint to get started.
+A [Model Context Protocol](https://modelcontextprotocol.io) server at `/mcp/` exposes tools so clients such as Claude Desktop, Cursor, or custom agents can read and write Astro data as part of an application.
 
 ### Mobile Interface
-A mobile-optimized interface at `/mobile` keeps your Universe accessible anywhere.
+`/mobile` offers a phone friendly UI for chat, notes, tasks, feeds, tables, library, categories, and agent tasks.
 
 ---
 
@@ -83,7 +85,7 @@ All data is stored on the host at `~/astro-data`:
 | `~/astro-data/documents` | `/app/documents` | Uploaded documents (PDF, DOCX, etc.) |
 | `~/astro-data/tailscale` | `/var/lib/tailscale` | Tailscale authentication state |
 
-Because all data lives in host-mounted volumes, you can tear down and rebuild the container freely without losing anything.
+Because all data lives in host mounted volumes, you can tear down and rebuild the container freely without losing anything.
 
 ### Updating
 
@@ -103,11 +105,11 @@ curl -fsSL https://runastro.sh/install.sh | bash -s -- [OPTIONS]
 
 | Flag | Default | Description |
 |---|---|---|
-| `--port PORT` | `8000` | Host port to expose |
-| `--data-dir DIR` | `~/astro-data` | Persistent data directory |
-| `--ts-authkey KEY` | none | Tailscale auth key (for remote access) |
-| `--ts-hostname NAME` | `astro` | Tailscale hostname |
-| `--ts-serve-https BOOL` | `true` | Enable Tailscale HTTPS proxy |
+| Port | `8000` | Host port to expose |
+| Data directory | `~/astro-data` | Persistent data directory |
+| Tailscale auth key | none | Tailscale auth key (for remote access) |
+| Tailscale hostname | `astro` | Tailscale hostname |
+| Tailscale HTTPS | `true` | Enable Tailscale HTTPS proxy |
 
 Or use environment variables:
 
@@ -119,13 +121,13 @@ PORT=9000 TS_AUTHKEY=tskey-auth-... curl -fsSL https://runastro.sh/install.sh | 
 
 ## Tailscale (Optional Remote Access)
 
-Astro includes built-in Tailscale support. On first run, provide your auth key:
+Astro includes built in Tailscale support. On first run, provide your auth key:
 
 ```bash
 curl -fsSL https://runastro.sh/install.sh | bash -s -- --ts-authkey tskey-auth-XXXXXXX
 ```
 
-Tailscale state is persisted, so subsequent runs don't need the key. Once connected:
+Tailscale state is persisted, so subsequent runs do not need the key. Once connected:
 
 - **LAN:** `http://localhost:8000`
 - **Tailscale HTTPS:** `https://astro.<your-tailnet>.ts.net`
@@ -137,15 +139,15 @@ Create an auth key at [login.tailscale.com/admin/settings/keys](https://login.ta
 ## First Run
 
 1. Open **http://localhost:8000**
-2. Start uploading documents, creating markdowns, or coordinating agents
+2. Connect MCP clients, create markdown instructions, or run Agent Tasks
 
-Embeddings are handled locally and no external API keys are required.
+Embeddings run locally; no external API keys are required for search.
 
 ---
 
 ## Agent Integration
 
-Astro provides two ways for AI agents to interact with your knowledge base.
+Astro gives agents two main integration paths.
 
 ### REST Search Endpoint
 
@@ -153,7 +155,7 @@ Astro provides two ways for AI agents to interact with your knowledge base.
 curl "http://localhost:8000/api/search?q=meeting+notes&k=5"
 ```
 
-Returns the top-k semantically similar chunks from the vector store as JSON.
+Returns the top k semantically similar chunks from the vector store as JSON.
 
 ### MCP Server
 
@@ -164,29 +166,29 @@ The MCP server is available at `http://localhost:8000/mcp/` and exposes 43 tools
 | **Search** | |
 | `search` | Semantic vector search across all indexed content |
 | **Markdowns** | |
-| `search_markdowns` | List/search markdown notes |
+| `search_markdowns` | List or search markdown notes |
 | `read_markdown` | Read a single note by ID |
 | `write_markdown` | Create a new note |
 | `update_markdown` | Update an existing note |
 | `delete_markdown` | Delete a note |
 | **Diagrams (Excalidraw)** | |
-| `search_diagrams` | List/search diagrams |
+| `search_diagrams` | List or search diagrams |
 | `read_diagram` | Read a single diagram by ID (Excalidraw JSON) |
 | `write_diagram` | Create a new diagram (Excalidraw format) |
 | `update_diagram` | Update an existing diagram |
 | `delete_diagram` | Delete a diagram |
 | **Tables** | |
-| `search_tables` | List/search tables |
+| `search_tables` | List or search tables |
 | `read_table` | Read a single table by ID (includes column definitions) |
 | `write_table` | Create a new table with typed columns |
-| `update_table` | Update a table's title, columns, or category |
+| `update_table` | Update a table title, columns, or category |
 | `delete_table` | Delete a table and all its rows |
 | `read_table_rows` | List rows with pagination and search |
 | `write_table_row` | Add a row to a table |
-| `update_table_row` | Update a row's data |
+| `update_table_row` | Update a row |
 | `delete_table_row` | Delete a row |
 | **Action Items** | |
-| `search_action_items` | List/search tasks and to-dos |
+| `search_action_items` | List or search tasks |
 | `read_action_item` | Read a single task by ID |
 | `write_action_item` | Create a new task |
 | `update_action_item` | Update a task |
@@ -194,10 +196,10 @@ The MCP server is available at `http://localhost:8000/mcp/` and exposes 43 tools
 | **Categories** | |
 | `list_all_categories` | List all categories |
 | `write_category` | Create a new category |
-| `update_category` | Update a category's name/emoji |
+| `update_category` | Update a category name or emoji |
 | `delete_category` | Delete a category |
 | **Links** | |
-| `search_links` | List/search bookmarks |
+| `search_links` | List or search bookmarks |
 | `write_link` | Save a new bookmark |
 | `update_link` | Update a bookmark |
 | `delete_link` | Delete a bookmark |
@@ -206,7 +208,7 @@ The MCP server is available at `http://localhost:8000/mcp/` and exposes 43 tools
 | `upload_document` | Upload a new document |
 | `delete_document` | Delete a document |
 | **Feeds** | |
-| `search_feeds` | List/search feeds |
+| `search_feeds` | List or search feeds |
 | `read_feed_posts` | Read posts from a feed |
 | `write_feed_post` | Push a post into a feed |
 | `delete_feed_post` | Delete a feed post |

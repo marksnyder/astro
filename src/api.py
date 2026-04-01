@@ -117,12 +117,13 @@ from src.markdowns import (
     delete_diagram,
     delete_table,
     delete_table_row,
+    diagram_summary_to_dict,
     diagram_to_dict,
     get_diagram,
     get_table,
     get_table_row,
-    list_diagrams,
-    list_pinned_diagrams,
+    list_diagram_summaries,
+    list_pinned_diagram_summaries,
     list_pinned_tables,
     list_table_rows,
     list_tables,
@@ -539,7 +540,7 @@ def api_list_pinned(universe_id: Optional[int] = None):
     links = [link_to_dict(l) for l in list_pinned_links(universe_id=universe_id)]
     feeds = [feed_to_dict(f) for f in list_pinned_feeds(universe_id=universe_id)]
     pinned_cats = [category_to_dict(c) for c in list_pinned_categories(universe_id=universe_id)]
-    diagrams = [diagram_to_dict(d) for d in list_pinned_diagrams(universe_id=universe_id)]
+    diagrams = [diagram_summary_to_dict(d) for d in list_pinned_diagram_summaries(universe_id=universe_id)]
     tables = [table_to_dict(t) for t in list_pinned_tables(universe_id=universe_id)]
     return {"markdowns": markdowns, "documents": docs, "links": links, "feeds": feeds, "feed_categories": pinned_cats, "diagrams": diagrams, "tables": tables}
 
@@ -1818,9 +1819,19 @@ class DiagramResponse(BaseModel):
     universe_id: int = 1
 
 
-@app.get("/api/diagrams", response_model=list[DiagramResponse])
+class DiagramSummaryResponse(BaseModel):
+    id: int
+    title: str
+    category_id: Optional[int]
+    pinned: bool
+    created_at: str
+    updated_at: str
+    universe_id: int = 1
+
+
+@app.get("/api/diagrams", response_model=list[DiagramSummaryResponse])
 def api_list_diagrams(q: str = "", category_id: Optional[int] = None, universe_id: Optional[int] = None):
-    return [diagram_to_dict(d) for d in list_diagrams(q, category_id, universe_id=universe_id)]
+    return [diagram_summary_to_dict(d) for d in list_diagram_summaries(q, category_id, universe_id=universe_id)]
 
 
 @app.get("/api/diagrams/{diagram_id}", response_model=DiagramResponse)

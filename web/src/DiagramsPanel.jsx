@@ -2,64 +2,9 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Excalidraw } from '@excalidraw/excalidraw'
 import '@excalidraw/excalidraw/index.css'
 import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
+import { parseDiagramData, EMPTY_DIAGRAM_JSON as EMPTY_DIAGRAM } from './diagramParse'
 
 const EXCALIDRAW_SOURCE = 'https://excalidraw.com'
-
-const EMPTY_DIAGRAM = JSON.stringify({
-  type: 'excalidraw',
-  version: 2,
-  source: EXCALIDRAW_SOURCE,
-  elements: [],
-  appState: { viewBackgroundColor: '#ffffff', gridSize: 20 },
-  files: {},
-})
-
-function parseDiagramData(raw) {
-  try {
-    const parsed = JSON.parse(raw)
-    if (parsed.type === 'excalidraw') return parsed
-    // Legacy format migration
-    if (parsed.version === 1 && Array.isArray(parsed.elements)) {
-      return {
-        type: 'excalidraw', version: 2, source: EXCALIDRAW_SOURCE,
-        elements: parsed.elements.map(el => {
-          const base = {
-            id: el.id || crypto.randomUUID?.() || Math.random().toString(36).slice(2),
-            type: el.type === 'line' ? 'arrow' : el.type,
-            x: el.x || 0, y: el.y || 0,
-            width: el.width || 0, height: el.height || 0,
-            angle: 0,
-            strokeColor: el.stroke || el.strokeColor || '#1e1e1e',
-            backgroundColor: el.fill || el.backgroundColor || 'transparent',
-            fillStyle: 'solid', strokeWidth: el.strokeWidth || 2,
-            strokeStyle: 'solid', roughness: 0, opacity: 100,
-            seed: Math.floor(Math.random() * 2e9),
-            version: 1, versionNonce: Math.floor(Math.random() * 2e9),
-            isDeleted: false, groupIds: [], frameId: null,
-            boundElements: null, updated: Date.now(),
-            link: null, locked: false, roundness: null,
-          }
-          if (el.type === 'line' || el.type === 'arrow') {
-            base.points = el.points || [[0, 0], [100, 0]]
-            base.endArrowhead = 'arrow'
-            base.startArrowhead = null
-          }
-          if (el.text && el.type === 'text') {
-            base.text = el.text; base.originalText = el.text
-            base.fontSize = el.fontSize || 20; base.fontFamily = 1
-            base.textAlign = 'center'; base.verticalAlign = 'middle'
-            base.lineHeight = 1.25
-            if (el.textColor) base.strokeColor = el.textColor
-          }
-          return base
-        }),
-        appState: { viewBackgroundColor: '#ffffff', gridSize: 20 },
-        files: {},
-      }
-    }
-  } catch { /* ignore */ }
-  return JSON.parse(EMPTY_DIAGRAM)
-}
 
 function serializeScene(elements, appState, files) {
   const cleanAppState = {}
@@ -380,13 +325,6 @@ function DiagramsPanel({ categories, onPinChange, universeId, onEditDiagram, ref
     onPinChange?.()
   }
 
-  const elementCount = (d) => {
-    try {
-      const parsed = JSON.parse(d.data)
-      return (parsed.elements || []).filter(e => !e.isDeleted).length
-    } catch { return 0 }
-  }
-
   const buildGroups = (items) => {
     const groups = []
     const groupMap = {}
@@ -438,7 +376,6 @@ function DiagramsPanel({ categories, onPinChange, universeId, onEditDiagram, ref
                         <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
                       </svg>
                       {d.title || 'Untitled'}
-                      <span className="diagram-card-count">{elementCount(d)}</span>
                     </div>
                     <button className={`pin-btn ${d.pinned ? 'pinned' : ''}`} onClick={e => togglePin(e, d)} title={d.pinned ? 'Unpin' : 'Pin'}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill={d.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

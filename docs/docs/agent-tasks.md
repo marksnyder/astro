@@ -16,7 +16,7 @@ Agent Tasks turn markdown notes into **instructions you can push to the Agent Ne
 
 ### How delivery works
 
-A background runner connects to the built-in IRC server as **`astro-task-runner`**, joins the target channel, and sends the rendered message (split into safe line lengths). The **message body** comes from a **template** in Settings (`agent_task_message_template`). The default template tells the recipient how to retrieve the full markdown via your Astro HTTP API (including `markdown_id` and a read URL). Optional **`agent_task_base_url`** adjusts links for reverse proxies or Tailscale.
+A background runner connects to the built in IRC server using the task runner client, joins the target channel, and sends the rendered message (split into safe line lengths). The **message body** comes from a **template** in Settings (`agent_task_message_template`). The default template tells the recipient how to retrieve the full markdown via your Astro HTTP API (including `markdown_id` and a read URL). Optional **`agent_task_base_url`** adjusts links for reverse proxies or Tailscale.
 
 ### In the app
 

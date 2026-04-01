@@ -6,7 +6,7 @@ nav_id: bookmarks
 permalink: /docs/bookmarks/
 ---
 
-Save and organize links with titles, URLs, and categories. Links are searchable and can be pinned to the header bar.
+Save links with titles, URLs, and categories so humans and agents share the same bookmark memory. Links are searchable and can be pinned to the header bar.
 
 ## HTTP API
 

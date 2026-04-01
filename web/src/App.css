@@ -6417,16 +6417,6 @@
 
 /* ── Diagrams ─────────────────────────────────────────── */
 
-.diagram-card-count {
-  font-size: 0.7rem;
-  color: #94a3b8;
-  background: rgba(148, 163, 184, 0.12);
-  padding: 1px 5px;
-  border-radius: 8px;
-  margin-left: 6px;
-  flex-shrink: 0;
-}
-
 .diagram-editor-view {
   display: flex;
   flex-direction: column;

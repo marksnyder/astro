@@ -8,7 +8,7 @@ permalink: /docs/unified-search/
 
 The desktop and mobile UIs offer **unified search** panels that query markdowns, documents, and links (and related types) in one place, with filters and quick navigation.
 
-This is **client-side orchestration** of the same backing APIs—there is no separate `/api/unified-search` route.
+This is **client side** orchestration of the same backing APIs. There is no separate unified search API route (paths use the existing feature routes only).
 
 ## Related HTTP API
 
