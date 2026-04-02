@@ -1845,26 +1845,33 @@ function App() {
           </div>
 
           <div className="chat-container">
-          {activeTab.type === 'markdown' && activeTab.data ? (
-            <MarkdownEditorView
-              key={activeTab.id}
-              markdown={activeTab.data}
-              categories={categories}
-              viewMode={markdownViewMode}
-              onClose={() => closeTab(activeTab.id)}
-              onSaved={(created, closed) => {
-                setMarkdownRefreshKey(k => k + 1)
-                fetchPinned()
-                if (created && !closed) {
-                  setTabs(prev => prev.map(t => t.id === activeTab.id
-                    ? { ...t, data: created, title: created.title || 'Untitled' }
-                    : t
-                  ))
-                }
-                if (closed) closeTab(activeTab.id)
-              }}
-            />
-          ) : activeTab.type === 'diagram' && activeTab.data ? (
+          {tabs.filter(t => t.type === 'markdown' && t.data).map(tab => (
+            <div
+              key={tab.id}
+              className="workspace-markdown-panel"
+              style={{ display: tab.id === activeTabId ? 'block' : 'none' }}
+              aria-hidden={tab.id !== activeTabId}
+            >
+              <MarkdownEditorView
+                markdown={tab.data}
+                categories={categories}
+                viewMode={markdownViewMode}
+                onClose={() => closeTab(tab.id)}
+                onSaved={(created, closed) => {
+                  setMarkdownRefreshKey(k => k + 1)
+                  fetchPinned()
+                  if (created && !closed) {
+                    setTabs(prev => prev.map(t => t.id === tab.id
+                      ? { ...t, data: created, title: created.title || 'Untitled' }
+                      : t
+                    ))
+                  }
+                  if (closed) closeTab(tab.id)
+                }}
+              />
+            </div>
+          ))}
+          {activeTab.type === 'diagram' && activeTab.data ? (
             <DiagramEditorView
               key={activeTab.id}
               diagram={activeTab.data}
