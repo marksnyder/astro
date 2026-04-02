@@ -1848,8 +1848,7 @@ function App() {
           {tabs.filter(t => t.type === 'markdown' && t.data).map(tab => (
             <div
               key={tab.id}
-              className="workspace-markdown-panel"
-              style={{ display: tab.id === activeTabId ? 'block' : 'none' }}
+              className={`workspace-markdown-panel ${tab.id !== activeTabId ? 'workspace-markdown-panel-hidden' : ''}`}
               aria-hidden={tab.id !== activeTabId}
             >
               <MarkdownEditorView

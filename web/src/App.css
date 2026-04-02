@@ -31,6 +31,23 @@
   max-width: none;
 }
 
+/* Wrapper keeps each markdown tab mounted; must fill flex height like a direct .markdown-inline-editor child */
+.workspace-markdown-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.workspace-markdown-panel-hidden {
+  display: none !important;
+}
+.workspace-markdown-panel > .markdown-inline-editor {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+
 /* ── Main Panel (tabs + content wrapper) ────────────── */
 
 .main-panel {
