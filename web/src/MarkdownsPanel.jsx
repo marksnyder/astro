@@ -696,6 +696,8 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
   const isNew = !!markdown?._new
   const autosaveTimer = useRef(null)
   const initializedRef = useRef(false)
+  // Only re-hydrate local state when the *document* changes, not when the parent passes a new object for the same id (e.g. after list refresh or autosave).
+  const markdownSyncKey = isNew ? `new:${markdown?._key ?? 'default'}` : markdown?.id
 
   const htmlToMarkdownText = (html) => {
     if (!html) return ''
@@ -709,6 +711,7 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
   }
 
   useEffect(() => {
+    if (markdown == null) return
     setCreatedId(null)
     initializedRef.current = false
     if (isNew) {
@@ -723,7 +726,8 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
     if (isNew) setTimeout(() => titleRef.current?.focus(), 50)
     setTimeout(() => { initializedRef.current = true }, 0)
     return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current) }
-  }, [markdown])
+    // Intentionally depend on document identity only — `markdown` reference often changes without a real navigation.
+  }, [markdownSyncKey])
 
   const doAutosave = useCallback(async (t, b, catId) => {
     if (!t.trim() && !b.trim()) return
@@ -746,7 +750,7 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
       setCreatedId(created.id)
       onSaved?.(created, false)
     }
-  }, [markdown, isNew, onSaved, createdId])
+  }, [markdown?.id, markdown?.universeId, isNew, onSaved, createdId])
 
   useEffect(() => {
     if (!initializedRef.current) return
