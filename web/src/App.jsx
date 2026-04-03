@@ -1284,6 +1284,8 @@ function App() {
       if (!confirm(`Delete category "${payload.name}" and all its sub-categories?`)) return
       await fetch(`/api/categories/${payload.id}`, { method: 'DELETE' })
       if (selectedCategoryId === payload.id) setSelectedCategoryId(null)
+    } else if (action === 'move') {
+      await fetch(`/api/categories/${payload.id}/move?direction=${payload.direction}`, { method: 'PUT' })
     }
     fetchCategories()
   }
@@ -1712,6 +1714,7 @@ function App() {
                 onRename={(id, name) => handleCategoryAction('rename', { id, name })}
                 onDelete={(id, name) => handleCategoryAction('delete', { id, name })}
                 onUpdateEmoji={(id, emoji) => handleCategoryAction('emoji', { id, emoji })}
+                onMoveCategory={(id, direction) => handleCategoryAction('move', { id, direction })}
               />
             </div>
           )}

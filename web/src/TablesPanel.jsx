@@ -1,14 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
+import { SidebarCategoryTree } from './SidebarCategoryTree'
 
 function TablesPanel({ categories, universeId, onPinChange, onEditTable, refreshKey, onLoaded }) {
   const [tables, setTables] = useState([])
   const [search, setSearch] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
   const [editingTable, setEditingTable] = useState(null)
-
-  const catMap = Object.fromEntries(categories.map(c => [c.id, c.name]))
-  const catEmojiMap = Object.fromEntries(categories.map(c => [c.id, c.emoji || null]))
 
   const fetchTables = useCallback(() => {
     const params = new URLSearchParams()
@@ -77,23 +75,6 @@ function TablesPanel({ categories, universeId, onPinChange, onEditTable, refresh
     input.click()
   }
 
-  const buildGroups = (items) => {
-    const groups = []
-    const groupMap = {}
-    for (const item of items) {
-      const key = item.category_id ?? '__none__'
-      if (!(key in groupMap)) {
-        const group = { categoryId: item.category_id, name: item.category_id ? (catMap[item.category_id] || 'Unknown') : null, items: [], newestAt: item.updated_at }
-        groupMap[key] = group
-        groups.push(group)
-      }
-      groupMap[key].items.push(item)
-      if (item.updated_at > groupMap[key].newestAt) groupMap[key].newestAt = item.updated_at
-    }
-    groups.sort((a, b) => b.newestAt.localeCompare(a.newestAt))
-    return groups
-  }
-
   return (
     <aside className="markdowns-panel">
       <div className="markdowns-header">
@@ -114,13 +95,15 @@ function TablesPanel({ categories, universeId, onPinChange, onEditTable, refresh
       <div className="markdowns-list">
         {tables.length === 0 ? (
           <div className="markdowns-empty">{search || selectedCategoryId ? 'No matching tables.' : 'No tables yet. Click + to create one.'}</div>
-        ) : buildGroups(tables).map(group => (
-          <div key={group.categoryId ?? '__none__'} className="ai-group">
-            <div className="ai-group-header">
-              <span className="ai-group-emoji">{group.categoryId ? (catEmojiMap[group.categoryId] || '🏷️') : '🏷️'}</span>
-              <span className="ai-group-name">{group.name || 'Uncategorized'}</span>
-            </div>
-            {group.items.map(table => {
+        ) : (
+          <SidebarCategoryTree
+            universeId={universeId}
+            panelId="tables"
+            categories={categories}
+            items={tables}
+            getCategoryId={(t) => t.category_id}
+            getTitle={(t) => t.title || ''}
+            renderItem={(table) => {
               let colCount = 0
               try { colCount = JSON.parse(table.columns).length } catch {}
               return (
@@ -132,12 +115,12 @@ function TablesPanel({ categories, universeId, onPinChange, onEditTable, refresh
                       </svg>
                       {table.title || 'Untitled'}
                     </div>
-                    <button className={`pin-btn ${table.pinned ? 'pinned' : ''}`} onClick={e => togglePin(e, table)} title={table.pinned ? 'Unpin' : 'Pin'}>
+                    <button className={`pin-btn ${table.pinned ? 'pinned' : ''}`} onClick={(e) => togglePin(e, table)} title={table.pinned ? 'Unpin' : 'Pin'}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill={table.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M12 17v5" /><path d="M9 2h6l-1 7h4l-5 7H7l2-7H5l1-7z" />
                       </svg>
                     </button>
-                    <button className="markdown-card-delete-btn" onClick={e => { e.stopPropagation(); remove(table.id) }} title="Delete table">
+                    <button className="markdown-card-delete-btn" onClick={(e) => { e.stopPropagation(); remove(table.id) }} title="Delete table">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
                       </svg>
@@ -148,9 +131,9 @@ function TablesPanel({ categories, universeId, onPinChange, onEditTable, refresh
                   </div>
                 </div>
               )
-            })}
-          </div>
-        ))}
+            }}
+          />
+        )}
       </div>
     </aside>
   )

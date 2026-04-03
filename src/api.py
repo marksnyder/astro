@@ -91,6 +91,7 @@ from src.markdowns import (
     link_to_dict,
     markdown_image_to_dict,
     markdown_to_dict,
+    move_category,
     update_category,
     update_feed,
     rename_universe,
@@ -285,6 +286,7 @@ class CategoryResponse(BaseModel):
     parent_id: Optional[int]
     universe_id: int = 1
     emoji: Optional[str] = None
+    sort_order: int = 0
 
 
 class DocumentInfo(BaseModel):
@@ -439,6 +441,16 @@ def api_update_category(cat_id: int, req: CategoryUpdateRequest):
     cat = update_category(cat_id, name=req.name, emoji=req.emoji)
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found")
+    return category_to_dict(cat)
+
+
+@app.put("/api/categories/{cat_id}/move", response_model=CategoryResponse)
+def api_move_category(cat_id: int, direction: str):
+    if direction not in ("up", "down"):
+        raise HTTPException(status_code=400, detail="direction must be 'up' or 'down'")
+    cat = move_category(cat_id, direction)
+    if not cat:
+        raise HTTPException(status_code=400, detail="Cannot move category in that direction")
     return category_to_dict(cat)
 
 

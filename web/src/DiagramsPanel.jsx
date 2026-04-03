@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Excalidraw } from '@excalidraw/excalidraw'
 import '@excalidraw/excalidraw/index.css'
 import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
+import { SidebarCategoryTree } from './SidebarCategoryTree'
 import { parseDiagramData, EMPTY_DIAGRAM_JSON as EMPTY_DIAGRAM } from './diagramParse'
 
 const EXCALIDRAW_SOURCE = 'https://excalidraw.com'
@@ -287,9 +288,6 @@ function DiagramsPanel({ categories, onPinChange, universeId, onEditDiagram, ref
   const [search, setSearch] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
 
-  const catMap = Object.fromEntries(categories.map(c => [c.id, c.name]))
-  const catEmojiMap = Object.fromEntries(categories.map(c => [c.id, c.emoji || null]))
-
   const fetchDiagrams = () => {
     const params = new URLSearchParams()
     if (search) params.set('q', search)
@@ -325,23 +323,6 @@ function DiagramsPanel({ categories, onPinChange, universeId, onEditDiagram, ref
     onPinChange?.()
   }
 
-  const buildGroups = (items) => {
-    const groups = []
-    const groupMap = {}
-    for (const item of items) {
-      const key = item.category_id ?? '__none__'
-      if (!(key in groupMap)) {
-        const group = { categoryId: item.category_id, name: item.category_id ? (catMap[item.category_id] || 'Unknown') : null, items: [], newestAt: item.updated_at }
-        groupMap[key] = group
-        groups.push(group)
-      }
-      groupMap[key].items.push(item)
-      if (item.updated_at > groupMap[key].newestAt) groupMap[key].newestAt = item.updated_at
-    }
-    groups.sort((a, b) => b.newestAt.localeCompare(a.newestAt))
-    return groups
-  }
-
   return (
     <aside className="markdowns-panel">
       <div className="markdowns-header">
@@ -362,36 +343,36 @@ function DiagramsPanel({ categories, onPinChange, universeId, onEditDiagram, ref
             {search || selectedCategoryId ? 'No matching diagrams.' : 'No diagrams yet. Click + to create one.'}
           </div>
         ) : (
-          buildGroups(diagrams).map(group => (
-            <div key={group.categoryId ?? '__none__'} className="ai-group">
-              <div className="ai-group-header">
-                <span className="ai-group-emoji">{group.categoryId ? (catEmojiMap[group.categoryId] || '🏷️') : '🏷️'}</span>
-                <span className="ai-group-name">{group.name || 'Uncategorized'}</span>
-              </div>
-              {group.items.map(d => (
-                <div key={d.id} className="markdown-card" onClick={() => startEdit(d)}>
-                  <div className="markdown-card-header">
-                    <div className="markdown-card-title">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 4, opacity: 0.5, flexShrink: 0 }}>
-                        <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
-                      </svg>
-                      {d.title || 'Untitled'}
-                    </div>
-                    <button className={`pin-btn ${d.pinned ? 'pinned' : ''}`} onClick={e => togglePin(e, d)} title={d.pinned ? 'Unpin' : 'Pin'}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill={d.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 17v5" /><path d="M9 2h6l-1 7h4l-5 7H7l2-7H5l1-7z" />
-                      </svg>
-                    </button>
-                    <button className="markdown-card-delete-btn" onClick={e => { e.stopPropagation(); remove(d.id) }} title="Delete diagram">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                      </svg>
-                    </button>
+          <SidebarCategoryTree
+            universeId={universeId}
+            panelId="diagrams"
+            categories={categories}
+            items={diagrams}
+            getCategoryId={(d) => d.category_id}
+            getTitle={(d) => d.title || ''}
+            renderItem={(d) => (
+              <div key={d.id} className="markdown-card" onClick={() => startEdit(d)}>
+                <div className="markdown-card-header">
+                  <div className="markdown-card-title">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 4, opacity: 0.5, flexShrink: 0 }}>
+                      <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+                    </svg>
+                    {d.title || 'Untitled'}
                   </div>
+                  <button className={`pin-btn ${d.pinned ? 'pinned' : ''}`} onClick={(e) => togglePin(e, d)} title={d.pinned ? 'Unpin' : 'Pin'}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill={d.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 17v5" /><path d="M9 2h6l-1 7h4l-5 7H7l2-7H5l1-7z" />
+                    </svg>
+                  </button>
+                  <button className="markdown-card-delete-btn" onClick={(e) => { e.stopPropagation(); remove(d.id) }} title="Delete diagram">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                    </svg>
+                  </button>
                 </div>
-              ))}
-            </div>
-          ))
+              </div>
+            )}
+          />
         )}
       </div>
     </aside>

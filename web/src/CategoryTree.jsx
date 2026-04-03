@@ -1,34 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import data from '@emoji-mart/data'
 import { Picker } from 'emoji-mart'
-
-// ── Build nested tree from flat list ──────────────────
-
-function buildTree(categories, parentId = null) {
-  return categories
-    .filter((c) => c.parent_id === parentId)
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((c) => ({ ...c, children: buildTree(categories, c.id) }))
-}
-
-// ── Flatten tree for <select> with indentation ────────
-
-function flattenForSelect(categories, parentId = null, depth = 0) {
-  const result = []
-  const children = categories
-    .filter((c) => c.parent_id === parentId)
-    .sort((a, b) => a.name.localeCompare(b.name))
-  for (const c of children) {
-    result.push({ ...c, depth })
-    result.push(...flattenForSelect(categories, c.id, depth + 1))
-  }
-  return result
-}
+import { buildCategoryTree, flattenCategoriesForSelect } from './categorySidebarOrder'
 
 // ── Category picker <select> ──────────────────────────
 
 export function CategoryPicker({ categories, value, onChange, className }) {
-  const flat = flattenForSelect(categories)
+  const flat = flattenCategoriesForSelect(categories)
   return (
     <select
       className={`category-select ${className || ''}`}
@@ -48,7 +26,7 @@ export function CategoryPicker({ categories, value, onChange, className }) {
 // ── Category filter picker (for panel filtering) ─────
 
 export function CategoryFilterPicker({ categories, value, onChange }) {
-  const flat = flattenForSelect(categories)
+  const flat = flattenCategoriesForSelect(categories)
   return (
     <select
       className="category-filter-select"
@@ -128,11 +106,25 @@ export function EmojiPopover({ emoji, onSelect, onClear }) {
 
 // ── Tree node (recursive) ─────────────────────────────
 
-function TreeNode({ node, depth, selectedId, onSelect, onAdd, onRename, onDelete, onUpdateEmoji }) {
+function TreeNode({
+  node,
+  depth,
+  siblings,
+  selectedId,
+  onSelect,
+  onAdd,
+  onRename,
+  onDelete,
+  onUpdateEmoji,
+  onMove,
+}) {
   const [expanded, setExpanded] = useState(true)
   const [renaming, setRenaming] = useState(false)
   const [renameVal, setRenameVal] = useState('')
   const hasChildren = node.children.length > 0
+  const sibIdx = siblings.findIndex((s) => s.id === node.id)
+  const canMoveUp = onMove && sibIdx > 0
+  const canMoveDown = onMove && sibIdx >= 0 && sibIdx < siblings.length - 1
 
   const startRename = (e) => {
     e.stopPropagation()
@@ -193,6 +185,32 @@ function TreeNode({ node, depth, selectedId, onSelect, onAdd, onRename, onDelete
         )}
 
         <div className="tree-actions">
+          {onMove && (
+            <>
+              <button
+                type="button"
+                className="tree-action-btn tree-move-btn"
+                disabled={!canMoveUp}
+                onClick={(e) => { e.stopPropagation(); if (canMoveUp) onMove(node.id, 'up') }}
+                title="Move up"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="18 15 12 9 6 15" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="tree-action-btn tree-move-btn"
+                disabled={!canMoveDown}
+                onClick={(e) => { e.stopPropagation(); if (canMoveDown) onMove(node.id, 'down') }}
+                title="Move down"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+            </>
+          )}
           <button
             className="tree-action-btn"
             onClick={(e) => { e.stopPropagation(); onAdd(node.id) }}
@@ -218,6 +236,7 @@ function TreeNode({ node, depth, selectedId, onSelect, onAdd, onRename, onDelete
         <TreeNode
           key={child.id}
           node={child}
+          siblings={node.children}
           depth={depth + 1}
           selectedId={selectedId}
           onSelect={onSelect}
@@ -225,6 +244,7 @@ function TreeNode({ node, depth, selectedId, onSelect, onAdd, onRename, onDelete
           onRename={onRename}
           onDelete={onDelete}
           onUpdateEmoji={onUpdateEmoji}
+          onMove={onMove}
         />
       ))}
     </>
@@ -233,10 +253,10 @@ function TreeNode({ node, depth, selectedId, onSelect, onAdd, onRename, onDelete
 
 // ── Main tree component ───────────────────────────────
 
-export default function CategoryTree({ categories, selectedId, onSelect, onAdd, onRename, onDelete, onUpdateEmoji }) {
+export default function CategoryTree({ categories, selectedId, onSelect, onAdd, onRename, onDelete, onUpdateEmoji, onMoveCategory }) {
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
-  const tree = buildTree(categories)
+  const tree = buildCategoryTree(categories)
 
   const commitAdd = () => {
     if (newName.trim()) {
@@ -270,6 +290,7 @@ export default function CategoryTree({ categories, selectedId, onSelect, onAdd, 
         <TreeNode
           key={node.id}
           node={node}
+          siblings={tree}
           depth={0}
           selectedId={selectedId}
           onSelect={onSelect}
@@ -277,6 +298,7 @@ export default function CategoryTree({ categories, selectedId, onSelect, onAdd, 
           onRename={onRename}
           onDelete={onDelete}
           onUpdateEmoji={onUpdateEmoji}
+          onMove={onMoveCategory}
         />
       ))}
 

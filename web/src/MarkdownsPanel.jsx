@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
+import { SidebarCategoryTree } from './SidebarCategoryTree'
 
 // ── MCP tool templates ────────────────────────────────
 
@@ -792,9 +793,6 @@ function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMa
   const [onlyLinked, setOnlyLinked] = useState(false)
   const [linkedMarkdownIds, setLinkedMarkdownIds] = useState(null)
 
-  const catMap = Object.fromEntries(categories.map((c) => [c.id, c.name]))
-  const catEmojiMap = Object.fromEntries(categories.map((c) => [c.id, c.emoji || null]))
-
   const fetchMarkdowns = () => {
     const params = new URLSearchParams()
     if (search) params.set('q', search)
@@ -852,23 +850,6 @@ function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMa
 
   // ── List view ────────────────────────────────────────
 
-  const buildGroups = (items, catMap) => {
-    const groups = []
-    const groupMap = {}
-    for (const item of items) {
-      const key = item.category_id ?? '__none__'
-      if (!(key in groupMap)) {
-        const group = { categoryId: item.category_id, name: item.category_id ? (catMap[item.category_id] || 'Unknown') : null, items: [], newestAt: item.updated_at }
-        groupMap[key] = group
-        groups.push(group)
-      }
-      groupMap[key].items.push(item)
-      if (item.updated_at > groupMap[key].newestAt) groupMap[key].newestAt = item.updated_at
-    }
-    groups.sort((a, b) => b.newestAt.localeCompare(a.newestAt))
-    return groups
-  }
-
   return (
     <aside className="markdowns-panel">
       <div className="markdowns-header">
@@ -905,13 +886,15 @@ function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMa
               {onlyLinked ? 'No markdowns with linked action items.' : search || selectedCategoryId ? 'No matching markdowns.' : 'No markdowns yet. Click + to create one.'}
             </div>
           )
-          return buildGroups(filtered, catMap).map((group) => (
-            <div key={group.categoryId ?? '__none__'} className="ai-group">
-              <div className="ai-group-header">
-                <span className="ai-group-emoji">{group.categoryId ? (catEmojiMap[group.categoryId] || '🏷️') : '🏷️'}</span>
-                <span className="ai-group-name">{group.name || 'Uncategorized'}</span>
-              </div>
-              {group.items.map((markdown) => (
+          return (
+            <SidebarCategoryTree
+              universeId={universeId}
+              panelId="markdowns"
+              categories={categories}
+              items={filtered}
+              getCategoryId={(m) => m.category_id}
+              getTitle={(m) => m.title || ''}
+              renderItem={(markdown) => (
                 <div key={markdown.id} className="markdown-card" onClick={() => startEdit(markdown)}>
                   <div className="markdown-card-header">
                     <div className="markdown-card-title">{markdown.title || 'Untitled'}</div>
@@ -939,9 +922,9 @@ function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMa
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
-          ))
+              )}
+            />
+          )
         })()}
       </div>
     </aside>

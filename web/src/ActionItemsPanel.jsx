@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
+import { SidebarCategoryTree } from './SidebarCategoryTree'
 
 function launchFireworks() {
   const canvas = document.createElement('canvas')
@@ -209,9 +210,6 @@ function ActionItemsPanel({ categories, onOpenMarkdown, universeId, onLoaded }) 
   const [saving, setSaving] = useState(false)
   const titleRef = useRef(null)
 
-  const catMap = Object.fromEntries(categories.map((c) => [c.id, c.name]))
-  const catEmojiMap = Object.fromEntries(categories.map((c) => [c.id, c.emoji || null]))
-
   const fetchItems = () => {
     const params = new URLSearchParams()
     if (search) params.set('q', search)
@@ -355,34 +353,12 @@ function ActionItemsPanel({ categories, onOpenMarkdown, universeId, onLoaded }) 
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
-  const buildGroups = (sourceItems) => {
-    const groups = []
-    const groupMap = {}
-    for (const item of sourceItems) {
-      const key = item.category_id ?? '__none__'
-      if (!(key in groupMap)) {
-        const group = { categoryId: item.category_id, name: item.category_id ? (catMap[item.category_id] || 'Unknown') : null, items: [] }
-        groupMap[key] = group
-        groups.push(group)
-      }
-      groupMap[key].items.push(item)
-    }
-    groups.sort((a, b) => {
-      if (a.categoryId === null && b.categoryId !== null) return 1
-      if (a.categoryId !== null && b.categoryId === null) return -1
-      if (a.name && b.name) return a.name.localeCompare(b.name)
-      return 0
-    })
-    return groups
-  }
-
   // Determine whether we can show the link picker (need a saved item id)
   const editingId = editing && editing !== 'new' ? editing.id : null
 
   const filteredItems = selectedCategoryId !== null
     ? items.filter(i => i.category_id === selectedCategoryId)
     : items
-  const groups = buildGroups(filteredItems)
 
   return (
     <div className="markdowns-panel">
@@ -421,108 +397,108 @@ function ActionItemsPanel({ categories, onOpenMarkdown, universeId, onLoaded }) 
             {search || selectedCategoryId ? 'No matching action items.' : showCompleted ? 'No action items.' : 'No open action items.'}
           </div>
         ) : (
-          groups.map((group) => (
-            <div key={group.categoryId ?? '__none__'} className="ai-group">
-              <div className="ai-group-header">
-                <span className="ai-group-emoji">{group.categoryId ? (catEmojiMap[group.categoryId] || '🏷️') : '🏷️'}</span>
-                <span className="ai-group-name">{group.name || 'Uncategorized'}</span>
-              </div>
-              {group.items.map((item) => (
-                <div
-                  key={item.id}
-                  className={`ai-card ${item.hot ? 'ai-hot' : ''} ${item.completed ? 'ai-completed' : ''}`}
+          <SidebarCategoryTree
+            universeId={universeId}
+            panelId="actions"
+            categories={categories}
+            items={filteredItems}
+            getCategoryId={(i) => i.category_id}
+            getTitle={(i) => i.title || ''}
+            renderItem={(item) => (
+              <div
+                key={item.id}
+                className={`ai-card ${item.hot ? 'ai-hot' : ''} ${item.completed ? 'ai-completed' : ''}`}
+              >
+                <button
+                  className={`ai-check-btn ${item.completed ? 'checked' : ''} ${flashingId === item.id ? 'ai-check-flash' : ''}`}
+                  onClick={() => toggleCompleted(item)}
+                  title={item.completed ? 'Mark incomplete' : 'Mark complete'}
                 >
-                  <button
-                    className={`ai-check-btn ${item.completed ? 'checked' : ''} ${flashingId === item.id ? 'ai-check-flash' : ''}`}
-                    onClick={() => toggleCompleted(item)}
-                    title={item.completed ? 'Mark incomplete' : 'Mark complete'}
-                  >
-                    {item.completed ? (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    ) : (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10" />
-                      </svg>
-                    )}
-                  </button>
-                  <div className="ai-card-body" onClick={() => startEdit(item)}>
-                    <div className="ai-card-title">
-                      {item.hot && (
-                        <span className="ai-hot-badge" title="Hot">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z" />
-                          </svg>
-                        </span>
-                      )}
-                      <span className={item.completed ? 'ai-title-done' : ''}>{item.title}</span>
-                    </div>
-                    {item.due_date && (
-                      <div className={`ai-due-date ${!item.completed && isOverdue(item.due_date) ? 'overdue' : ''}`}>
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                  {item.completed ? (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                    </svg>
+                  )}
+                </button>
+                <div className="ai-card-body" onClick={() => startEdit(item)}>
+                  <div className="ai-card-title">
+                    {item.hot && (
+                      <span className="ai-hot-badge" title="Hot">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z" />
                         </svg>
-                        {formatDueDate(item.due_date)}
-                        {!item.completed && isOverdue(item.due_date) && <span className="ai-overdue-label">overdue</span>}
-                      </div>
+                      </span>
                     )}
-                    {item.links && item.links.filter(l => l.link_type === 'markdown').length > 0 && (
-                      <div className="ai-card-markdown-links">
-                        {item.links.filter(l => l.link_type === 'markdown').map(lk => (
-                          <button
-                            key={lk.id}
-                            className="ai-markdown-link-btn"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              if (onOpenMarkdown && lk.markdown_id) onOpenMarkdown(lk.markdown_id)
-                            }}
-                            title={`Open markdown: ${lk.display_name}`}
-                          >
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                              <polyline points="14 2 14 8 20 8" />
-                            </svg>
-                            <span>{lk.display_name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {item.links && item.links.filter(l => l.link_type === 'document').length > 0 && (
-                      <div className="ai-card-links-count">
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-                          <polyline points="13 2 13 9 20 9" />
-                        </svg>
-                        {item.links.filter(l => l.link_type === 'document').length} doc{item.links.filter(l => l.link_type === 'document').length !== 1 ? 's' : ''}
-                      </div>
-                    )}
+                    <span className={item.completed ? 'ai-title-done' : ''}>{item.title}</span>
                   </div>
-                  <button
-                    className={`ai-hot-btn ${item.hot ? 'active' : ''}`}
-                    onClick={(e) => { e.stopPropagation(); toggleHot(item) }}
-                    title={item.hot ? 'Remove hot flag' : 'Mark as hot'}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill={item.hot ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z" />
-                    </svg>
-                  </button>
-                  <button
-                    className="ai-delete-btn"
-                    onClick={(e) => removeItem(e, item)}
-                    title="Delete"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                      <path d="M10 11v6" /><path d="M14 11v6" />
-                      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                    </svg>
-                  </button>
+                  {item.due_date && (
+                    <div className={`ai-due-date ${!item.completed && isOverdue(item.due_date) ? 'overdue' : ''}`}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                      </svg>
+                      {formatDueDate(item.due_date)}
+                      {!item.completed && isOverdue(item.due_date) && <span className="ai-overdue-label">overdue</span>}
+                    </div>
+                  )}
+                  {item.links && item.links.filter(l => l.link_type === 'markdown').length > 0 && (
+                    <div className="ai-card-markdown-links">
+                      {item.links.filter(l => l.link_type === 'markdown').map(lk => (
+                        <button
+                          key={lk.id}
+                          className="ai-markdown-link-btn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (onOpenMarkdown && lk.markdown_id) onOpenMarkdown(lk.markdown_id)
+                          }}
+                          title={`Open markdown: ${lk.display_name}`}
+                        >
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                          </svg>
+                          <span>{lk.display_name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {item.links && item.links.filter(l => l.link_type === 'document').length > 0 && (
+                    <div className="ai-card-links-count">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+                        <polyline points="13 2 13 9 20 9" />
+                      </svg>
+                      {item.links.filter(l => l.link_type === 'document').length} doc{item.links.filter(l => l.link_type === 'document').length !== 1 ? 's' : ''}
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
-          ))
+                <button
+                  className={`ai-hot-btn ${item.hot ? 'active' : ''}`}
+                  onClick={(e) => { e.stopPropagation(); toggleHot(item) }}
+                  title={item.hot ? 'Remove hot flag' : 'Mark as hot'}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill={item.hot ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z" />
+                  </svg>
+                </button>
+                <button
+                  className="ai-delete-btn"
+                  onClick={(e) => removeItem(e, item)}
+                  title="Delete"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                    <path d="M10 11v6" /><path d="M14 11v6" />
+                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          />
         )}
       </div>
 

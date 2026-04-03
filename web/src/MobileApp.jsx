@@ -9,6 +9,9 @@ import BACKGROUNDS from './backgrounds'
 import { parseDiagramData, EMPTY_DIAGRAM_JSON } from './diagramParse'
 import CategoryTree from './CategoryTree'
 import AgentTasksPanel from './AgentTasksPanel'
+import { sortCategoriesForTree } from './categorySidebarOrder'
+import { formatCategoryHierarchyLabel } from './categoryHierarchy'
+import { MobileCategoryTree } from './SidebarCategoryTree'
 
 const LOGO_URL = '/logo.png'
 
@@ -78,8 +81,7 @@ function MobileCategorySelect({ categories, value, onChange }) {
     }
     const opts = []
     const walk = (parentId, depth) => {
-      const children = childMap[parentId] || []
-      children.sort((a, b) => a.name.localeCompare(b.name))
+      const children = sortCategoriesForTree(childMap[parentId] || [])
       for (const c of children) {
         opts.push({ id: c.id, label: '\u00A0\u00A0'.repeat(depth) + (c.emoji ? c.emoji + ' ' : '') + c.name })
         walk(c.id, depth + 1)
@@ -129,10 +131,6 @@ function MobileMarkdowns({ categories, universeId }) {
   const releaseWakeLock = () => {
     if (wakeLockRef.current) { wakeLockRef.current.release().catch(() => {}); wakeLockRef.current = null }
   }
-
-  const catMap = Object.fromEntries(categories.map(c => [c.id, c.name]))
-  const catEmojiMap = Object.fromEntries(categories.map(c => [c.id, c.emoji]))
-  const catLabel = (id) => { const e = catEmojiMap[id]; const n = catMap[id]; return e ? `${e} ${n}` : n }
 
   const getLastCategoryId = () => {
     try { const v = localStorage.getItem('mn-last-category'); return v ? parseInt(v) : null } catch { return null }
@@ -421,40 +419,31 @@ function MobileMarkdowns({ categories, universeId }) {
       <div className="mn-markdowns-list">
         {markdowns.length === 0 ? (
           <div className="mn-empty">{search || filterCatId ? 'No matching markdowns.' : 'No markdowns yet. Tap + to create one.'}</div>
-        ) : (() => {
-          const groups = {}
-          const order = []
-          for (const markdown of markdowns) {
-            const key = markdown.category_id ?? '__none__'
-            if (!groups[key]) { groups[key] = []; order.push(key) }
-            groups[key].push(markdown)
-          }
-          order.sort((a, b) => {
-            if (a === '__none__') return 1
-            if (b === '__none__') return -1
-            return (catMap[a] || '').localeCompare(catMap[b] || '')
-          })
-          return order.map(key => (
-            <div key={key} className="ma-group">
-              <div className="ma-group-header">
-                {key === '__none__' ? 'Uncategorized' : catLabel(key) || 'Unknown'}
-                <span className="ma-group-count">{groups[key].length}</span>
-              </div>
-              {groups[key].map(markdown => (
-                <div key={markdown.id} className={`mn-markdown-card ${markdown.pinned ? 'pinned' : ''}`} onClick={() => setViewing(markdown)}>
-                  <div className="mn-markdown-title">
-                    {markdown.pinned && <svg className="mn-pin-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1"><path d="M12 2l3 9h9l-7 5 3 9-8-6-8 6 3-9-7-5h9z" /></svg>}
-                    {markdown.title || 'Untitled'}
-                  </div>
-                  <div className="mn-markdown-preview">{stripHtml(markdown.body).slice(0, 100)}</div>
-                  <div className="mn-markdown-card-footer">
-                    <span className="mn-markdown-date">{formatDate(markdown.updated_at)}</span>
-                  </div>
+        ) : (
+          <MobileCategoryTree
+            universeId={universeId}
+            panelId="m.markdowns"
+            categories={categories}
+            items={markdowns}
+            getCategoryId={(m) => m.category_id}
+            getTitle={(m) => m.title || ''}
+            renderCategoryHeaderExtra={(categoryId) => (
+              <span className="ma-group-count">{markdowns.filter((m) => (m.category_id ?? null) === (categoryId ?? null)).length}</span>
+            )}
+            renderItem={(markdown) => (
+              <div key={markdown.id} className={`mn-markdown-card ${markdown.pinned ? 'pinned' : ''}`} onClick={() => setViewing(markdown)}>
+                <div className="mn-markdown-title">
+                  {markdown.pinned && <svg className="mn-pin-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1"><path d="M12 2l3 9h9l-7 5 3 9-8-6-8 6 3-9-7-5h9z" /></svg>}
+                  {markdown.title || 'Untitled'}
                 </div>
-              ))}
-            </div>
-          ))
-        })()}
+                <div className="mn-markdown-preview">{stripHtml(markdown.body).slice(0, 100)}</div>
+                <div className="mn-markdown-card-footer">
+                  <span className="mn-markdown-date">{formatDate(markdown.updated_at)}</span>
+                </div>
+              </div>
+            )}
+          />
+        )}
       </div>
     </div>
   )
@@ -473,10 +462,6 @@ function MobileActions({ categories, universeId }) {
   const [categoryId, setCategoryId] = useState(null)
   const [saving, setSaving] = useState(false)
   const titleRef = useRef(null)
-
-  const catMap = Object.fromEntries(categories.map(c => [c.id, c.name]))
-  const catEmojiMap = Object.fromEntries(categories.map(c => [c.id, c.emoji]))
-  const catLabel = (id) => { const e = catEmojiMap[id]; const n = catMap[id]; return e ? `${e} ${n}` : n }
 
   const fetchItems = useCallback(() => {
     const params = new URLSearchParams()
@@ -615,49 +600,39 @@ function MobileActions({ categories, universeId }) {
       <div className="mn-markdowns-list">
         {items.length === 0 ? (
           <div className="mn-empty">{search ? 'No matching items.' : 'No action items. Tap + to add one.'}</div>
-        ) : (() => {
-          const groups = {}
-          const order = []
-          for (const item of items) {
-            const key = item.category_id ?? '__none__'
-            if (!groups[key]) { groups[key] = []; order.push(key) }
-            groups[key].push(item)
-          }
-          // Sort: named categories alphabetically, uncategorized last
-          order.sort((a, b) => {
-            if (a === '__none__') return 1
-            if (b === '__none__') return -1
-            return (catMap[a] || '').localeCompare(catMap[b] || '')
-          })
-          return order.map(key => (
-            <div key={key} className="ma-group">
-              <div className="ma-group-header">
-                {key === '__none__' ? 'Uncategorized' : catLabel(key) || 'Unknown'}
-                <span className="ma-group-count">{groups[key].length}</span>
-              </div>
-              {groups[key].map(item => (
-                <div key={item.id} className={`ma-item ${item.completed ? 'done' : ''} ${item.hot ? 'hot' : ''}`}>
-                  <button className={`ma-check ${item.completed ? 'checked' : ''}`} onClick={() => toggleCompleted(item)}>
-                    {item.completed ? (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                    ) : (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /></svg>
-                    )}
-                  </button>
-                  <div className="ma-item-body" onClick={() => startEdit(item)}>
-                    <div className={`ma-item-title ${item.completed ? 'strike' : ''}`}>
-                      {item.hot && <svg className="ma-hot-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1"><path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z" /></svg>}
-                      {item.title}
-                    </div>
-                    <div className="ma-item-meta">
-                      {item.due_date && <span className={`ma-due ${!item.completed && new Date() > new Date(item.due_date) ? 'overdue' : ''}`}>{formatDue(item.due_date)}</span>}
-                    </div>
+        ) : (
+          <MobileCategoryTree
+            universeId={universeId}
+            panelId="m.actions"
+            categories={categories}
+            items={items}
+            getCategoryId={(it) => it.category_id}
+            getTitle={(it) => it.title || ''}
+            renderCategoryHeaderExtra={(categoryId) => (
+              <span className="ma-group-count">{items.filter((it) => (it.category_id ?? null) === (categoryId ?? null)).length}</span>
+            )}
+            renderItem={(item) => (
+              <div key={item.id} className={`ma-item ${item.completed ? 'done' : ''} ${item.hot ? 'hot' : ''}`}>
+                <button className={`ma-check ${item.completed ? 'checked' : ''}`} onClick={() => toggleCompleted(item)}>
+                  {item.completed ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /></svg>
+                  )}
+                </button>
+                <div className="ma-item-body" onClick={() => startEdit(item)}>
+                  <div className={`ma-item-title ${item.completed ? 'strike' : ''}`}>
+                    {item.hot && <svg className="ma-hot-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1"><path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z" /></svg>}
+                    {item.title}
+                  </div>
+                  <div className="ma-item-meta">
+                    {item.due_date && <span className={`ma-due ${!item.completed && new Date() > new Date(item.due_date) ? 'overdue' : ''}`}>{formatDue(item.due_date)}</span>}
                   </div>
                 </div>
-              ))}
-            </div>
-          ))
-        })()}
+              </div>
+            )}
+          />
+        )}
       </div>
     </div>
   )
@@ -693,10 +668,6 @@ function MobileFeeds({ categories, universeId }) {
   const [postCategory, setPostCategory] = useState(null)
   const [feedUnreadCounts, setFeedUnreadCounts] = useState({})
   const [feedRecent7d, setFeedRecent7d] = useState({})
-
-  const catMap = Object.fromEntries(categories.map(c => [c.id, c.name]))
-  const catEmojiMap = Object.fromEntries(categories.map(c => [c.id, c.emoji]))
-  const catLabel = (id) => { const e = catEmojiMap[id]; const n = catMap[id]; return e ? `${e} ${n}` : n }
 
   const fetchFeedUnreadCounts = useCallback(() => {
     const params = universeId ? `?universe_id=${universeId}` : ''
@@ -850,53 +821,47 @@ title=Report&file=@report.pdf`}</pre>
       <div className="mn-markdowns-list">
         {feeds.length === 0 ? (
           <div className="mn-empty">No feeds yet. Tap + to create one.</div>
-        ) : (() => {
-          const groups = {}
-          const order = []
-          for (const feed of feeds) {
-            const key = feed.category_id ?? '__none__'
-            if (!groups[key]) { groups[key] = []; order.push(key) }
-            groups[key].push(feed)
-          }
-          order.sort((a, b) => {
-            if (a === '__none__') return 1
-            if (b === '__none__') return -1
-            return (catMap[a] || '').localeCompare(catMap[b] || '')
-          })
-          return order.map(key => {
-            const catId = key === '__none__' ? null : Number(key)
-            const catName = key === '__none__' ? 'Uncategorized' : (catLabel(key) || 'Unknown')
-            return (
-              <div key={key} className="ma-group">
-                <div className="ma-group-header">
-                  {catName}
-                  <button
-                    className={`feed-category-circle-btn ${(feedUnreadCounts[catId] || 0) > 0 ? 'has-unread' : ''}`}
-                    onClick={() => setPostCategory({ id: catId, name: catName })}
-                    title="View posts"
-                  >
-                    <span className="feed-circle-unread">{feedUnreadCounts[catId] || 0}</span>
-                    <span className="feed-circle-recent">{feedRecent7d[catId] || 0} / 7d</span>
+        ) : (
+          <MobileCategoryTree
+            universeId={universeId}
+            panelId="m.feeds"
+            categories={categories}
+            items={feeds}
+            getCategoryId={(f) => f.category_id}
+            getTitle={(f) => f.title || ''}
+            renderCategoryHeaderExtra={(categoryId) => (
+              <button
+                type="button"
+                className={`feed-category-circle-btn ${(feedUnreadCounts[categoryId ?? null] || 0) > 0 ? 'has-unread' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setPostCategory({
+                    id: categoryId ?? null,
+                    name: formatCategoryHierarchyLabel(categories, categoryId),
+                  })
+                }}
+                title="View posts"
+              >
+                <span className="feed-circle-unread">{feedUnreadCounts[categoryId ?? null] || 0}</span>
+                <span className="feed-circle-recent">{feedRecent7d[categoryId ?? null] || 0} / 7d</span>
+              </button>
+            )}
+            renderItem={(feed) => (
+              <div key={feed.id} className="mn-markdown-card">
+                <img className="feed-list-avatar" src={feedAvatar(feed.title, 28)} alt="" />
+                <div className="mn-markdown-title">{feed.title || 'Untitled'}</div>
+                <div className="mn-markdown-card-footer">
+                  <MobileSparkline data={feed.trend_14d} />
+                  <span className="feed-avg-label">{feed.avg_14d}/day</span>
+                  <span className="feed-last-post">{feed.days_since_last != null ? (feed.days_since_last === 0 ? 'today' : `${feed.days_since_last}d ago`) : '—'}</span>
+                  <button className="mf-edit-btn" onClick={(e) => { e.stopPropagation(); startEdit(feed) }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                   </button>
                 </div>
-                {groups[key].map(feed => (
-                  <div key={feed.id} className="mn-markdown-card">
-                    <img className="feed-list-avatar" src={feedAvatar(feed.title, 28)} alt="" />
-                    <div className="mn-markdown-title">{feed.title || 'Untitled'}</div>
-                    <div className="mn-markdown-card-footer">
-                      <MobileSparkline data={feed.trend_14d} />
-                      <span className="feed-avg-label">{feed.avg_14d}/day</span>
-                      <span className="feed-last-post">{feed.days_since_last != null ? (feed.days_since_last === 0 ? 'today' : `${feed.days_since_last}d ago`) : '—'}</span>
-                      <button className="mf-edit-btn" onClick={e => { e.stopPropagation(); startEdit(feed) }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                      </button>
-                    </div>
-                  </div>
-                ))}
               </div>
-            )
-          })
-        })()}
+            )}
+          />
+        )}
       </div>
     </div>
   )
@@ -1062,10 +1027,6 @@ function MobileTables({ categories, universeId }) {
   const [rowSearch, setRowSearch] = useState('')
   const [saving, setSaving] = useState(false)
   const titleRef = useRef(null)
-
-  const catMap = Object.fromEntries(categories.map(c => [c.id, c.name]))
-  const catEmojiMap = Object.fromEntries(categories.map(c => [c.id, c.emoji]))
-  const catLabel = (id) => { const e = catEmojiMap[id]; const n = catMap[id]; return e ? `${e} ${n}` : n }
 
   const fetchTables = useCallback(() => {
     const params = new URLSearchParams()
@@ -1304,38 +1265,29 @@ function MobileTables({ categories, universeId }) {
       <div className="mn-markdowns-list">
         {tables.length === 0 ? (
           <div className="mn-empty">{search ? 'No matching tables.' : 'No tables yet. Tap + to create one.'}</div>
-        ) : (() => {
-          const groups = {}
-          const order = []
-          for (const table of tables) {
-            const key = table.category_id ?? '__none__'
-            if (!groups[key]) { groups[key] = []; order.push(key) }
-            groups[key].push(table)
-          }
-          order.sort((a, b) => {
-            if (a === '__none__') return 1
-            if (b === '__none__') return -1
-            return (catMap[a] || '').localeCompare(catMap[b] || '')
-          })
-          return order.map(key => (
-            <div key={key} className="ma-group">
-              <div className="ma-group-header">
-                {key === '__none__' ? 'Uncategorized' : catLabel(key) || 'Unknown'}
-                <span className="ma-group-count">{groups[key].length}</span>
-              </div>
-              {groups[key].map(table => {
-                let colCount = 0
-                try { colCount = JSON.parse(table.columns).length } catch {}
-                return (
-                  <div key={table.id} className="mn-markdown-card" onClick={() => { setViewing(table); setPage(1); setRowSearch('') }}>
-                    <div className="mn-markdown-title">{table.title || 'Untitled'}</div>
-                    <div className="mn-markdown-preview">{colCount} column{colCount !== 1 ? 's' : ''}</div>
-                  </div>
-                )
-              })}
-            </div>
-          ))
-        })()}
+        ) : (
+          <MobileCategoryTree
+            universeId={universeId}
+            panelId="m.tables"
+            categories={categories}
+            items={tables}
+            getCategoryId={(t) => t.category_id}
+            getTitle={(t) => t.title || ''}
+            renderCategoryHeaderExtra={(categoryId) => (
+              <span className="ma-group-count">{tables.filter((t) => (t.category_id ?? null) === (categoryId ?? null)).length}</span>
+            )}
+            renderItem={(table) => {
+              let colCount = 0
+              try { colCount = JSON.parse(table.columns).length } catch {}
+              return (
+                <div key={table.id} className="mn-markdown-card" onClick={() => { setViewing(table); setPage(1); setRowSearch('') }}>
+                  <div className="mn-markdown-title">{table.title || 'Untitled'}</div>
+                  <div className="mn-markdown-preview">{colCount} column{colCount !== 1 ? 's' : ''}</div>
+                </div>
+              )
+            }}
+          />
+        )}
       </div>
     </div>
   )
@@ -1360,9 +1312,6 @@ function MobileDocumentsReadonly({ categories, universeId }) {
   const [docs, setDocs] = useState([])
   const [search, setSearch] = useState('')
   const [filterCatId, setFilterCatId] = useState(null)
-  const catMap = Object.fromEntries(categories.map(c => [c.id, c.name]))
-  const catEmojiMap = Object.fromEntries(categories.map(c => [c.id, c.emoji]))
-  const catLabel = (id) => { const e = catEmojiMap[id]; const n = catMap[id]; return e ? `${e} ${n}` : n }
 
   const fetchDocs = useCallback(() => {
     const params = new URLSearchParams()
@@ -1381,22 +1330,6 @@ function MobileDocumentsReadonly({ categories, universeId }) {
     return () => clearTimeout(t)
   }, [search, filterCatId, universeId, fetchDocs])
 
-  const groups = useMemo(() => {
-    const g = {}
-    const order = []
-    for (const doc of docs) {
-      const key = doc.category_id ?? '__none__'
-      if (!g[key]) { g[key] = []; order.push(key) }
-      g[key].push(doc)
-    }
-    order.sort((a, b) => {
-      if (a === '__none__') return 1
-      if (b === '__none__') return -1
-      return (catMap[a] || '').localeCompare(catMap[b] || '')
-    })
-    return order.map(k => ({ key: k, items: g[k] }))
-  }, [docs, catMap])
-
   return (
     <div className="mn-list-view">
       <div className="markdowns-header">
@@ -1412,13 +1345,18 @@ function MobileDocumentsReadonly({ categories, universeId }) {
       <div className="mn-markdowns-list">
         {docs.length === 0 ? (
           <div className="mn-empty">{search || filterCatId != null ? 'No matching documents.' : 'No documents yet.'}</div>
-        ) : groups.map(({ key, items }) => (
-          <div key={String(key)} className="ma-group">
-            <div className="ma-group-header">
-              {key === '__none__' ? 'Uncategorized' : catLabel(key) || 'Unknown'}
-              <span className="ma-group-count">{items.length}</span>
-            </div>
-            {items.map(doc => (
+        ) : (
+          <MobileCategoryTree
+            universeId={universeId}
+            panelId="m.documents"
+            categories={categories}
+            items={docs}
+            getCategoryId={(d) => d.category_id}
+            getTitle={(d) => d.name || ''}
+            renderCategoryHeaderExtra={(categoryId) => (
+              <span className="ma-group-count">{docs.filter((d) => (d.category_id ?? null) === (categoryId ?? null)).length}</span>
+            )}
+            renderItem={(doc) => (
               <button
                 key={doc.path}
                 type="button"
@@ -1429,9 +1367,9 @@ function MobileDocumentsReadonly({ categories, universeId }) {
                 <div className="mn-markdown-title">{doc.name}</div>
                 <div className="mn-markdown-preview">{doc.extension?.toUpperCase() || '—'} · {formatDocSize(doc.size)}</div>
               </button>
-            ))}
-          </div>
-        ))}
+            )}
+          />
+        )}
       </div>
     </div>
   )
@@ -1441,9 +1379,6 @@ function MobileLinksReadonly({ categories, universeId }) {
   const [links, setLinks] = useState([])
   const [search, setSearch] = useState('')
   const [filterCatId, setFilterCatId] = useState(null)
-  const catMap = Object.fromEntries(categories.map(c => [c.id, c.name]))
-  const catEmojiMap = Object.fromEntries(categories.map(c => [c.id, c.emoji]))
-  const catLabel = (id) => { const e = catEmojiMap[id]; const n = catMap[id]; return e ? `${e} ${n}` : n }
 
   const fetchLinks = useCallback(() => {
     const params = new URLSearchParams()
@@ -1462,22 +1397,6 @@ function MobileLinksReadonly({ categories, universeId }) {
     return () => clearTimeout(t)
   }, [search, filterCatId, universeId, fetchLinks])
 
-  const groups = useMemo(() => {
-    const g = {}
-    const order = []
-    for (const link of links) {
-      const key = link.category_id ?? '__none__'
-      if (!g[key]) { g[key] = []; order.push(key) }
-      g[key].push(link)
-    }
-    order.sort((a, b) => {
-      if (a === '__none__') return 1
-      if (b === '__none__') return -1
-      return (catMap[a] || '').localeCompare(catMap[b] || '')
-    })
-    return order.map(k => ({ key: k, items: g[k] }))
-  }, [links, catMap])
-
   return (
     <div className="mn-list-view">
       <div className="markdowns-header">
@@ -1493,13 +1412,18 @@ function MobileLinksReadonly({ categories, universeId }) {
       <div className="mn-markdowns-list">
         {links.length === 0 ? (
           <div className="mn-empty">{search || filterCatId != null ? 'No matching links.' : 'No links yet.'}</div>
-        ) : groups.map(({ key, items }) => (
-          <div key={String(key)} className="ma-group">
-            <div className="ma-group-header">
-              {key === '__none__' ? 'Uncategorized' : catLabel(key) || 'Unknown'}
-              <span className="ma-group-count">{items.length}</span>
-            </div>
-            {items.map(link => (
+        ) : (
+          <MobileCategoryTree
+            universeId={universeId}
+            panelId="m.links"
+            categories={categories}
+            items={links}
+            getCategoryId={(l) => l.category_id}
+            getTitle={(l) => l.title || l.url || ''}
+            renderCategoryHeaderExtra={(categoryId) => (
+              <span className="ma-group-count">{links.filter((l) => (l.category_id ?? null) === (categoryId ?? null)).length}</span>
+            )}
+            renderItem={(link) => (
               <button
                 key={link.id}
                 type="button"
@@ -1510,9 +1434,9 @@ function MobileLinksReadonly({ categories, universeId }) {
                 <div className="mn-markdown-title">{link.title || link.url || 'Untitled'}</div>
                 <div className="mn-markdown-preview">{link.url}</div>
               </button>
-            ))}
-          </div>
-        ))}
+            )}
+          />
+        )}
       </div>
     </div>
   )
@@ -1564,9 +1488,6 @@ function MobileDiagramsReadonly({ categories, universeId }) {
   const [search, setSearch] = useState('')
   const [filterCatId, setFilterCatId] = useState(null)
   const [viewing, setViewing] = useState(null)
-  const catMap = Object.fromEntries(categories.map(c => [c.id, c.name]))
-  const catEmojiMap = Object.fromEntries(categories.map(c => [c.id, c.emoji]))
-  const catLabel = (id) => { const e = catEmojiMap[id]; const n = catMap[id]; return e ? `${e} ${n}` : n }
 
   const fetchDiagrams = useCallback(() => {
     const params = new URLSearchParams()
@@ -1599,22 +1520,6 @@ function MobileDiagramsReadonly({ categories, universeId }) {
     setViewing(full)
   }
 
-  const groups = useMemo(() => {
-    const g = {}
-    const order = []
-    for (const diagram of diagrams) {
-      const key = diagram.category_id ?? '__none__'
-      if (!g[key]) { g[key] = []; order.push(key) }
-      g[key].push(diagram)
-    }
-    order.sort((a, b) => {
-      if (a === '__none__') return 1
-      if (b === '__none__') return -1
-      return (catMap[a] || '').localeCompare(catMap[b] || '')
-    })
-    return order.map(k => ({ key: k, items: g[k] }))
-  }, [diagrams, catMap])
-
   if (viewing) {
     return (
       <MobileDiagramReadonly
@@ -1640,13 +1545,18 @@ function MobileDiagramsReadonly({ categories, universeId }) {
       <div className="mn-markdowns-list">
         {diagrams.length === 0 ? (
           <div className="mn-empty">{search || filterCatId != null ? 'No matching diagrams.' : 'No diagrams yet.'}</div>
-        ) : groups.map(({ key, items }) => (
-          <div key={String(key)} className="ma-group">
-            <div className="ma-group-header">
-              {key === '__none__' ? 'Uncategorized' : catLabel(key) || 'Unknown'}
-              <span className="ma-group-count">{items.length}</span>
-            </div>
-            {items.map(d => (
+        ) : (
+          <MobileCategoryTree
+            universeId={universeId}
+            panelId="m.diagrams"
+            categories={categories}
+            items={diagrams}
+            getCategoryId={(d) => d.category_id}
+            getTitle={(d) => d.title || ''}
+            renderCategoryHeaderExtra={(categoryId) => (
+              <span className="ma-group-count">{diagrams.filter((d) => (d.category_id ?? null) === (categoryId ?? null)).length}</span>
+            )}
+            renderItem={(d) => (
               <button
                 key={d.id}
                 type="button"
@@ -1657,9 +1567,9 @@ function MobileDiagramsReadonly({ categories, universeId }) {
                 <div className="mn-markdown-title">{d.title || 'Untitled'}</div>
                 {d.updated_at && <div className="mn-markdown-preview">{d.updated_at}</div>}
               </button>
-            ))}
-          </div>
-        ))}
+            )}
+          />
+        )}
       </div>
     </div>
   )
@@ -1692,6 +1602,8 @@ function MobileCategories({ categories, universeId, onRefresh }) {
     } else if (action === 'delete') {
       if (!confirm(`Delete category "${payload.name}" and all its sub-categories?`)) return
       await fetch(`/api/categories/${payload.id}`, { method: 'DELETE' })
+    } else if (action === 'move') {
+      await fetch(`/api/categories/${payload.id}/move?direction=${payload.direction}`, { method: 'PUT' })
     }
     onRefresh?.()
   }
@@ -1710,6 +1622,7 @@ function MobileCategories({ categories, universeId, onRefresh }) {
           onRename={(id, name) => handleCategoryAction('rename', { id, name })}
           onDelete={(id, name) => handleCategoryAction('delete', { id, name })}
           onUpdateEmoji={(id, emoji) => handleCategoryAction('emoji', { id, emoji })}
+          onMoveCategory={(id, direction) => handleCategoryAction('move', { id, direction })}
         />
       </div>
     </div>

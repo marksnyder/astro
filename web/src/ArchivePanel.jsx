@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
+import { SidebarCategoryTree } from './SidebarCategoryTree'
 
 function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`
@@ -85,9 +86,6 @@ function ArchivePanel({ categories, onPinChange, universeId, onLoaded }) {
   const [uploadError, setUploadError] = useState('')
   const [editingCat, setEditingCat] = useState(null) // doc path being category-edited
   const fileInputRef = useRef(null)
-
-  const catMap = Object.fromEntries(categories.map((c) => [c.id, c.name]))
-  const catEmojiMap = Object.fromEntries(categories.map((c) => [c.id, c.emoji || null]))
 
   const fetchDocs = () => {
     const params = new URLSearchParams()
@@ -195,23 +193,6 @@ function ArchivePanel({ categories, onPinChange, universeId, onLoaded }) {
     fetchDocs()
   }
 
-  const buildGroups = (items, catMap) => {
-    const groups = []
-    const groupMap = {}
-    for (const item of items) {
-      const key = item.category_id ?? '__none__'
-      if (!(key in groupMap)) {
-        const group = { categoryId: item.category_id, name: item.category_id ? (catMap[item.category_id] || 'Unknown') : null, items: [], newestAt: item.modified_at || '' }
-        groupMap[key] = group
-        groups.push(group)
-      }
-      groupMap[key].items.push(item)
-      if ((item.modified_at || '') > groupMap[key].newestAt) groupMap[key].newestAt = item.modified_at || ''
-    }
-    groups.sort((a, b) => b.newestAt.localeCompare(a.newestAt))
-    return groups
-  }
-
   return (
     <div className="markdowns-panel">
       <div className="markdowns-header">
@@ -265,13 +246,15 @@ function ArchivePanel({ categories, onPinChange, universeId, onLoaded }) {
               {onlyLinked ? 'No documents with linked action items.' : search || selectedCategoryId ? 'No matching documents.' : 'No documents in archive.'}
             </div>
           )
-          return buildGroups(filtered, catMap).map((group) => (
-            <div key={group.categoryId ?? '__none__'} className="ai-group">
-              <div className="ai-group-header">
-                <span className="ai-group-emoji">{group.categoryId ? (catEmojiMap[group.categoryId] || '🏷️') : '🏷️'}</span>
-                <span className="ai-group-name">{group.name || 'Uncategorized'}</span>
-              </div>
-              {group.items.map((doc) => (
+          return (
+            <SidebarCategoryTree
+              universeId={universeId}
+              panelId="archive"
+              categories={categories}
+              items={filtered}
+              getCategoryId={(d) => d.category_id}
+              getTitle={(d) => d.name || ''}
+              renderItem={(doc) => (
                 <div key={doc.path} className="archive-card" onClick={(e) => openDoc(e, doc)} title={['pdf', 'xlsx', 'xls'].includes(doc.extension) ? `View ${doc.name}` : `Download ${doc.name}`}>
                   <div className="archive-card-info">
                     <div className="archive-card-name">{doc.name}</div>
@@ -311,9 +294,9 @@ function ArchivePanel({ categories, onPinChange, universeId, onLoaded }) {
                     </svg>
                   </button>
                 </div>
-              ))}
-            </div>
-          ))
+              )}
+            />
+          )
         })()}
       </div>
       {editingCat && (

@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
+import { formatCategoryHierarchyLabel } from './categoryHierarchy'
+import { SidebarCategoryTree } from './SidebarCategoryTree'
 
 function feedAvatar(name, size = 32) {
   return `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(name || 'Feed')}&radius=50&fontSize=40&size=${size}`
@@ -31,9 +33,6 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
   const titleRef = useRef(null)
   const [postCategory, setPostCategory] = useState(null) // { id, name } or { id: null, name: 'Uncategorized' }
 
-  const catMap = Object.fromEntries(categories.map(c => [c.id, c.name]))
-  const catEmojiMap = Object.fromEntries(categories.map(c => [c.id, c.emoji || null]))
-
   const fetchFeeds = () => {
     const params = new URLSearchParams()
     if (search) params.set('q', search)
@@ -55,11 +54,11 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
   useEffect(() => {
     if (openFeedRequest) {
       const cat = openFeedRequest.category_id
-      const catObj = { id: cat ?? null, name: cat ? (catMap[cat] || 'Unknown') : 'Uncategorized' }
+      const catObj = { id: cat ?? null, name: formatCategoryHierarchyLabel(categories, cat) }
       onViewPosts?.(catObj)
       onOpenFeedRequestHandled?.()
     }
-  }, [openFeedRequest])
+  }, [openFeedRequest, categories])
 
   useEffect(() => {
     if (postCategory) {
@@ -139,23 +138,6 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
     onPinChange?.()
   }
 
-  const buildGroups = (items) => {
-    const groups = []
-    const groupMap = {}
-    for (const item of items) {
-      const key = item.category_id ?? '__none__'
-      if (!(key in groupMap)) {
-        const group = { categoryId: item.category_id, name: item.category_id ? (catMap[item.category_id] || 'Unknown') : null, items: [], newestAt: item.updated_at }
-        groupMap[key] = group
-        groups.push(group)
-      }
-      groupMap[key].items.push(item)
-      if (item.updated_at > groupMap[key].newestAt) groupMap[key].newestAt = item.updated_at
-    }
-    groups.sort((a, b) => b.newestAt.localeCompare(a.newestAt))
-    return groups
-  }
-
   const baseUrl = `${window.location.origin}/api/feeds`
 
   return (
@@ -175,33 +157,47 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
           <div className="markdowns-empty">
             No feeds yet. Click + to create one.
           </div>
-        ) : buildGroups(feeds).map(group => (
-          <div key={group.categoryId ?? '__none__'} className="ai-group">
-            <div className="ai-group-header">
-              <span className="ai-group-emoji">{group.categoryId ? (catEmojiMap[group.categoryId] || '🏷️') : '🏷️'}</span>
-              <span className="ai-group-name">{group.name || 'Uncategorized'}</span>
-              {group.categoryId != null && (
+        ) : (
+          <SidebarCategoryTree
+            universeId={universeId}
+            panelId="feeds"
+            categories={categories}
+            items={feeds}
+            getCategoryId={(f) => f.category_id}
+            getTitle={(f) => f.title || ''}
+            renderCategoryHeaderExtra={(categoryId) => (
+              <>
+                {categoryId != null && (
+                  <button
+                    type="button"
+                    className={`ai-group-posts-btn ${pinnedCategoryIds.has(categoryId) ? 'pinned' : ''}`}
+                    onClick={(e) => toggleCategoryPin(e, categoryId)}
+                    title={pinnedCategoryIds.has(categoryId) ? 'Unpin category' : 'Pin category to header'}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill={pinnedCategoryIds.has(categoryId) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 17v5" />
+                      <path d="M9 2h6l-1 7h4l-5 7H7l2-7H5l1-7z" />
+                    </svg>
+                  </button>
+                )}
                 <button
-                  className={`ai-group-posts-btn ${pinnedCategoryIds.has(group.categoryId) ? 'pinned' : ''}`}
-                  onClick={e => toggleCategoryPin(e, group.categoryId)}
-                  title={pinnedCategoryIds.has(group.categoryId) ? 'Unpin category' : 'Pin category to header'}
+                  type="button"
+                  className={`feed-category-circle-btn ${(unreadCounts?.[categoryId ?? null] || 0) > 0 ? 'has-unread' : ''}`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setPostCategory({
+                      id: categoryId ?? null,
+                      name: formatCategoryHierarchyLabel(categories, categoryId),
+                    })
+                  }}
+                  title="View posts for this category"
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill={pinnedCategoryIds.has(group.categoryId) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 17v5" />
-                    <path d="M9 2h6l-1 7h4l-5 7H7l2-7H5l1-7z" />
-                  </svg>
+                  <span className="feed-circle-unread">{unreadCounts?.[categoryId ?? null] || 0}</span>
+                  <span className="feed-circle-recent">{recent7dCounts?.[categoryId ?? null] || 0} / 7d</span>
                 </button>
-              )}
-              <button
-                className={`feed-category-circle-btn ${(unreadCounts?.[group.categoryId ?? null] || 0) > 0 ? 'has-unread' : ''}`}
-                onClick={() => setPostCategory({ id: group.categoryId ?? null, name: group.name || 'Uncategorized' })}
-                title="View posts for this category"
-              >
-                <span className="feed-circle-unread">{unreadCounts?.[group.categoryId ?? null] || 0}</span>
-                <span className="feed-circle-recent">{recent7dCounts?.[group.categoryId ?? null] || 0} / 7d</span>
-              </button>
-            </div>
-            {group.items.map(feed => (
+              </>
+            )}
+            renderItem={(feed) => (
               <div key={feed.id} className="link-card">
                 <img className="feed-list-avatar" src={feedAvatar(feed.title, 28)} alt="" />
                 <div className="link-card-info">
@@ -212,13 +208,13 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
                     <span className="feed-last-post">{feed.days_since_last != null ? (feed.days_since_last === 0 ? 'today' : `${feed.days_since_last}d ago`) : '—'}</span>
                   </div>
                 </div>
-                <button className="archive-action-btn" onClick={e => { e.stopPropagation(); startEdit(feed) }} title="Edit feed">
+                <button className="archive-action-btn" onClick={(e) => { e.stopPropagation(); startEdit(feed) }} title="Edit feed">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                   </svg>
                 </button>
-                <button className="archive-action-btn archive-delete-btn" onClick={e => remove(e, feed.id)} title="Delete">
+                <button className="archive-action-btn archive-delete-btn" onClick={(e) => remove(e, feed.id)} title="Delete">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="3 6 5 6 21 6" />
                     <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
@@ -227,9 +223,9 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
                   </svg>
                 </button>
               </div>
-            ))}
-          </div>
-        ))}
+            )}
+          />
+        )}
       </div>
 
       {/* Edit / Create feed modal — portaled to body to escape sidebar stacking context */}

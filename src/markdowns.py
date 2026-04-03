@@ -39,6 +39,7 @@ class Category:
     parent_id: int | None
     universe_id: int = 1
     emoji: str | None = None
+    sort_order: int = 0
 
 
 @dataclass
@@ -237,23 +238,57 @@ def universe_to_dict(u: Universe) -> dict:
 # ── Categories CRUD ───────────────────────────────────────────────────────
 
 
+def _row_to_category(r: sqlite3.Row) -> Category:
+    return Category(
+        id=r["id"],
+        name=r["name"],
+        parent_id=r["parent_id"],
+        universe_id=r["universe_id"],
+        emoji=r["emoji"],
+        sort_order=int(r["sort_order"]),
+    )
+
+
 def list_categories(universe_id: int | None = None) -> list[Category]:
     conn = _get_conn()
     if universe_id is not None:
-        rows = conn.execute("SELECT id, name, parent_id, universe_id, emoji FROM categories WHERE universe_id = ? ORDER BY name", (universe_id,)).fetchall()
+        rows = conn.execute(
+            "SELECT id, name, parent_id, universe_id, emoji, sort_order FROM categories WHERE universe_id = ? ORDER BY sort_order, name",
+            (universe_id,),
+        ).fetchall()
     else:
-        rows = conn.execute("SELECT id, name, parent_id, universe_id, emoji FROM categories ORDER BY name").fetchall()
+        rows = conn.execute(
+            "SELECT id, name, parent_id, universe_id, emoji, sort_order FROM categories ORDER BY universe_id, sort_order, name"
+        ).fetchall()
     conn.close()
-    return [Category(id=r["id"], name=r["name"], parent_id=r["parent_id"], universe_id=r["universe_id"], emoji=r["emoji"]) for r in rows]
+    return [_row_to_category(r) for r in rows]
 
 
 def create_category(name: str, parent_id: int | None = None, universe_id: int = 1, emoji: str | None = None) -> Category:
     conn = _get_conn()
-    cur = conn.execute("INSERT INTO categories (name, parent_id, universe_id, emoji) VALUES (?, ?, ?, ?)", (name, parent_id, universe_id, emoji))
+    if parent_id is None:
+        row = conn.execute(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM categories WHERE universe_id = ? AND parent_id IS NULL",
+            (universe_id,),
+        ).fetchone()
+    else:
+        row = conn.execute(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM categories WHERE universe_id = ? AND parent_id = ?",
+            (universe_id, parent_id),
+        ).fetchone()
+    next_order = int(row["n"] if row else 0)
+    cur = conn.execute(
+        "INSERT INTO categories (name, parent_id, universe_id, emoji, sort_order) VALUES (?, ?, ?, ?, ?)",
+        (name, parent_id, universe_id, emoji, next_order),
+    )
     conn.commit()
     cat_id = cur.lastrowid
+    row = conn.execute(
+        "SELECT id, name, parent_id, universe_id, emoji, sort_order FROM categories WHERE id = ?",
+        (cat_id,),
+    ).fetchone()
     conn.close()
-    return Category(id=cat_id, name=name, parent_id=parent_id, universe_id=universe_id, emoji=emoji)  # type: ignore[arg-type]
+    return _row_to_category(row)
 
 
 def update_category(cat_id: int, name: str | None = None, emoji: str | None = ...) -> Category | None:
@@ -276,9 +311,12 @@ def update_category(cat_id: int, name: str | None = None, emoji: str | None = ..
     if cur.rowcount == 0:
         conn.close()
         return None
-    row = conn.execute("SELECT id, name, parent_id, universe_id, emoji FROM categories WHERE id = ?", (cat_id,)).fetchone()
+    row = conn.execute(
+        "SELECT id, name, parent_id, universe_id, emoji, sort_order FROM categories WHERE id = ?",
+        (cat_id,),
+    ).fetchone()
     conn.close()
-    return Category(id=row["id"], name=row["name"], parent_id=row["parent_id"], universe_id=row["universe_id"], emoji=row["emoji"])
+    return _row_to_category(row) if row else None
 
 
 def delete_category(cat_id: int) -> bool:
@@ -287,6 +325,58 @@ def delete_category(cat_id: int) -> bool:
     conn.commit()
     conn.close()
     return cur.rowcount > 0
+
+
+def move_category(cat_id: int, direction: str) -> Category | None:
+    """Swap sort_order with an adjacent sibling. direction is 'up' or 'down'."""
+    if direction not in ("up", "down"):
+        return None
+    conn = _get_conn()
+    row = conn.execute(
+        "SELECT id, parent_id, universe_id FROM categories WHERE id = ?",
+        (cat_id,),
+    ).fetchone()
+    if not row:
+        conn.close()
+        return None
+    parent_id = row["parent_id"]
+    universe_id = row["universe_id"]
+    if parent_id is None:
+        siblings = conn.execute(
+            "SELECT id FROM categories WHERE universe_id = ? AND parent_id IS NULL ORDER BY sort_order, name",
+            (universe_id,),
+        ).fetchall()
+    else:
+        siblings = conn.execute(
+            "SELECT id FROM categories WHERE universe_id = ? AND parent_id = ? ORDER BY sort_order, name",
+            (universe_id, parent_id),
+        ).fetchall()
+    ids = [r["id"] for r in siblings]
+    if cat_id not in ids:
+        conn.close()
+        return None
+    idx = ids.index(cat_id)
+    if direction == "up" and idx == 0:
+        conn.close()
+        return None
+    if direction == "down" and idx >= len(ids) - 1:
+        conn.close()
+        return None
+    other_id = ids[idx - 1] if direction == "up" else ids[idx + 1]
+    a = conn.execute("SELECT sort_order FROM categories WHERE id = ?", (cat_id,)).fetchone()
+    b = conn.execute("SELECT sort_order FROM categories WHERE id = ?", (other_id,)).fetchone()
+    if not a or not b:
+        conn.close()
+        return None
+    conn.execute("UPDATE categories SET sort_order = ? WHERE id = ?", (b["sort_order"], cat_id))
+    conn.execute("UPDATE categories SET sort_order = ? WHERE id = ?", (a["sort_order"], other_id))
+    conn.commit()
+    row = conn.execute(
+        "SELECT id, name, parent_id, universe_id, emoji, sort_order FROM categories WHERE id = ?",
+        (cat_id,),
+    ).fetchone()
+    conn.close()
+    return _row_to_category(row) if row else None
 
 
 def set_category_pinned(cat_id: int, pinned: bool) -> bool:
@@ -300,11 +390,16 @@ def set_category_pinned(cat_id: int, pinned: bool) -> bool:
 def list_pinned_categories(universe_id: int | None = None) -> list[Category]:
     conn = _get_conn()
     if universe_id is not None:
-        rows = conn.execute("SELECT id, name, parent_id, universe_id, emoji FROM categories WHERE pinned = 1 AND universe_id = ? ORDER BY name", (universe_id,)).fetchall()
+        rows = conn.execute(
+            "SELECT id, name, parent_id, universe_id, emoji, sort_order FROM categories WHERE pinned = 1 AND universe_id = ? ORDER BY sort_order, name",
+            (universe_id,),
+        ).fetchall()
     else:
-        rows = conn.execute("SELECT id, name, parent_id, universe_id, emoji FROM categories WHERE pinned = 1 ORDER BY name").fetchall()
+        rows = conn.execute(
+            "SELECT id, name, parent_id, universe_id, emoji, sort_order FROM categories WHERE pinned = 1 ORDER BY universe_id, sort_order, name"
+        ).fetchall()
     conn.close()
-    return [Category(id=r["id"], name=r["name"], parent_id=r["parent_id"], universe_id=r["universe_id"], emoji=r["emoji"]) for r in rows]
+    return [_row_to_category(r) for r in rows]
 
 
 def get_descendant_ids(category_id: int) -> set[int]:

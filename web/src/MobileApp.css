@@ -1282,6 +1282,90 @@ html.m-mobile-shell #root {
   font-weight: 700;
 }
 
+/* Mobile category tree (nested folders) */
+.ma-cat-tree {
+  display: flex;
+  flex-direction: column;
+}
+
+.ma-cat-tree-node {
+  border-bottom: 1px solid var(--border);
+}
+
+.ma-cat-tree-folder {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 12px 8px 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--accent);
+  background: var(--bg-secondary);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ma-cat-tree-chevron-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.ma-cat-tree-chevron {
+  transition: transform 0.15s ease;
+}
+
+.ma-cat-tree-chevron.open {
+  transform: rotate(90deg);
+}
+
+.ma-cat-tree-emoji {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1;
+  text-transform: none;
+}
+
+.ma-cat-tree-label {
+  flex: 1;
+  min-width: 0;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.ma-cat-tree-branch {
+  background: var(--bg-primary);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ma-cat-tree-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .ma-group {
   border-bottom: 1px solid var(--border);
 }
@@ -1300,6 +1384,115 @@ html.m-mobile-shell #root {
   position: sticky;
   top: 0;
   z-index: 1;
+}
+
+.ma-group-header.ma-group-header-collapsible {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.ma-group-hierarchy-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+}
+
+.ma-group-ancestor-row {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.ma-group-leaf-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+.ma-group-leaf-row .ma-group-title-hierarchy {
+  color: var(--text-primary);
+}
+
+.ma-group[data-depth="0"] .ma-group-header {
+  background: color-mix(in srgb, var(--bg-secondary) 68%, var(--bg-tertiary) 32%);
+}
+.ma-group[data-depth="1"] .ma-group-header {
+  background: var(--bg-secondary);
+}
+.ma-group[data-depth="2"] .ma-group-header {
+  background: color-mix(in srgb, var(--bg-secondary) 90%, var(--accent) 10%);
+}
+.ma-group[data-depth="3"] .ma-group-header {
+  background: color-mix(in srgb, var(--bg-secondary) 83%, var(--accent) 17%);
+}
+.ma-group[data-depth="4"] .ma-group-header {
+  background: color-mix(in srgb, var(--bg-secondary) 76%, var(--accent) 24%);
+}
+.ma-group[data-depth="5"] .ma-group-header {
+  background: color-mix(in srgb, var(--bg-secondary) 69%, var(--accent) 31%);
+}
+.ma-group[data-depth="6"] .ma-group-header,
+.ma-group[data-depth="7"] .ma-group-header,
+.ma-group[data-depth="8"] .ma-group-header {
+  background: color-mix(in srgb, var(--bg-secondary) 63%, var(--accent) 37%);
+}
+
+.ma-group-header-collapsible {
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ma-group-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  margin: -4px 0 -4px -6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.ma-group-chevron:active {
+  background: rgba(55, 148, 255, 0.12);
+}
+
+.ma-group-chevron-svg {
+  transition: transform 0.15s ease;
+  color: var(--text-secondary);
+}
+
+.ma-group-chevron-svg.open {
+  transform: rotate(90deg);
+}
+
+.ma-group-title-hierarchy {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.ma-group-leaf-row .feed-category-circle-btn {
+  margin-left: auto;
 }
 
 .ma-group-count {

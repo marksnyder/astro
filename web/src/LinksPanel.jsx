@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
+import { SidebarCategoryTree } from './SidebarCategoryTree'
 
 function LinksPanel({ categories, onPinChange, universeId, onLoaded }) {
   const [links, setLinks] = useState([])
@@ -11,9 +12,6 @@ function LinksPanel({ categories, onPinChange, universeId, onLoaded }) {
   const [categoryId, setCategoryId] = useState(null)
   const [saving, setSaving] = useState(false)
   const titleRef = useRef(null)
-
-  const catMap = Object.fromEntries(categories.map((c) => [c.id, c.name]))
-  const catEmojiMap = Object.fromEntries(categories.map((c) => [c.id, c.emoji || null]))
 
   const fetchLinks = () => {
     const params = new URLSearchParams()
@@ -97,23 +95,6 @@ function LinksPanel({ categories, onPinChange, universeId, onLoaded }) {
     if (link.url) window.open(link.url, '_blank', 'noopener,noreferrer')
   }
 
-  const buildGroups = (items, catMap) => {
-    const groups = []
-    const groupMap = {}
-    for (const item of items) {
-      const key = item.category_id ?? '__none__'
-      if (!(key in groupMap)) {
-        const group = { categoryId: item.category_id, name: item.category_id ? (catMap[item.category_id] || 'Unknown') : null, items: [], newestAt: item.updated_at }
-        groupMap[key] = group
-        groups.push(group)
-      }
-      groupMap[key].items.push(item)
-      if (item.updated_at > groupMap[key].newestAt) groupMap[key].newestAt = item.updated_at
-    }
-    groups.sort((a, b) => b.newestAt.localeCompare(a.newestAt))
-    return groups
-  }
-
   const formatDomain = (rawUrl) => {
     try {
       return new URL(rawUrl).hostname.replace(/^www\./, '')
@@ -145,13 +126,15 @@ function LinksPanel({ categories, onPinChange, universeId, onLoaded }) {
               {search || selectedCategoryId ? 'No matching links.' : 'No links yet. Click + to add one.'}
             </div>
           )
-          return buildGroups(links, catMap).map((group) => (
-            <div key={group.categoryId ?? '__none__'} className="ai-group">
-              <div className="ai-group-header">
-                <span className="ai-group-emoji">{group.categoryId ? (catEmojiMap[group.categoryId] || '🏷️') : '🏷️'}</span>
-                <span className="ai-group-name">{group.name || 'Uncategorized'}</span>
-              </div>
-              {group.items.map((link) => (
+          return (
+            <SidebarCategoryTree
+              universeId={universeId}
+              panelId="links"
+              categories={categories}
+              items={links}
+              getCategoryId={(l) => l.category_id}
+              getTitle={(l) => l.title || ''}
+              renderItem={(link) => (
                 <div key={link.id} className="link-card" onClick={() => startEdit(link)} title={link.url}>
                   <div className="link-card-info">
                     <div className="link-card-title">{link.title || 'Untitled'}</div>
@@ -179,9 +162,9 @@ function LinksPanel({ categories, onPinChange, universeId, onLoaded }) {
                     </svg>
                   </button>
                 </div>
-              ))}
-            </div>
-          ))
+              )}
+            />
+          )
         })()}
       </div>
       {editing !== null && (

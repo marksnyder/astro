@@ -3117,6 +3117,10 @@
 
 .tree-action-btn:hover { color: var(--accent); background: rgba(55, 148, 255, 0.15); }
 .tree-action-delete:hover { color: #e53e3e; background: rgba(229, 62, 62, 0.1); }
+.tree-move-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
 
 .tree-add-input-row {
   padding: 4px 12px;
@@ -3990,7 +3994,103 @@
   background: rgba(229, 62, 62, 0.1);
 }
 
-/* ── Action item category groups ───────────────────── */
+/* ── Sidebar category tree (nested folders + items) ─── */
+
+.ai-cat-tree {
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-cat-tree-node {
+  border-bottom: 1px solid var(--border);
+}
+
+.ai-cat-tree-node:last-child {
+  border-bottom: none;
+}
+
+.ai-cat-tree-folder {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 10px 6px 0;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+
+.ai-cat-tree-folder:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.ai-cat-tree-chevron-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ai-cat-tree-chevron-btn:hover {
+  background: rgba(55, 148, 255, 0.12);
+  color: var(--text-primary);
+}
+
+.ai-cat-tree-chevron {
+  transition: transform 0.15s ease;
+}
+
+.ai-cat-tree-chevron.open {
+  transform: rotate(90deg);
+}
+
+.ai-cat-tree-emoji {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.ai-cat-tree-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ai-cat-tree-folder .feed-category-circle-btn,
+.ai-cat-tree-folder .ai-group-posts-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.ai-cat-tree-branch {
+  background: var(--bg-secondary);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ai-cat-tree-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ── Action item category groups (legacy flat group — kept for pin styles) ───────────────────── */
 
 .ai-group {
   border-bottom: 1px solid var(--border);
@@ -4009,9 +4109,125 @@
   border-bottom: 1px solid var(--border);
 }
 
+.ai-group-header.ai-group-header-collapsible {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.ai-group-hierarchy-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+}
+
+.ai-group-ancestor-row {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+}
+
+.ai-group-leaf-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+}
+
+/* Category group header tint by tree depth (left sidebar) */
+.ai-group[data-depth="0"] .ai-group-header {
+  background: color-mix(in srgb, var(--bg-tertiary) 70%, var(--bg-secondary) 30%);
+}
+.ai-group[data-depth="1"] .ai-group-header {
+  background: var(--bg-tertiary);
+}
+.ai-group[data-depth="2"] .ai-group-header {
+  background: color-mix(in srgb, var(--bg-tertiary) 91%, var(--accent) 9%);
+}
+.ai-group[data-depth="3"] .ai-group-header {
+  background: color-mix(in srgb, var(--bg-tertiary) 84%, var(--accent) 16%);
+}
+.ai-group[data-depth="4"] .ai-group-header {
+  background: color-mix(in srgb, var(--bg-tertiary) 77%, var(--accent) 23%);
+}
+.ai-group[data-depth="5"] .ai-group-header {
+  background: color-mix(in srgb, var(--bg-tertiary) 70%, var(--accent) 30%);
+}
+.ai-group[data-depth="6"] .ai-group-header,
+.ai-group[data-depth="7"] .ai-group-header,
+.ai-group[data-depth="8"] .ai-group-header {
+  background: color-mix(in srgb, var(--bg-tertiary) 64%, var(--accent) 36%);
+}
+
+.ai-group-header-collapsible {
+  cursor: pointer;
+  user-select: none;
+}
+
+.ai-group-header-collapsible:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.ai-group-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.12s;
+}
+
+.ai-group-chevron:hover {
+  background: rgba(55, 148, 255, 0.12);
+  color: var(--text-primary);
+}
+
+.ai-group-chevron-svg {
+  transition: transform 0.15s ease;
+}
+
+.ai-group-chevron-svg.open {
+  transform: rotate(90deg);
+}
+
 .ai-group-header svg {
   color: var(--accent);
   flex-shrink: 0;
+}
+
+.ai-group-header-collapsible .ai-group-chevron svg {
+  color: var(--text-secondary);
+}
+
+.ai-group-header-collapsible .ai-group-chevron:hover svg {
+  color: var(--text-primary);
+}
+
+.ai-group-leaf-row .ai-group-name-hierarchy {
+  flex: 1;
+  min-width: 0;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.ai-group-leaf-row .feed-category-circle-btn {
+  margin-left: auto;
 }
 
 .ai-group-emoji {
