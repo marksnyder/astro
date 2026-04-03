@@ -29,8 +29,6 @@ def clear_all():
     tables_to_clear = [
         "feed_artifacts",
         "feeds",
-        "action_item_links",
-        "action_items",
         "markdown_images",
         "markdowns",
         "links",
@@ -287,7 +285,7 @@ services:
 - Requirements for notification channels changed mid-sprint
 - Standup is running over 15 minutes consistently
 
-### Action Items
+### Follow-ups
 1. **Fix flaky tests** — dedicate 1 day next sprint to stabilize test suite
 2. **Requirements freeze** — no scope changes after sprint planning
 3. **Standup timer** — 90 seconds per person, parking lot for discussions
@@ -482,7 +480,7 @@ async def fetch_all(urls):
 - Want to present at next engineering all-hands on our caching strategy
 - Training budget: looking at advanced Kubernetes certification
 
-### Action Items from Last Week
+### Follow-ups from last week
 - [x] Write ADR for WebSocket vs SSE decision
 - [x] Pair with QA on test automation framework
 - [ ] Schedule knowledge-sharing session on distributed tracing
@@ -1017,55 +1015,6 @@ Instead of passive reading:
             (title, cat_id, HOME, api_key, ts(5), ts(5)),
         )
 
-    # ── WORK Action Items ────────────────────────────────────────────────
-
-    def future(days):
-        return (now + timedelta(days=days)).isoformat()
-
-    work_actions = [
-        ("Review PR #342 — WebSocket migration", True, False, future(3), work_cats["Code Review"]),
-        ("Fix flaky integration tests in CI", True, False, None, work_cats["DevOps & CI/CD"]),
-        ("Write ADR for caching strategy", False, False, future(5), work_cats["Architecture & Design"]),
-        ("Update API documentation for v2 endpoints", False, False, None, work_cats["Documentation"]),
-        ("Schedule knowledge-sharing on distributed tracing", False, False, None, work_cats["Meeting Notes"]),
-        ("Investigate memory spike in production worker", True, False, None, work_cats["Debugging"]),
-        ("Set up Datadog monitors for new microservice", False, False, None, work_cats["DevOps & CI/CD"]),
-        ("Prepare sprint planning for next cycle", False, False, future(2), work_cats["Sprint Planning"]),
-        ("Refactor user service to use repository pattern", False, False, ts(10), work_cats["Architecture & Design"]),
-        ("Onboard new team member — pair programming sessions", False, False, None, work_cats["Meeting Notes"]),
-    ]
-
-    for title, hot, completed, due, cat_id in work_actions:
-        conn.execute(
-            "INSERT INTO action_items (title, hot, completed, due_date, category_id, universe_id, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
-            (title, int(hot), int(completed), due, cat_id, WORK, ts(2), ts(1)),
-        )
-
-    # ── HOME Action Items ────────────────────────────────────────────────
-
-    home_actions = [
-        ("Update resume with latest project metrics", True, False, None, home_cats["Resume & Portfolio"]),
-        ("Practice system design — design Twitter", False, False, None, home_cats["Interviewing"]),
-        ("Complete Week 3 of ML Specialization", False, False, future(7), home_cats["Online Courses"]),
-        ("Finish reading Deep Work", False, False, None, home_cats["Reading List"]),
-        ("Meal prep for the week", True, False, future(1), home_cats["Nutrition"]),
-        ("30 min meditation streak — day 14", False, False, None, home_cats["Mental Health"]),
-        ("Send follow-up to 3 networking contacts", False, False, future(4), home_cats["Networking"]),
-        ("Register for local tech meetup", False, False, None, home_cats["Networking"]),
-        ("Create Anki deck for AWS certification", False, False, ts(7), home_cats["Study Techniques"]),
-        ("Schedule annual physical exam", False, False, None, home_cats["Wellness"]),
-        ("Write blog post about learning journey", False, False, None, home_cats["Career Development"]),
-        ("Try new healthy recipe — salmon bowl", False, False, None, home_cats["Nutrition"]),
-    ]
-
-    for title, hot, completed, due, cat_id in home_actions:
-        conn.execute(
-            "INSERT INTO action_items (title, hot, completed, due_date, category_id, universe_id, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
-            (title, int(hot), int(completed), due, cat_id, HOME, ts(3), ts(1)),
-        )
-
-    conn.commit()
-
     # ── Feed Artifacts ───────────────────────────────────────────────────
 
     # Collect feed IDs by title for referencing
@@ -1145,7 +1094,7 @@ Instead of passive reading:
 
     # Print summary
     counts = {}
-    for table in ["categories", "markdowns", "links", "feeds", "action_items", "feed_artifacts"]:
+    for table in ["categories", "markdowns", "links", "feeds", "feed_artifacts"]:
         counts[table] = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
 
     conn.close()

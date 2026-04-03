@@ -19,7 +19,6 @@ Astro is a **self hosted platform for building applications on top of AI**: agen
 - [Document archive](/docs/documents/)
 - [Diagrams](/docs/diagrams/)
 - [Tables](/docs/tables/)
-- [Action items](/docs/action-items/)
 - [Bookmarks](/docs/bookmarks/)
 - [Universes](/docs/universes/)
 - [Categories](/docs/categories/)

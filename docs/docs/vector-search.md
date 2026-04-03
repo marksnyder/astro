@@ -6,7 +6,7 @@ nav_id: vector-search
 permalink: /docs/vector-search/
 ---
 
-Astro maintains a **ChromaDB** vector store that indexes markdowns, documents, and action items using local embeddings (BAAI/bge-small-en-v1.5). This enables semantic search across your knowledge base without external embedding API keys.
+Astro maintains a **ChromaDB** vector store that indexes markdowns and documents using local embeddings (BAAI/bge-small-en-v1.5). This enables semantic search across your knowledge base without external embedding API keys.
 
 - Local, CPU-based embeddings with no API key needed
 - Automatic indexing of content when it changes (where applicable)

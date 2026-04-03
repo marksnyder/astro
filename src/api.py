@@ -23,12 +23,8 @@ from src.markdowns import (
     FEED_FILES_DIR,
     IMAGES_DIR,
     agent_task_to_dict,
-    action_item_link_to_dict,
-    action_item_to_dict,
-    add_action_item_link,
     add_markdown_image,
     category_to_dict,
-    create_action_item,
     create_agent_task,
     create_category,
     create_feed,
@@ -39,9 +35,7 @@ from src.markdowns import (
     create_link,
     create_markdown,
     create_universe,
-    delete_action_item,
     delete_agent_task,
-    delete_action_item_link,
     delete_all_markdown_images,
     delete_category,
     delete_document_meta,
@@ -53,7 +47,6 @@ from src.markdowns import (
     delete_universe,
     feed_post_to_dict,
     feed_to_dict,
-    get_action_item,
     get_agent_task,
     get_all_document_categories,
     get_all_document_meta,
@@ -65,13 +58,9 @@ from src.markdowns import (
     set_category_pinned,
     get_link,
     get_markdown,
-    get_linked_targets,
     get_universe,
-    get_universe_action_item_ids,
     get_universe_document_paths,
     get_universe_markdown_ids,
-    list_action_item_links,
-    list_action_items,
     list_agent_tasks,
     list_feed_posts,
     list_feed_posts_by_category,
@@ -80,7 +69,6 @@ from src.markdowns import (
     get_recent_counts_by_category,
     list_feeds,
     list_links,
-    list_links_for_markdown,
     list_categories,
     list_markdown_images,
     list_markdowns,
@@ -103,7 +91,6 @@ from src.markdowns import (
     get_setting,
     set_setting,
     universe_to_dict,
-    update_action_item,
     update_agent_task,
     update_link,
     update_markdown,
@@ -138,12 +125,10 @@ from src.markdowns import (
 )
 from src.store import (
     add_documents,
-    delete_action_item_from_store,
     delete_document_chunks,
     delete_markdown_from_store,
     doc_count,
     get_retriever,
-    upsert_action_item,
     upsert_markdown,
 )
 
@@ -304,50 +289,6 @@ class DocumentCategoryRequest(BaseModel):
     category_id: Optional[int] = None
 
 
-class ActionItemRequest(BaseModel):
-    title: str
-    hot: bool = False
-    due_date: Optional[str] = None
-    category_id: Optional[int] = None
-
-
-class ActionItemUpdateRequest(BaseModel):
-    title: str
-    hot: bool
-    completed: bool
-    due_date: Optional[str] = None
-    category_id: Optional[int] = None
-
-
-class ActionItemLinkRequest(BaseModel):
-    link_type: str  # 'markdown' or 'document'
-    markdown_id: Optional[int] = None
-    document_path: Optional[str] = None
-
-
-class ActionItemLinkResponse(BaseModel):
-    id: int
-    action_item_id: int
-    link_type: str
-    markdown_id: Optional[int]
-    document_path: Optional[str]
-    created_at: str
-    # Resolved display fields
-    display_name: str = ""
-
-
-class ActionItemResponse(BaseModel):
-    id: int
-    title: str
-    hot: bool
-    completed: bool
-    due_date: Optional[str]
-    category_id: Optional[int]
-    created_at: str
-    updated_at: str
-    links: list[ActionItemLinkResponse] = []
-
-
 class LinkRequest(BaseModel):
     title: str
     url: str
@@ -408,8 +349,6 @@ def api_delete_universe(uid: int):
     # Clean up vector store entries before deleting DB rows
     for nid in get_universe_markdown_ids(uid):
         delete_markdown_from_store(nid)
-    for aid in get_universe_action_item_ids(uid):
-        delete_action_item_from_store(aid)
     for path in get_universe_document_paths(uid):
         delete_document_chunks(str(DOCUMENTS_DIR / path))
         # Remove physical file
@@ -644,15 +583,6 @@ def api_serve_markdown_image(filename: str):
     return FileResponse(safe)
 
 
-# ── Action items linked to a markdown ─────────────────────────────────────
-
-
-@app.get("/api/markdowns/{markdown_id}/action-items")
-def api_markdown_action_items(markdown_id: int):
-    """Return action items linked to this markdown (with link_id for unlinking)."""
-    return list_links_for_markdown(markdown_id)
-
-
 # ── Documents (archive) ──────────────────────────────────────────────────
 
 
@@ -843,121 +773,6 @@ def api_upload_document(file: UploadFile, universe_id: int = 1):
     rel = dest.relative_to(DOCUMENTS_DIR)
     set_document_universe(str(rel), universe_id)
     return {"name": dest.name, "path": str(rel), "chunks": len(chunks)}
-
-
-# ── Action items ──────────────────────────────────────────────────────────
-
-
-def _resolve_link(link_dict: dict) -> dict:
-    """Add display_name to a link dict."""
-    if link_dict["link_type"] == "markdown" and link_dict["markdown_id"]:
-        markdown = get_markdown(link_dict["markdown_id"])
-        link_dict["display_name"] = (markdown.title or "Untitled markdown") if markdown else "Deleted markdown"
-    elif link_dict["link_type"] == "document" and link_dict["document_path"]:
-        link_dict["display_name"] = Path(link_dict["document_path"]).name
-    return link_dict
-
-
-def _enrich_action_item(item) -> dict:
-    """Convert action item to dict and attach resolved links."""
-    d = action_item_to_dict(item)
-    links = list_action_item_links(item.id)
-    d["links"] = [_resolve_link(action_item_link_to_dict(lk)) for lk in links]
-    return d
-
-
-def _vectorize_action_item(item) -> None:
-    """Upsert an action item into the vector store with full context."""
-    cat_name = None
-    if item.category_id:
-        cats = list_categories()
-        cat = next((c for c in cats if c.id == item.category_id), None)
-        if cat:
-            cat_name = cat.name
-    upsert_action_item(
-        item.id, item.title,
-        completed=item.completed, hot=item.hot,
-        due_date=item.due_date, category_name=cat_name,
-        universe_id=item.universe_id,
-    )
-
-
-@app.get("/api/action-items", response_model=list[ActionItemResponse])
-def api_list_action_items(q: str = "", show_completed: bool = False, universe_id: Optional[int] = None):
-    return [_enrich_action_item(i) for i in list_action_items(q, show_completed, universe_id=universe_id)]
-
-
-@app.post("/api/action-items", response_model=ActionItemResponse, status_code=201)
-def api_create_action_item(req: ActionItemRequest, universe_id: int = 1):
-    item = create_action_item(req.title, req.hot, req.due_date, req.category_id, universe_id=universe_id)
-    _vectorize_action_item(item)
-    return _enrich_action_item(item)
-
-
-@app.put("/api/action-items/{item_id}", response_model=ActionItemResponse)
-def api_update_action_item(item_id: int, req: ActionItemUpdateRequest):
-    item = update_action_item(
-        item_id, title=req.title, hot=req.hot,
-        completed=req.completed, due_date=req.due_date,
-        category_id=req.category_id,
-    )
-    if not item:
-        raise HTTPException(status_code=404, detail="Action item not found")
-    _vectorize_action_item(item)
-    return _enrich_action_item(item)
-
-
-@app.delete("/api/action-items/{item_id}")
-def api_delete_action_item(item_id: int):
-    if not delete_action_item(item_id):
-        raise HTTPException(status_code=404, detail="Action item not found")
-    delete_action_item_from_store(item_id)
-    return {"ok": True}
-
-
-@app.post("/api/action-items/reindex")
-def api_reindex_action_items():
-    """Re-vectorize all action items with enriched content."""
-    items = list_action_items("", show_completed=True)
-    for item in items:
-        _vectorize_action_item(item)
-    return {"ok": True, "count": len(items)}
-
-
-# ── Action item links ────────────────────────────────────────────────────
-
-
-@app.get("/api/action-items/{item_id}/links", response_model=list[ActionItemLinkResponse])
-def api_list_action_item_links(item_id: int):
-    links = list_action_item_links(item_id)
-    return [_resolve_link(action_item_link_to_dict(lk)) for lk in links]
-
-
-@app.post("/api/action-items/{item_id}/links", response_model=ActionItemLinkResponse, status_code=201)
-def api_add_action_item_link(item_id: int, req: ActionItemLinkRequest):
-    if not get_action_item(item_id):
-        raise HTTPException(status_code=404, detail="Action item not found")
-    if req.link_type not in ("markdown", "document"):
-        raise HTTPException(status_code=400, detail="link_type must be 'markdown' or 'document'")
-    if req.link_type == "markdown" and not req.markdown_id:
-        raise HTTPException(status_code=400, detail="markdown_id required for markdown links")
-    if req.link_type == "document" and not req.document_path:
-        raise HTTPException(status_code=400, detail="document_path required for document links")
-    link = add_action_item_link(item_id, req.link_type, req.markdown_id, req.document_path)
-    return _resolve_link(action_item_link_to_dict(link))
-
-
-@app.delete("/api/action-item-links/{link_id}")
-def api_delete_action_item_link(link_id: int):
-    if not delete_action_item_link(link_id):
-        raise HTTPException(status_code=404, detail="Link not found")
-    return {"ok": True}
-
-
-@app.get("/api/action-item-links/linked-targets")
-def api_linked_targets():
-    """Return markdown IDs and document paths that have action-item links."""
-    return get_linked_targets()
 
 
 # ── Agent Tasks ────────────────────────────────────────────────────────────
@@ -1220,9 +1035,9 @@ def api_reindex():
     Call this after a restore to re-create all embeddings.
     """
     import traceback
-    from src.store import clear, add_documents as add_docs, upsert_markdown, upsert_action_item
+    from src.store import clear, add_documents as add_docs, upsert_markdown
 
-    counts = {"markdowns": 0, "action_items": 0, "document_chunks": 0}
+    counts = {"markdowns": 0, "document_chunks": 0}
 
     try:
         # 1. Clear existing vector store
@@ -1235,24 +1050,7 @@ def api_reindex():
             upsert_markdown(markdown.id, f"{markdown.title}\n\n{markdown.body}", markdown.title, universe_id=markdown.universe_id)
             counts["markdowns"] += 1
 
-        # 3. Re-index action items
-        print("[reindex] Indexing action items...")
-        cats = list_categories()
-        for item in list_action_items("", show_completed=True):
-            cat_name = None
-            if item.category_id:
-                cat = next((c for c in cats if c.id == item.category_id), None)
-                if cat:
-                    cat_name = cat.name
-            upsert_action_item(
-                item.id, item.title,
-                completed=item.completed, hot=item.hot,
-                due_date=item.due_date, category_name=cat_name,
-                universe_id=item.universe_id,
-            )
-            counts["action_items"] += 1
-
-        # 4. Re-index documents from the documents/ folder
+        # 3. Re-index documents from the documents/ folder
         print("[reindex] Indexing documents...")
         all_meta = get_all_document_meta()
         if DOCUMENTS_DIR.is_dir():

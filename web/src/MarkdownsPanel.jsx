@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
+import { CategoryPicker } from './CategoryTree'
 import { SidebarCategoryTree } from './SidebarCategoryTree'
 
 // ── MCP tool templates ────────────────────────────────
@@ -10,8 +10,6 @@ const MD_MCP_DIRECT = {
   search: (uid) => `> Use the \`search\` tool to find "<query>" in the knowledge base${uid ? ` (universe_id: ${uid})` : ''}\n`,
   search_markdowns: (uid) => `> Use the \`search_markdowns\` tool to search for markdowns matching "<query>"${uid ? ` (universe_id: ${uid})` : ''}\n`,
   write_markdown: (uid) => `> Use the \`write_markdown\` tool to create a new markdown with title: "<title>", body: "<content>"${uid ? ` (universe_id: ${uid})` : ''}\n`,
-  search_action_items: (uid) => `> Use the \`search_action_items\` tool to list action items${uid ? ` (universe_id: ${uid})` : ''}\n`,
-  write_action_item: (uid) => `> Use the \`write_action_item\` tool to create an action item with title: "<title>"${uid ? ` (universe_id: ${uid})` : ''}\n`,
   list_all_categories: (uid) => `> Use the \`list_all_categories\` tool to list all categories${uid ? ` (universe_id: ${uid})` : ''}\n`,
   write_category: (uid) => `> Use the \`write_category\` tool to create a category with name: "<name>"${uid ? ` (universe_id: ${uid})` : ''}\n`,
   search_links: (uid) => `> Use the \`search_links\` tool to search for bookmarks matching "<query>"${uid ? ` (universe_id: ${uid})` : ''}\n`,
@@ -25,8 +23,8 @@ const MD_MCP_DIRECT = {
 }
 
 const MD_UNIVERSE_TOOLS = new Set([
-  'search', 'search_markdowns', 'write_markdown', 'search_action_items',
-  'write_action_item', 'list_all_categories', 'write_category',
+  'search', 'search_markdowns', 'write_markdown',
+  'list_all_categories', 'write_category',
   'search_links', 'write_link', 'list_documents', 'upload_document', 'search_feeds',
 ])
 
@@ -61,7 +59,6 @@ function MdMcpLookup({ tool, onInsert, onClose }) {
 
   const endpoints = {
     read_markdown: '/api/markdowns', update_markdown: '/api/markdowns', delete_markdown: '/api/markdowns',
-    read_action_item: '/api/action-items?show_completed=true', update_action_item: '/api/action-items?show_completed=true', delete_action_item: '/api/action-items?show_completed=true',
     update_category: '/api/categories', delete_category: '/api/categories',
     update_link: '/api/links', delete_link: '/api/links',
     delete_document: '/api/documents',
@@ -69,7 +66,6 @@ function MdMcpLookup({ tool, onInsert, onClose }) {
   }
   const titles = {
     read_markdown: 'Read Markdown', update_markdown: 'Update Markdown', delete_markdown: 'Delete Markdown',
-    read_action_item: 'Read Action Item', update_action_item: 'Update Action Item', delete_action_item: 'Delete Action Item',
     update_category: 'Update Category', delete_category: 'Delete Category',
     update_link: 'Update Link', delete_link: 'Delete Link',
     delete_document: 'Delete Document',
@@ -77,7 +73,6 @@ function MdMcpLookup({ tool, onInsert, onClose }) {
   }
   const descs = {
     read_markdown: 'Select a markdown to read.', update_markdown: 'Select a markdown to update.', delete_markdown: 'Select a markdown to delete.',
-    read_action_item: 'Select an action item to read.', update_action_item: 'Select an action item to update.', delete_action_item: 'Select an action item to delete.',
     update_category: 'Select a category to update.', delete_category: 'Select a category to delete.',
     update_link: 'Select a link to update.', delete_link: 'Select a link to delete.',
     delete_document: 'Select a document to delete.',
@@ -102,9 +97,6 @@ function MdMcpLookup({ tool, onInsert, onClose }) {
       read_markdown: `> Use the \`read_markdown\` tool to read markdown "${name}" (markdown_id: ${id})\n`,
       update_markdown: `> Use the \`update_markdown\` tool to update markdown "${name}" (markdown_id: ${id}) with title: "<title>", body: "<body>"\n`,
       delete_markdown: `> Use the \`delete_markdown\` tool to delete markdown "${name}" (markdown_id: ${id})\n`,
-      read_action_item: `> Use the \`read_action_item\` tool to read action item "${name}" (item_id: ${id})\n`,
-      update_action_item: `> Use the \`update_action_item\` tool to update action item "${name}" (item_id: ${id}) with title: "<title>"\n`,
-      delete_action_item: `> Use the \`delete_action_item\` tool to delete action item "${name}" (item_id: ${id})\n`,
       update_category: `> Use the \`update_category\` tool to update category "${name}" (category_id: ${id}) with name: "<name>"\n`,
       delete_category: `> Use the \`delete_category\` tool to delete category "${name}" (category_id: ${id})\n`,
       update_link: `> Use the \`update_link\` tool to update link "${name}" (link_id: ${id}) with title: "<title>", url: "<url>"\n`,
@@ -277,9 +269,6 @@ function MarkdownEditor({ value, onChange, placeholder }) {
                 { type: 'direct', name: 'search_markdowns' }, { type: 'direct', name: 'write_markdown' },
                 { type: 'lookup', name: 'read_markdown' }, { type: 'lookup', name: 'update_markdown' }, { type: 'lookup', name: 'delete_markdown' },
                 { type: 'sep' },
-                { type: 'direct', name: 'search_action_items' }, { type: 'direct', name: 'write_action_item' },
-                { type: 'lookup', name: 'read_action_item' }, { type: 'lookup', name: 'update_action_item' }, { type: 'lookup', name: 'delete_action_item' },
-                { type: 'sep' },
                 { type: 'direct', name: 'list_all_categories' }, { type: 'direct', name: 'write_category' },
                 { type: 'lookup', name: 'update_category' }, { type: 'lookup', name: 'delete_category' },
                 { type: 'sep' },
@@ -423,268 +412,6 @@ function MarkdownImageGallery({ markdownId }) {
   )
 }
 
-// ── Action items linked to a markdown ─────────────────────
-
-function MarkdownActionItems({ markdownId, categories }) {
-  const [items, setItems] = useState([])
-  const [adding, setAdding] = useState(false)
-  const [newTitle, setNewTitle] = useState('')
-  const [newHot, setNewHot] = useState(false)
-  const [newDueDate, setNewDueDate] = useState('')
-  const [newCategoryId, setNewCategoryId] = useState(null)
-  const [saving, setSaving] = useState(false)
-  const [editingId, setEditingId] = useState(null)
-  const [editTitle, setEditTitle] = useState('')
-  const [editHot, setEditHot] = useState(false)
-  const [editDueDate, setEditDueDate] = useState('')
-  const [editCategoryId, setEditCategoryId] = useState(null)
-  const addRef = useRef(null)
-  const editRef = useRef(null)
-
-  const fetchItems = () => {
-    if (!markdownId) return
-    fetch(`/api/markdowns/${markdownId}/action-items`)
-      .then(r => r.json())
-      .then(setItems)
-      .catch(() => {})
-  }
-
-  useEffect(() => { fetchItems() }, [markdownId])
-
-  const startAdd = () => {
-    setAdding(true)
-    setNewTitle('')
-    setNewHot(false)
-    setNewDueDate('')
-    setNewCategoryId(null)
-    setTimeout(() => addRef.current?.focus(), 50)
-  }
-
-  const cancelAdd = () => setAdding(false)
-
-  const saveNew = async () => {
-    if (!newTitle.trim() || saving) return
-    setSaving(true)
-    try {
-      const res = await fetch('/api/action-items', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: newTitle.trim(),
-          hot: newHot,
-          due_date: newDueDate || null,
-          category_id: newCategoryId,
-        }),
-      })
-      const created = await res.json()
-      await fetch(`/api/action-items/${created.id}/links`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ link_type: 'markdown', markdown_id: markdownId }),
-      })
-      setAdding(false)
-      fetchItems()
-    } finally { setSaving(false) }
-  }
-
-  const startEdit = (item) => {
-    setEditingId(item.id)
-    setEditTitle(item.title)
-    setEditHot(item.hot)
-    setEditDueDate(item.due_date || '')
-    setEditCategoryId(item.category_id)
-    setTimeout(() => editRef.current?.focus(), 50)
-  }
-
-  const cancelEdit = () => setEditingId(null)
-
-  const saveEdit = async (item) => {
-    if (!editTitle.trim()) return
-    await fetch(`/api/action-items/${item.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: editTitle.trim(),
-        hot: editHot,
-        completed: item.completed,
-        due_date: editDueDate || null,
-        category_id: editCategoryId,
-      }),
-    })
-    setEditingId(null)
-    fetchItems()
-  }
-
-  const toggleCompleted = async (item) => {
-    await fetch(`/api/action-items/${item.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: item.title,
-        hot: item.hot,
-        completed: !item.completed,
-        due_date: item.due_date,
-        category_id: item.category_id,
-      }),
-    })
-    fetchItems()
-  }
-
-  const unlinkItem = async (item) => {
-    await fetch(`/api/action-item-links/${item.link_id}`, { method: 'DELETE' })
-    fetchItems()
-  }
-
-  const deleteItem = async (item) => {
-    if (!confirm(`Delete "${item.title}"?`)) return
-    await fetch(`/api/action-items/${item.id}`, { method: 'DELETE' })
-    fetchItems()
-  }
-
-  const isOverdue = (d) => d && new Date() > new Date(d)
-
-  const formatDue = (d) => {
-    if (!d) return ''
-    return new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-  }
-
-  if (!markdownId) return null
-
-  return (
-    <div className="markdown-ai-section">
-      <div className="markdown-ai-header">
-        <span className="markdown-ai-label">Action Items</span>
-        <button className="markdown-ai-add-btn" onClick={startAdd} title="Add action item">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-        </button>
-      </div>
-
-      {adding && (
-        <div className="markdown-ai-add-form">
-          <input
-            ref={addRef}
-            className="markdown-ai-input"
-            placeholder="Action item title..."
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') saveNew(); if (e.key === 'Escape') cancelAdd() }}
-          />
-          <div className="markdown-ai-form-row">
-            <button
-              className={`ai-hot-toggle small ${newHot ? 'active' : ''}`}
-              onClick={() => setNewHot(!newHot)}
-              title="Hot"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill={newHot ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z" />
-              </svg>
-            </button>
-            <input
-              type="date"
-              className="ai-date-input small"
-              value={newDueDate}
-              onChange={(e) => setNewDueDate(e.target.value)}
-            />
-            <div className="markdown-ai-form-actions">
-              <button className="markdown-ai-save-btn" onClick={saveNew} disabled={!newTitle.trim() || saving}>
-                {saving ? 'Adding...' : 'Add'}
-              </button>
-              <button className="markdown-ai-cancel-btn" onClick={cancelAdd}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {items.length > 0 && (
-        <div className="markdown-ai-list">
-          {items.map((item) => (
-            editingId === item.id ? (
-              <div key={item.id} className="markdown-ai-item editing">
-                <input
-                  ref={editRef}
-                  className="markdown-ai-input"
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(item); if (e.key === 'Escape') cancelEdit() }}
-                />
-                <div className="markdown-ai-form-row">
-                  <button
-                    className={`ai-hot-toggle small ${editHot ? 'active' : ''}`}
-                    onClick={() => setEditHot(!editHot)}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill={editHot ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z" />
-                    </svg>
-                  </button>
-                  <input
-                    type="date"
-                    className="ai-date-input small"
-                    value={editDueDate}
-                    onChange={(e) => setEditDueDate(e.target.value)}
-                  />
-                  <div className="markdown-ai-form-actions">
-                    <button className="markdown-ai-save-btn" onClick={() => saveEdit(item)} disabled={!editTitle.trim()}>Save</button>
-                    <button className="markdown-ai-cancel-btn" onClick={cancelEdit}>Cancel</button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div key={item.id} className={`markdown-ai-item ${item.hot ? 'hot' : ''} ${item.completed ? 'done' : ''}`}>
-                <button
-                  className={`markdown-ai-check ${item.completed ? 'checked' : ''}`}
-                  onClick={() => toggleCompleted(item)}
-                  title={item.completed ? 'Mark incomplete' : 'Mark complete'}
-                >
-                  {item.completed ? (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  ) : (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10" />
-                    </svg>
-                  )}
-                </button>
-                <div className="markdown-ai-body" onClick={() => startEdit(item)}>
-                  <span className={`markdown-ai-title ${item.completed ? 'strike' : ''}`}>
-                    {item.hot && (
-                      <svg className="markdown-ai-hot-icon" width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z" />
-                      </svg>
-                    )}
-                    {item.title}
-                  </span>
-                  {item.due_date && (
-                    <span className={`markdown-ai-due ${!item.completed && isOverdue(item.due_date) ? 'overdue' : ''}`}>
-                      {formatDue(item.due_date)}
-                    </span>
-                  )}
-                </div>
-                <button className="markdown-ai-unlink" onClick={() => unlinkItem(item)} title="Unlink from markdown">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18.84 12.25l1.72-1.71a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                    <path d="M5.16 11.75l-1.72 1.71a5 5 0 0 0 7.07 7.07l1.72-1.71" />
-                    <line x1="1" y1="1" x2="23" y2="23" />
-                  </svg>
-                </button>
-                <button className="markdown-ai-del" onClick={() => deleteItem(item)} title="Delete action item">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                    <path d="M10 11v6" /><path d="M14 11v6" />
-                  </svg>
-                </button>
-              </div>
-            )
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── Markdowns panel ───────────────────────────────────────
 
 export function MarkdownEditorView({ markdown, categories, onClose, onSaved, previewMode, viewMode }) {
@@ -698,7 +425,10 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
   const autosaveTimer = useRef(null)
   const initializedRef = useRef(false)
   // Only re-hydrate local state when the *document* changes, not when the parent passes a new object for the same id (e.g. after list refresh or autosave).
-  const markdownSyncKey = isNew ? `new:${markdown?._key ?? 'default'}` : markdown?.id
+  // Include category for new docs so "new in category" from the sidebar updates the picker when reusing the same tab.
+  const newDocCategoryKey =
+    markdown?.category_id === undefined ? 'u' : markdown?.category_id === null ? 'n' : String(markdown.category_id)
+  const markdownSyncKey = isNew ? `new:${markdown?._key ?? 'default'}:${newDocCategoryKey}` : markdown?.id
 
   const htmlToMarkdownText = (html) => {
     if (!html) return ''
@@ -718,7 +448,7 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
     if (isNew) {
       setTitle('')
       setBody('')
-      setCategoryId(null)
+      setCategoryId(markdown?.category_id === undefined ? null : markdown.category_id)
     } else {
       setTitle(markdown.title || '')
       setBody(htmlToMarkdownText(markdown.body))
@@ -780,7 +510,6 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
           />
         )}
         {currentId && <MarkdownImageGallery markdownId={currentId} />}
-        {currentId && <MarkdownActionItems markdownId={currentId} categories={categories} />}
       </div>
     </div>
   )
@@ -789,14 +518,10 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
 function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMarkdownRequestHandled, universeId, onEditMarkdown, refreshKey, onLoaded }) {
   const [markdowns, setMarkdowns] = useState([])
   const [search, setSearch] = useState('')
-  const [selectedCategoryId, setSelectedCategoryId] = useState(null)
-  const [onlyLinked, setOnlyLinked] = useState(false)
-  const [linkedMarkdownIds, setLinkedMarkdownIds] = useState(null)
 
   const fetchMarkdowns = () => {
     const params = new URLSearchParams()
     if (search) params.set('q', search)
-    if (selectedCategoryId !== null) params.set('category_id', selectedCategoryId)
     if (universeId) params.set('universe_id', universeId)
     fetch(`/api/markdowns?${params}`)
       .then(res => res.json())
@@ -805,18 +530,11 @@ function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMa
       .finally(() => onLoaded?.())
   }
 
-  const fetchLinkedIds = () => {
-    fetch('/api/action-item-links/linked-targets')
-      .then(r => r.json())
-      .then(data => setLinkedMarkdownIds(new Set(data.markdown_ids)))
-      .catch(() => {})
-  }
-
-  useEffect(() => { fetchMarkdowns(); fetchLinkedIds() }, [universeId, refreshKey])
+  useEffect(() => { fetchMarkdowns() }, [universeId, refreshKey])
   useEffect(() => {
     const timer = setTimeout(fetchMarkdowns, 300)
     return () => clearTimeout(timer)
-  }, [search, selectedCategoryId, universeId])
+  }, [search, universeId])
 
   useEffect(() => {
     if (editMarkdownRequest) {
@@ -825,8 +543,11 @@ function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMa
     }
   }, [editMarkdownRequest])
 
-  const startNew = () => {
-    onEditMarkdown?.({ _new: true, universeId })
+  /** `presetCategoryId`: omit = no preset; `null` = Uncategorized */
+  const startNew = (presetCategoryId) => {
+    const payload = { _new: true, universeId }
+    if (presetCategoryId !== undefined) payload.category_id = presetCategoryId
+    onEditMarkdown?.(payload)
   }
 
   const startEdit = (markdown) => {
@@ -851,39 +572,23 @@ function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMa
   // ── List view ────────────────────────────────────────
 
   return (
-    <aside className="markdowns-panel">
+    <aside className="markdowns-panel sidebar-tree-panel">
       <div className="markdowns-header">
         <span className="markdowns-header-title">Markdowns</span>
-        <button className="markdowns-add-btn" onClick={startNew} title="New markdown">
+        <button className="markdowns-add-btn" onClick={() => startNew()} title="New markdown">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
           </svg>
         </button>
       </div>
       <div className="markdowns-search">
-        <div className="ai-search-row">
-          <input className="markdowns-search-input" placeholder="Search markdowns..." value={search} onChange={(e) => setSearch(e.target.value)} />
-          <button
-            className={`linked-filter-btn ${onlyLinked ? 'active' : ''}`}
-            onClick={() => setOnlyLinked(!onlyLinked)}
-            title={onlyLinked ? 'Show all markdowns' : 'Show only markdowns with action items'}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-            </svg>
-          </button>
-        </div>
-        <CategoryFilterPicker categories={categories} value={selectedCategoryId} onChange={setSelectedCategoryId} />
+        <input className="markdowns-search-input" placeholder="Search markdowns..." value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
       <div className="markdowns-list">
         {(() => {
-          const filtered = onlyLinked && linkedMarkdownIds
-            ? markdowns.filter(n => linkedMarkdownIds.has(n.id))
-            : markdowns
-          if (filtered.length === 0) return (
+          if (markdowns.length === 0) return (
             <div className="markdowns-empty">
-              {onlyLinked ? 'No markdowns with linked action items.' : search || selectedCategoryId ? 'No matching markdowns.' : 'No markdowns yet. Click + to create one.'}
+              {search ? 'No matching markdowns.' : 'No markdowns yet. Click + to create one.'}
             </div>
           )
           return (
@@ -891,11 +596,30 @@ function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMa
               universeId={universeId}
               panelId="markdowns"
               categories={categories}
-              items={filtered}
+              items={markdowns}
+              showExpandCollapse
+              itemKind="markdowns"
               getCategoryId={(m) => m.category_id}
               getTitle={(m) => m.title || ''}
+              renderCategoryHeaderExtra={(categoryId) => (
+                <button
+                  type="button"
+                  className="sidebar-tree-new-in-cat-btn"
+                  title={categoryId == null ? 'New markdown in Uncategorized' : 'New markdown in this category'}
+                  aria-label={categoryId == null ? 'New markdown in Uncategorized' : 'New markdown in this category'}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    startNew(categoryId)
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                </button>
+              )}
               renderItem={(markdown) => (
-                <div key={markdown.id} className="markdown-card" onClick={() => startEdit(markdown)}>
+                <div key={markdown.id} className="markdown-card sidebar-tree-file" onClick={() => startEdit(markdown)}>
                   <div className="markdown-card-header">
                     <div className="markdown-card-title">{markdown.title || 'Untitled'}</div>
                     <button

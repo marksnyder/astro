@@ -6,7 +6,7 @@ nav_id: categories
 permalink: /docs/categories/
 ---
 
-A parent and child category tree labels markdowns, documents, diagrams, tables, action items, and links with one shared structure for apps you build on Astro. Categories can have emojis for quick visual identification.
+A parent and child category tree labels markdowns, documents, diagrams, tables, and links with one shared structure for apps you build on Astro. Categories can have emojis for quick visual identification.
 
 ## HTTP API
 

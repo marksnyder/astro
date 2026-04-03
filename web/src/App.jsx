@@ -3,7 +3,6 @@ import './App.css'
 import MarkdownsPanel, { MarkdownEditorView } from './MarkdownsPanel'
 import ArchivePanel from './ArchivePanel'
 import LinksPanel from './LinksPanel'
-import ActionItemsPanel from './ActionItemsPanel'
 import FeedsPanel, { PostTimeline } from './FeedsPanel'
 import DiagramsPanel, { DiagramEditorView } from './DiagramsPanel'
 import TablesPanel, { TableEditorView } from './TablesPanel'
@@ -196,7 +195,7 @@ function UniverseManager({ universes, currentId, onSwitch, onClose, onRefresh })
       alert('Cannot delete the last universe.')
       return
     }
-    if (!confirm(`DELETE UNIVERSE "${uname}"?\n\nThis will permanently destroy ALL markdowns, documents, action items, links, and categories in this universe.\n\nThis action CANNOT be undone.`)) return
+    if (!confirm(`DELETE UNIVERSE "${uname}"?\n\nThis will permanently destroy ALL markdowns, documents, links, and categories in this universe.\n\nThis action CANNOT be undone.`)) return
     if (!confirm(`Are you absolutely sure? Type the universe name to confirm.\n\n(Click OK to proceed with deletion of "${uname}")`)) return
     const res = await fetch(`/api/universes/${uid}`, { method: 'DELETE' })
     if (res.ok) {
@@ -326,7 +325,7 @@ function HelpDialog({ onClose }) {
                 <div className="help-code-title">mcp_config.json</div>
                 <pre>{JSON.stringify({ mcpServers: { astro: { url: `${origin}/mcp` } } }, null, 2)}</pre>
               </div>
-              <p className="help-note">The MCP server provides tools for managing action items, markdowns, documents, links, feeds, and IRC messaging.</p>
+              <p className="help-note">The MCP server provides tools for managing markdowns, documents, links, feeds, and IRC messaging.</p>
             </div>
           )}
         </div>
@@ -510,7 +509,7 @@ function SettingsDialog({ onClose }) {
       const data = await res.json()
       setStatus({
         type: 'success',
-        text: `Reindex complete! Markdowns: ${data.reindexed.markdowns}, Action items: ${data.reindexed.action_items}, Document chunks: ${data.reindexed.document_chunks}.`,
+        text: `Reindex complete! Markdowns: ${data.reindexed.markdowns}, Document chunks: ${data.reindexed.document_chunks}.`,
       })
     } catch (e) {
       setStatus({ type: 'error', text: `Reindex failed: ${e.message}` })
@@ -608,8 +607,6 @@ const MCP_DIRECT_TEMPLATES = {
   set_default_universe: () => '> Use the `set_default_universe` tool to set the default universe (universe_id: <id>)\n',
   search_markdowns: (uid) => `> Use the \`search_markdowns\` tool to search for markdowns matching "<query>"${uid ? ` (universe_id: ${uid})` : ''}\n`,
   write_markdown: (uid) => `> Use the \`write_markdown\` tool to create a new markdown with title: "<title>", body: "<content>"${uid ? ` (universe_id: ${uid})` : ''}\n`,
-  search_action_items: (uid) => `> Use the \`search_action_items\` tool to list action items${uid ? ` (universe_id: ${uid})` : ''}\n`,
-  write_action_item: (uid) => `> Use the \`write_action_item\` tool to create an action item with title: "<title>"${uid ? ` (universe_id: ${uid})` : ''}\n`,
   list_all_categories: (uid) => `> Use the \`list_all_categories\` tool to list all categories${uid ? ` (universe_id: ${uid})` : ''}\n`,
   write_category: (uid) => `> Use the \`write_category\` tool to create a category with name: "<name>"${uid ? ` (universe_id: ${uid})` : ''}\n`,
   search_links: (uid) => `> Use the \`search_links\` tool to search for bookmarks matching "<query>"${uid ? ` (universe_id: ${uid})` : ''}\n`,
@@ -621,8 +618,8 @@ const MCP_DIRECT_TEMPLATES = {
 }
 
 const UNIVERSE_TOOLS = new Set([
-  'search', 'search_markdowns', 'write_markdown', 'search_action_items',
-  'write_action_item', 'list_all_categories', 'write_category',
+  'search', 'search_markdowns', 'write_markdown',
+  'list_all_categories', 'write_category',
   'search_links', 'write_link', 'list_documents', 'upload_document', 'search_feeds',
 ])
 
@@ -657,7 +654,6 @@ function McpToolLookup({ tool, onInsert, onClose }) {
 
   const endpoints = {
     read_markdown: '/api/markdowns', update_markdown: '/api/markdowns', delete_markdown: '/api/markdowns',
-    read_action_item: '/api/action-items?show_completed=true', update_action_item: '/api/action-items?show_completed=true', delete_action_item: '/api/action-items?show_completed=true',
     update_category: '/api/categories', delete_category: '/api/categories',
     update_link: '/api/links', delete_link: '/api/links',
     delete_document: '/api/documents',
@@ -666,7 +662,6 @@ function McpToolLookup({ tool, onInsert, onClose }) {
 
   const titles = {
     read_markdown: 'Read Markdown', update_markdown: 'Update Markdown', delete_markdown: 'Delete Markdown',
-    read_action_item: 'Read Action Item', update_action_item: 'Update Action Item', delete_action_item: 'Delete Action Item',
     update_category: 'Update Category', delete_category: 'Delete Category',
     update_link: 'Update Link', delete_link: 'Delete Link',
     delete_document: 'Delete Document',
@@ -675,7 +670,6 @@ function McpToolLookup({ tool, onInsert, onClose }) {
 
   const descs = {
     read_markdown: 'Select a markdown to read.', update_markdown: 'Select a markdown to update.', delete_markdown: 'Select a markdown to delete.',
-    read_action_item: 'Select an action item to read.', update_action_item: 'Select an action item to update.', delete_action_item: 'Select an action item to delete.',
     update_category: 'Select a category to update.', delete_category: 'Select a category to delete.',
     update_link: 'Select a link to update.', delete_link: 'Select a link to delete.',
     delete_document: 'Select a document to delete.',
@@ -701,9 +695,6 @@ function McpToolLookup({ tool, onInsert, onClose }) {
       read_markdown: `> Use the \`read_markdown\` tool to read markdown "${name}" (markdown_id: ${id})\n`,
       update_markdown: `> Use the \`update_markdown\` tool to update markdown "${name}" (markdown_id: ${id}) with title: "<title>", body: "<body>"\n`,
       delete_markdown: `> Use the \`delete_markdown\` tool to delete markdown "${name}" (markdown_id: ${id})\n`,
-      read_action_item: `> Use the \`read_action_item\` tool to read action item "${name}" (item_id: ${id})\n`,
-      update_action_item: `> Use the \`update_action_item\` tool to update action item "${name}" (item_id: ${id}) with title: "<title>"\n`,
-      delete_action_item: `> Use the \`delete_action_item\` tool to delete action item "${name}" (item_id: ${id})\n`,
       update_category: `> Use the \`update_category\` tool to update category "${name}" (category_id: ${id}) with name: "<name>"\n`,
       delete_category: `> Use the \`delete_category\` tool to delete category "${name}" (category_id: ${id})\n`,
       update_link: `> Use the \`update_link\` tool to update link "${name}" (link_id: ${id}) with title: "<title>", url: "<url>"\n`,
@@ -765,7 +756,7 @@ function App() {
   useEffect(() => { ircNickRef.current = ircNick }, [ircNick])
   const [universes, setUniverses] = useState([])
   const [currentUniverseId, setCurrentUniverseId] = useState(null)
-  const [sidebarTab, setSidebarTab] = useState('actions')
+  const [sidebarTab, setSidebarTab] = useState('markdowns')
   const [sidebarLoading, setSidebarLoading] = useState(false)
   useEffect(() => { if (sidebarTab !== 'categories') setSidebarLoading(true) }, [sidebarTab])
   const [categories, setCategories] = useState([])
@@ -1618,11 +1609,6 @@ function App() {
         )}
         <div className="sidebar" style={{ width: sidebarWidth, minWidth: sidebarWidth }}>
           <div className="sidebar-rail">
-            <button className={`rail-tab ${sidebarTab === 'actions' ? 'active' : ''}`} onClick={() => setSidebarTab('actions')} title="Action Items">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z" />
-              </svg>
-            </button>
             <button className={`rail-tab ${sidebarTab === 'markdowns' ? 'active' : ''}`} onClick={() => setSidebarTab('markdowns')} title="Markdowns">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -1777,24 +1763,6 @@ function App() {
               onEditTable={(t) => openTableTab(t._new ? { ...t, _key: 'new' } : t)}
               refreshKey={tableRefreshKey}
               onLoaded={() => setSidebarLoading(false)}
-            />
-          )}
-          {sidebarTab === 'actions' && (
-            <ActionItemsPanel
-              categories={categories}
-              universeId={currentUniverseId}
-              onLoaded={() => setSidebarLoading(false)}
-              onOpenMarkdown={(markdownId) => {
-                fetch(`/api/markdowns/${markdownId}`).then(r => {
-                  if (!r.ok) return
-                  return r.json()
-                }).then(markdown => {
-                  if (markdown) {
-                    setSidebarTab('markdowns')
-                    setEditMarkdownRequest(markdown)
-                  }
-                })
-              }}
             />
           )}
           </div>

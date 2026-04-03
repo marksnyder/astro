@@ -12,6 +12,7 @@ import AgentTasksPanel from './AgentTasksPanel'
 import { sortCategoriesForTree } from './categorySidebarOrder'
 import { formatCategoryHierarchyLabel } from './categoryHierarchy'
 import { MobileCategoryTree } from './SidebarCategoryTree'
+import { FeedsFlatCategoryList } from './FeedsFlatCategoryList'
 
 const LOGO_URL = '/logo.png'
 
@@ -245,7 +246,7 @@ function MobileMarkdowns({ categories, universeId }) {
     return () => clearTimeout(t)
   }, [search, filterCatId, universeId])
 
-  const startNew = () => {
+  const startNew = (presetCategoryId) => {
     autosaveInitRef.current = false
     createdIdRef.current = null
     setEditing('new')
@@ -253,7 +254,13 @@ function MobileMarkdowns({ categories, universeId }) {
     const ts = now.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
     setTitle(`Mobile Markdown # ${ts}`)
     setBody('')
-    setCategoryId(filterCatId ?? getLastCategoryId())
+    let cat
+    if (presetCategoryId !== undefined) {
+      cat = presetCategoryId
+    } else {
+      cat = filterCatId ?? getLastCategoryId()
+    }
+    setCategoryId(cat)
     setTimeout(() => { titleRef.current?.focus(); autosaveInitRef.current = true }, 80)
   }
 
@@ -409,7 +416,7 @@ function MobileMarkdowns({ categories, universeId }) {
       <div className="mn-search-bar">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
         <input className="mn-search-input" placeholder="Search markdowns..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        <button className="mn-new-btn" onClick={startNew} title="New markdown">
+        <button className="mn-new-btn" onClick={() => startNew()} title="New markdown">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
         </button>
       </div>
@@ -425,10 +432,28 @@ function MobileMarkdowns({ categories, universeId }) {
             panelId="m.markdowns"
             categories={categories}
             items={markdowns}
+            itemKind="markdowns"
             getCategoryId={(m) => m.category_id}
             getTitle={(m) => m.title || ''}
             renderCategoryHeaderExtra={(categoryId) => (
-              <span className="ma-group-count">{markdowns.filter((m) => (m.category_id ?? null) === (categoryId ?? null)).length}</span>
+              <span className="ma-cat-header-extra">
+                <span className="ma-group-count">{markdowns.filter((m) => (m.category_id ?? null) === (categoryId ?? null)).length}</span>
+                <button
+                  type="button"
+                  className="ma-cat-new-md-btn"
+                  title={categoryId == null ? 'New markdown in Uncategorized' : 'New markdown in this category'}
+                  aria-label={categoryId == null ? 'New markdown in Uncategorized' : 'New markdown in this category'}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    startNew(categoryId)
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                </button>
+              </span>
             )}
             renderItem={(markdown) => (
               <div key={markdown.id} className={`mn-markdown-card ${markdown.pinned ? 'pinned' : ''}`} onClick={() => setViewing(markdown)}>
@@ -439,195 +464,6 @@ function MobileMarkdowns({ categories, universeId }) {
                 <div className="mn-markdown-preview">{stripHtml(markdown.body).slice(0, 100)}</div>
                 <div className="mn-markdown-card-footer">
                   <span className="mn-markdown-date">{formatDate(markdown.updated_at)}</span>
-                </div>
-              </div>
-            )}
-          />
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ── Action items view ─────────────────────────────────
-
-function MobileActions({ categories, universeId }) {
-  const [items, setItems] = useState([])
-  const [search, setSearch] = useState('')
-  const [showCompleted, setShowCompleted] = useState(false)
-  const [editing, setEditing] = useState(null) // null | 'new' | item object
-  const [title, setTitle] = useState('')
-  const [hot, setHot] = useState(false)
-  const [dueDate, setDueDate] = useState('')
-  const [categoryId, setCategoryId] = useState(null)
-  const [saving, setSaving] = useState(false)
-  const titleRef = useRef(null)
-
-  const fetchItems = useCallback(() => {
-    const params = new URLSearchParams()
-    if (search) params.set('q', search)
-    if (showCompleted) params.set('show_completed', 'true')
-    if (universeId) params.set('universe_id', universeId)
-    fetch(`/api/action-items?${params}`)
-      .then(r => r.json())
-      .then(data => {
-        const seen = new Set()
-        const unique = data.filter(d => { if (seen.has(d.id)) return false; seen.add(d.id); return true })
-        setItems(unique)
-      })
-      .catch(() => {})
-  }, [search, showCompleted, universeId])
-
-  useEffect(() => { fetchItems() }, [universeId])
-  useEffect(() => {
-    const t = setTimeout(fetchItems, 300)
-    return () => clearTimeout(t)
-  }, [search, showCompleted, universeId])
-
-  const startNew = () => {
-    setEditing('new')
-    setTitle('')
-    setHot(false)
-    setDueDate('')
-    setCategoryId(null)
-    setTimeout(() => titleRef.current?.focus(), 80)
-  }
-
-  const startEdit = (item) => {
-    setEditing(item)
-    setTitle(item.title)
-    setHot(item.hot)
-    setDueDate(item.due_date || '')
-    setCategoryId(item.category_id)
-    setTimeout(() => titleRef.current?.focus(), 80)
-  }
-
-  const cancelEdit = () => setEditing(null)
-
-  const save = async () => {
-    if (!title.trim()) return
-    setSaving(true)
-    try {
-      if (editing === 'new') {
-        await fetch(`/api/action-items?universe_id=${universeId || 1}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: title.trim(), hot, due_date: dueDate || null, category_id: categoryId }),
-        })
-      } else {
-        await fetch(`/api/action-items/${editing.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: title.trim(), hot, completed: editing.completed, due_date: dueDate || null, category_id: categoryId }),
-        })
-      }
-      setEditing(null)
-      fetchItems()
-    } finally { setSaving(false) }
-  }
-
-  const toggleCompleted = async (item) => {
-    await fetch(`/api/action-items/${item.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: item.title, hot: item.hot, completed: !item.completed, due_date: item.due_date, category_id: item.category_id }),
-    })
-    fetchItems()
-  }
-
-  const remove = async (item) => {
-    if (!confirm(`Delete "${item.title}"?`)) return
-    await fetch(`/api/action-items/${item.id}`, { method: 'DELETE' })
-    setEditing(null)
-    fetchItems()
-  }
-
-  const isOverdue = (d) => d && !items.find(i => i.due_date === d)?.completed && new Date() > new Date(d)
-  const formatDue = (d) => {
-    if (!d) return ''
-    return new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-  }
-
-  // ── Edit / New ─────────────────────────
-  if (editing) {
-    return (
-      <div className="mn-edit">
-        <div className="mn-view-header">
-          <button className="mn-back-btn" onClick={cancelEdit}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
-          </button>
-          <span className="mn-view-header-title">{editing === 'new' ? 'New Action Item' : 'Edit Action Item'}</span>
-          <span style={{ flex: 1 }} />
-          {editing !== 'new' && (
-            <button className="mn-action-btn mn-action-danger" onClick={() => remove(editing)}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /></svg>
-            </button>
-          )}
-          <button className="mn-save-btn" onClick={save} disabled={saving || !title.trim()}>
-            {saving ? 'Saving...' : 'Save'}
-          </button>
-        </div>
-        <div className="mn-edit-body">
-          <input ref={titleRef} className="mn-edit-title" placeholder="Action item title..." value={title} onChange={(e) => setTitle(e.target.value)} />
-          <div className="ma-edit-row">
-            <button className={`ma-hot-btn ${hot ? 'active' : ''}`} onClick={() => setHot(!hot)}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill={hot ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z" /></svg>
-              Hot
-            </button>
-            <input type="date" className="ma-date-input" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-          </div>
-          <MobileCategorySelect categories={categories} value={categoryId} onChange={setCategoryId} />
-        </div>
-      </div>
-    )
-  }
-
-  // ── List ───────────────────────────────
-  return (
-    <div className="mn-list-view">
-      <div className="mn-search-bar">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-        <input className="mn-search-input" placeholder="Search action items..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        <button className="mn-new-btn" onClick={startNew} title="New action item">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-        </button>
-      </div>
-      <div className="mn-filter-bar">
-        <button className={`ma-filter-btn ${showCompleted ? 'active' : ''}`} onClick={() => setShowCompleted(!showCompleted)}>
-          {showCompleted ? 'Hide Completed' : 'Show Completed'}
-        </button>
-      </div>
-      <div className="mn-markdowns-list">
-        {items.length === 0 ? (
-          <div className="mn-empty">{search ? 'No matching items.' : 'No action items. Tap + to add one.'}</div>
-        ) : (
-          <MobileCategoryTree
-            universeId={universeId}
-            panelId="m.actions"
-            categories={categories}
-            items={items}
-            getCategoryId={(it) => it.category_id}
-            getTitle={(it) => it.title || ''}
-            renderCategoryHeaderExtra={(categoryId) => (
-              <span className="ma-group-count">{items.filter((it) => (it.category_id ?? null) === (categoryId ?? null)).length}</span>
-            )}
-            renderItem={(item) => (
-              <div key={item.id} className={`ma-item ${item.completed ? 'done' : ''} ${item.hot ? 'hot' : ''}`}>
-                <button className={`ma-check ${item.completed ? 'checked' : ''}`} onClick={() => toggleCompleted(item)}>
-                  {item.completed ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                  ) : (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /></svg>
-                  )}
-                </button>
-                <div className="ma-item-body" onClick={() => startEdit(item)}>
-                  <div className={`ma-item-title ${item.completed ? 'strike' : ''}`}>
-                    {item.hot && <svg className="ma-hot-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1"><path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z" /></svg>}
-                    {item.title}
-                  </div>
-                  <div className="ma-item-meta">
-                    {item.due_date && <span className={`ma-due ${!item.completed && new Date() > new Date(item.due_date) ? 'overdue' : ''}`}>{formatDue(item.due_date)}</span>}
-                  </div>
                 </div>
               </div>
             )}
@@ -822,9 +658,8 @@ title=Report&file=@report.pdf`}</pre>
         {feeds.length === 0 ? (
           <div className="mn-empty">No feeds yet. Tap + to create one.</div>
         ) : (
-          <MobileCategoryTree
-            universeId={universeId}
-            panelId="m.feeds"
+          <FeedsFlatCategoryList
+            variant="mobile"
             categories={categories}
             items={feeds}
             getCategoryId={(f) => f.category_id}
@@ -1271,6 +1106,7 @@ function MobileTables({ categories, universeId }) {
             panelId="m.tables"
             categories={categories}
             items={tables}
+            itemKind="tables"
             getCategoryId={(t) => t.category_id}
             getTitle={(t) => t.title || ''}
             renderCategoryHeaderExtra={(categoryId) => (
@@ -1351,6 +1187,7 @@ function MobileDocumentsReadonly({ categories, universeId }) {
             panelId="m.documents"
             categories={categories}
             items={docs}
+            itemKind="archive"
             getCategoryId={(d) => d.category_id}
             getTitle={(d) => d.name || ''}
             renderCategoryHeaderExtra={(categoryId) => (
@@ -1418,6 +1255,7 @@ function MobileLinksReadonly({ categories, universeId }) {
             panelId="m.links"
             categories={categories}
             items={links}
+            itemKind="links"
             getCategoryId={(l) => l.category_id}
             getTitle={(l) => l.title || l.url || ''}
             renderCategoryHeaderExtra={(categoryId) => (
@@ -1551,6 +1389,7 @@ function MobileDiagramsReadonly({ categories, universeId }) {
             panelId="m.diagrams"
             categories={categories}
             items={diagrams}
+            itemKind="diagrams"
             getCategoryId={(d) => d.category_id}
             getTitle={(d) => d.title || ''}
             renderCategoryHeaderExtra={(categoryId) => (
@@ -2270,7 +2109,6 @@ function MobileApp() {
           </div>
         )}
         {view === 'markdowns' && <MobileMarkdowns categories={categories} universeId={currentUniverseId} />}
-        {view === 'actions' && <MobileActions categories={categories} universeId={currentUniverseId} />}
         {view === 'feeds' && <MobileFeeds categories={categories} universeId={currentUniverseId} />}
         {view === 'tables' && <MobileTables categories={categories} universeId={currentUniverseId} />}
         {view === 'documents' && <MobileDocumentsReadonly categories={categories} universeId={currentUniverseId} />}
@@ -2295,10 +2133,6 @@ function MobileApp() {
         <button className={`m-tab ${view === 'markdowns' ? 'active' : ''}`} onClick={() => setView('markdowns')}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
           <span>Markdowns</span>
-        </button>
-        <button className={`m-tab ${view === 'actions' ? 'active' : ''}`} onClick={() => setView('actions')}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z" /></svg>
-          <span>Actions</span>
         </button>
         <button className={`m-tab ${view === 'feeds' ? 'active' : ''}`} onClick={() => setView('feeds')}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11a9 9 0 0 1 9 9" /><path d="M4 4a16 16 0 0 1 16 16" /><circle cx="5" cy="19" r="1" /></svg>

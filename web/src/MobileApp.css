@@ -1195,93 +1195,6 @@ html.m-mobile-shell #root {
   margin-right: auto;
 }
 
-/* ── Action items ─────────────────────────────────── */
-
-.ma-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
-  transition: background 0.1s;
-}
-
-.ma-item:active {
-  background: var(--bg-tertiary);
-}
-
-.ma-item.done {
-  opacity: 0.55;
-}
-
-.ma-check {
-  flex-shrink: 0;
-  margin-top: 2px;
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 0;
-  border-radius: 50%;
-  transition: color 0.15s;
-}
-
-.ma-check.checked {
-  color: var(--accent);
-}
-
-.ma-item-body {
-  flex: 1;
-  min-width: 0;
-  cursor: pointer;
-}
-
-.ma-item-title {
-  font-size: 15px;
-  font-weight: 500;
-  line-height: 1.4;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.ma-item-title.strike {
-  text-decoration: line-through;
-  color: var(--text-secondary);
-}
-
-.ma-hot-icon {
-  color: #f56565;
-  flex-shrink: 0;
-}
-
-.ma-item.hot .ma-item-title {
-  color: #f56565;
-}
-
-.ma-item-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 3px;
-}
-
-.ma-due {
-  font-size: 11px;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.ma-due.overdue {
-  color: #e53e3e;
-  font-weight: 700;
-}
-
 /* Mobile category tree (nested folders) */
 .ma-cat-tree {
   display: flex;
@@ -1504,6 +1417,34 @@ html.m-mobile-shell #root {
   border-radius: 8px;
 }
 
+.ma-cat-header-extra {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.ma-cat-new-md-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: rgba(55, 148, 255, 0.12);
+  color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ma-cat-new-md-btn:active {
+  opacity: 0.85;
+}
+
 .feed-category-circle-btn {
   width: 50px;
   height: 50px;
@@ -1588,68 +1529,6 @@ html.m-mobile-shell #root {
 .ma-group-posts-btn:active {
   border-color: var(--accent);
   color: var(--accent);
-}
-
-.ma-filter-btn {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  padding: 6px 12px;
-  cursor: pointer;
-  transition: color 0.15s, background 0.15s;
-}
-
-.ma-filter-btn.active {
-  color: var(--accent);
-  background: rgba(55, 148, 255, 0.10);
-  border-color: var(--accent);
-}
-
-/* Action item edit form */
-
-.ma-edit-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.ma-hot-btn {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text-secondary);
-  font-size: 14px;
-  padding: 8px 14px;
-  cursor: pointer;
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
-}
-
-.ma-hot-btn.active {
-  color: #f56565;
-  background: rgba(245, 101, 101, 0.10);
-  border-color: #f56565;
-}
-
-.ma-date-input {
-  flex: 1;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text-primary);
-  font-size: 14px;
-  padding: 8px 12px;
-  outline: none;
-  font-family: inherit;
-}
-
-.ma-date-input:focus {
-  border-color: var(--accent);
 }
 
 /* ── Background attribution (mobile) ─────────────── */

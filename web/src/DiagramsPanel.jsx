@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Excalidraw } from '@excalidraw/excalidraw'
 import '@excalidraw/excalidraw/index.css'
-import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
+import { CategoryPicker } from './CategoryTree'
 import { SidebarCategoryTree } from './SidebarCategoryTree'
 import { parseDiagramData, EMPTY_DIAGRAM_JSON as EMPTY_DIAGRAM } from './diagramParse'
 
@@ -286,12 +286,10 @@ export function DiagramEditorView({ diagram, categories, onClose, onSaved }) {
 function DiagramsPanel({ categories, onPinChange, universeId, onEditDiagram, refreshKey, onLoaded }) {
   const [diagrams, setDiagrams] = useState([])
   const [search, setSearch] = useState('')
-  const [selectedCategoryId, setSelectedCategoryId] = useState(null)
 
   const fetchDiagrams = () => {
     const params = new URLSearchParams()
     if (search) params.set('q', search)
-    if (selectedCategoryId !== null) params.set('category_id', selectedCategoryId)
     if (universeId) params.set('universe_id', universeId)
     fetch(`/api/diagrams?${params}`)
       .then(res => res.json())
@@ -304,7 +302,7 @@ function DiagramsPanel({ categories, onPinChange, universeId, onEditDiagram, ref
   useEffect(() => {
     const timer = setTimeout(fetchDiagrams, 300)
     return () => clearTimeout(timer)
-  }, [search, selectedCategoryId, universeId])
+  }, [search, universeId])
 
   const startNew = () => { onEditDiagram?.({ _new: true, universeId }) }
   const startEdit = (d) => { onEditDiagram?.(d) }
@@ -324,7 +322,7 @@ function DiagramsPanel({ categories, onPinChange, universeId, onEditDiagram, ref
   }
 
   return (
-    <aside className="markdowns-panel">
+    <aside className="markdowns-panel sidebar-tree-panel">
       <div className="markdowns-header">
         <span className="markdowns-header-title">Diagrams</span>
         <button className="markdowns-add-btn" onClick={startNew} title="New diagram">
@@ -335,12 +333,11 @@ function DiagramsPanel({ categories, onPinChange, universeId, onEditDiagram, ref
       </div>
       <div className="markdowns-search">
         <input className="markdowns-search-input" placeholder="Search diagrams..." value={search} onChange={e => setSearch(e.target.value)} />
-        <CategoryFilterPicker categories={categories} value={selectedCategoryId} onChange={setSelectedCategoryId} />
       </div>
       <div className="markdowns-list">
         {diagrams.length === 0 ? (
           <div className="markdowns-empty">
-            {search || selectedCategoryId ? 'No matching diagrams.' : 'No diagrams yet. Click + to create one.'}
+            {search ? 'No matching diagrams.' : 'No diagrams yet. Click + to create one.'}
           </div>
         ) : (
           <SidebarCategoryTree
@@ -348,17 +345,14 @@ function DiagramsPanel({ categories, onPinChange, universeId, onEditDiagram, ref
             panelId="diagrams"
             categories={categories}
             items={diagrams}
+            showExpandCollapse
+            itemKind="diagrams"
             getCategoryId={(d) => d.category_id}
             getTitle={(d) => d.title || ''}
             renderItem={(d) => (
-              <div key={d.id} className="markdown-card" onClick={() => startEdit(d)}>
+              <div key={d.id} className="markdown-card sidebar-tree-file" onClick={() => startEdit(d)}>
                 <div className="markdown-card-header">
-                  <div className="markdown-card-title">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 4, opacity: 0.5, flexShrink: 0 }}>
-                      <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
-                    </svg>
-                    {d.title || 'Untitled'}
-                  </div>
+                  <div className="markdown-card-title">{d.title || 'Untitled'}</div>
                   <button className={`pin-btn ${d.pinned ? 'pinned' : ''}`} onClick={(e) => togglePin(e, d)} title={d.pinned ? 'Unpin' : 'Pin'}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill={d.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M12 17v5" /><path d="M9 2h6l-1 7h4l-5 7H7l2-7H5l1-7z" />

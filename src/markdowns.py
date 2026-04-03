@@ -43,19 +43,6 @@ class Category:
 
 
 @dataclass
-class ActionItem:
-    id: int | None
-    title: str
-    hot: bool
-    completed: bool
-    due_date: str | None
-    category_id: int | None
-    created_at: str
-    updated_at: str
-    universe_id: int = 1
-
-
-@dataclass
 class Link:
     id: int | None
     title: str
@@ -199,7 +186,6 @@ def delete_universe(uid: int) -> bool:
     conn.execute("DELETE FROM feeds WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM markdowns WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM links WHERE universe_id = ?", (uid,))
-    conn.execute("DELETE FROM action_items WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM diagrams WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM tables_ WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM document_meta WHERE universe_id = ?", (uid,))
@@ -213,13 +199,6 @@ def delete_universe(uid: int) -> bool:
 def get_universe_markdown_ids(uid: int) -> list[int]:
     conn = _get_conn()
     rows = conn.execute("SELECT id FROM markdowns WHERE universe_id = ?", (uid,)).fetchall()
-    conn.close()
-    return [r["id"] for r in rows]
-
-
-def get_universe_action_item_ids(uid: int) -> list[int]:
-    conn = _get_conn()
-    rows = conn.execute("SELECT id FROM action_items WHERE universe_id = ?", (uid,)).fetchall()
     conn.close()
     return [r["id"] for r in rows]
 
@@ -794,213 +773,6 @@ def delete_all_markdown_images(markdown_id: int) -> int:
 
 def markdown_image_to_dict(img: MarkdownImage) -> dict:
     return asdict(img)
-
-
-# ── Action items CRUD ────────────────────────────────────────────────────
-
-
-def _row_to_action_item(row: sqlite3.Row) -> ActionItem:
-    return ActionItem(
-        id=row["id"],
-        title=row["title"],
-        hot=bool(row["hot"]),
-        completed=bool(row["completed"]),
-        due_date=row["due_date"],
-        category_id=row["category_id"],
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
-        universe_id=row["universe_id"],
-    )
-
-
-def list_action_items(query: str = "", show_completed: bool = False, universe_id: int | None = None) -> list[ActionItem]:
-    conn = _get_conn()
-    conditions: list[str] = []
-    params: list = []
-    if universe_id is not None:
-        conditions.append("universe_id = ?")
-        params.append(universe_id)
-    if not show_completed:
-        conditions.append("completed = 0")
-    if query:
-        conditions.append("title LIKE ?")
-        params.append(f"%{query}%")
-    where = f" WHERE {' AND '.join(conditions)}" if conditions else ""
-    rows = conn.execute(
-        f"SELECT * FROM action_items{where} ORDER BY completed ASC, updated_at DESC", params
-    ).fetchall()
-    conn.close()
-    return [_row_to_action_item(r) for r in rows]
-
-
-def get_action_item(item_id: int) -> ActionItem | None:
-    conn = _get_conn()
-    row = conn.execute("SELECT * FROM action_items WHERE id = ?", (item_id,)).fetchone()
-    conn.close()
-    return _row_to_action_item(row) if row else None
-
-
-def create_action_item(title: str, hot: bool = False, due_date: str | None = None, category_id: int | None = None, universe_id: int = 1) -> ActionItem:
-    now = _now()
-    conn = _get_conn()
-    cur = conn.execute(
-        "INSERT INTO action_items (title, hot, completed, due_date, category_id, universe_id, created_at, updated_at) VALUES (?, ?, 0, ?, ?, ?, ?, ?)",
-        (title, int(hot), due_date, category_id, universe_id, now, now),
-    )
-    conn.commit()
-    item_id = cur.lastrowid
-    conn.close()
-    return get_action_item(item_id)  # type: ignore[return-value]
-
-
-def update_action_item(
-    item_id: int, title: str, hot: bool,
-    completed: bool, due_date: str | None = None, category_id: int | None = None,
-) -> ActionItem | None:
-    now = _now()
-    conn = _get_conn()
-    cur = conn.execute(
-        "UPDATE action_items SET title = ?, hot = ?, completed = ?, due_date = ?, category_id = ?, updated_at = ? WHERE id = ?",
-        (title, int(hot), int(completed), due_date, category_id, now, item_id),
-    )
-    conn.commit()
-    conn.close()
-    if cur.rowcount == 0:
-        return None
-    return get_action_item(item_id)
-
-
-def delete_action_item(item_id: int) -> bool:
-    conn = _get_conn()
-    cur = conn.execute("DELETE FROM action_items WHERE id = ?", (item_id,))
-    conn.commit()
-    conn.close()
-    return cur.rowcount > 0
-
-
-def action_item_to_dict(item: ActionItem) -> dict:
-    return asdict(item)
-
-
-# ── Action item links ────────────────────────────────────────────────────
-
-
-@dataclass
-class ActionItemLink:
-    id: int
-    action_item_id: int
-    link_type: str  # 'markdown' or 'document'
-    markdown_id: int | None
-    document_path: str | None
-    created_at: str
-
-
-def _row_to_link(row: sqlite3.Row) -> ActionItemLink:
-    return ActionItemLink(
-        id=row["id"],
-        action_item_id=row["action_item_id"],
-        link_type=row["link_type"],
-        markdown_id=row["markdown_id"],
-        document_path=row["document_path"],
-        created_at=row["created_at"],
-    )
-
-
-def list_action_item_links(action_item_id: int) -> list[ActionItemLink]:
-    conn = _get_conn()
-    rows = conn.execute(
-        "SELECT * FROM action_item_links WHERE action_item_id = ? ORDER BY created_at",
-        (action_item_id,),
-    ).fetchall()
-    conn.close()
-    return [_row_to_link(r) for r in rows]
-
-
-def add_action_item_link(
-    action_item_id: int,
-    link_type: str,
-    markdown_id: int | None = None,
-    document_path: str | None = None,
-) -> ActionItemLink:
-    now = _now()
-    conn = _get_conn()
-    # Prevent duplicate links
-    if link_type == "markdown":
-        dup = conn.execute(
-            "SELECT id FROM action_item_links WHERE action_item_id = ? AND link_type = 'markdown' AND markdown_id = ?",
-            (action_item_id, markdown_id),
-        ).fetchone()
-    else:
-        dup = conn.execute(
-            "SELECT id FROM action_item_links WHERE action_item_id = ? AND link_type = 'document' AND document_path = ?",
-            (action_item_id, document_path),
-        ).fetchone()
-    if dup:
-        row = conn.execute("SELECT * FROM action_item_links WHERE id = ?", (dup["id"],)).fetchone()
-        conn.close()
-        return _row_to_link(row)
-    cur = conn.execute(
-        "INSERT INTO action_item_links (action_item_id, link_type, markdown_id, document_path, created_at) VALUES (?, ?, ?, ?, ?)",
-        (action_item_id, link_type, markdown_id, document_path, now),
-    )
-    conn.commit()
-    link_id = cur.lastrowid
-    conn.close()
-    return ActionItemLink(
-        id=link_id, action_item_id=action_item_id, link_type=link_type,
-        markdown_id=markdown_id, document_path=document_path, created_at=now,
-    )
-
-
-def delete_action_item_link(link_id: int) -> bool:
-    conn = _get_conn()
-    cur = conn.execute("DELETE FROM action_item_links WHERE id = ?", (link_id,))
-    conn.commit()
-    conn.close()
-    return cur.rowcount > 0
-
-
-def list_links_for_markdown(markdown_id: int) -> list[dict]:
-    """Return action items linked to a given markdown, with link id."""
-    conn = _get_conn()
-    rows = conn.execute(
-        """
-        SELECT l.id AS link_id, a.*
-        FROM action_item_links l
-        JOIN action_items a ON a.id = l.action_item_id
-        WHERE l.link_type = 'markdown' AND l.markdown_id = ?
-        ORDER BY a.updated_at DESC
-        """,
-        (markdown_id,),
-    ).fetchall()
-    conn.close()
-    results = []
-    for r in rows:
-        item = _row_to_action_item(r)
-        d = asdict(item)
-        d["link_id"] = r["link_id"]
-        results.append(d)
-    return results
-
-
-def get_linked_targets() -> dict:
-    """Return markdown IDs and document paths that have at least one action-item link."""
-    conn = _get_conn()
-    markdown_rows = conn.execute(
-        "SELECT DISTINCT markdown_id FROM action_item_links WHERE link_type = 'markdown' AND markdown_id IS NOT NULL"
-    ).fetchall()
-    doc_rows = conn.execute(
-        "SELECT DISTINCT document_path FROM action_item_links WHERE link_type = 'document' AND document_path IS NOT NULL"
-    ).fetchall()
-    conn.close()
-    return {
-        "markdown_ids": [r["markdown_id"] for r in markdown_rows],
-        "document_paths": [r["document_path"] for r in doc_rows],
-    }
-
-
-def action_item_link_to_dict(link: ActionItemLink) -> dict:
-    return asdict(link)
 
 
 # ── App settings ─────────────────────────────────────────────────────────

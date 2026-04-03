@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
+import { CategoryPicker } from './CategoryTree'
 import { SidebarCategoryTree } from './SidebarCategoryTree'
 
 function formatSize(bytes) {
@@ -78,9 +78,6 @@ EXT_ICONS.doc = EXT_ICONS.docx
 function ArchivePanel({ categories, onPinChange, universeId, onLoaded }) {
   const [docs, setDocs] = useState([])
   const [search, setSearch] = useState('')
-  const [selectedCategoryId, setSelectedCategoryId] = useState(null)
-  const [onlyLinked, setOnlyLinked] = useState(false)
-  const [linkedDocPaths, setLinkedDocPaths] = useState(null) // Set or null
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState('') // e.g. "Uploading 2 of 5..."
   const [uploadError, setUploadError] = useState('')
@@ -90,7 +87,6 @@ function ArchivePanel({ categories, onPinChange, universeId, onLoaded }) {
   const fetchDocs = () => {
     const params = new URLSearchParams()
     if (search) params.set('q', search)
-    if (selectedCategoryId !== null) params.set('category_id', selectedCategoryId)
     if (universeId) params.set('universe_id', universeId)
     fetch(`/api/documents?${params}`)
       .then(res => res.json())
@@ -99,18 +95,11 @@ function ArchivePanel({ categories, onPinChange, universeId, onLoaded }) {
       .finally(() => onLoaded?.())
   }
 
-  const fetchLinkedPaths = () => {
-    fetch('/api/action-item-links/linked-targets')
-      .then(r => r.json())
-      .then(data => setLinkedDocPaths(new Set(data.document_paths)))
-      .catch(() => {})
-  }
-
-  useEffect(() => { fetchDocs(); fetchLinkedPaths() }, [universeId])
+  useEffect(() => { fetchDocs() }, [universeId])
   useEffect(() => {
     const timer = setTimeout(fetchDocs, 300)
     return () => clearTimeout(timer)
-  }, [search, selectedCategoryId, universeId])
+  }, [search, universeId])
 
   const openDoc = (e, doc) => {
     e.stopPropagation()
@@ -194,7 +183,7 @@ function ArchivePanel({ categories, onPinChange, universeId, onLoaded }) {
   }
 
   return (
-    <div className="markdowns-panel">
+    <div className="markdowns-panel sidebar-tree-panel">
       <div className="markdowns-header">
         <span className="markdowns-header-title">Documents</span>
         <div className="archive-header-actions">
@@ -221,29 +210,13 @@ function ArchivePanel({ categories, onPinChange, universeId, onLoaded }) {
         <div className="archive-upload-error" onClick={() => setUploadError('')}>{uploadError}</div>
       )}
       <div className="markdowns-search">
-        <div className="ai-search-row">
-          <input className="markdowns-search-input" placeholder="Search documents..." value={search} onChange={(e) => setSearch(e.target.value)} />
-          <button
-            className={`linked-filter-btn ${onlyLinked ? 'active' : ''}`}
-            onClick={() => setOnlyLinked(!onlyLinked)}
-            title={onlyLinked ? 'Show all documents' : 'Show only documents with action items'}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-            </svg>
-          </button>
-        </div>
-        <CategoryFilterPicker categories={categories} value={selectedCategoryId} onChange={setSelectedCategoryId} />
+        <input className="markdowns-search-input" placeholder="Search documents..." value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
       <div className="markdowns-list">
         {(() => {
-          const filtered = onlyLinked && linkedDocPaths
-            ? docs.filter(d => linkedDocPaths.has(d.path))
-            : docs
-          if (filtered.length === 0) return (
+          if (docs.length === 0) return (
             <div className="markdowns-empty">
-              {onlyLinked ? 'No documents with linked action items.' : search || selectedCategoryId ? 'No matching documents.' : 'No documents in archive.'}
+              {search ? 'No matching documents.' : 'No documents in archive.'}
             </div>
           )
           return (
@@ -251,11 +224,13 @@ function ArchivePanel({ categories, onPinChange, universeId, onLoaded }) {
               universeId={universeId}
               panelId="archive"
               categories={categories}
-              items={filtered}
+              items={docs}
+              showExpandCollapse
+              itemKind="archive"
               getCategoryId={(d) => d.category_id}
               getTitle={(d) => d.name || ''}
               renderItem={(doc) => (
-                <div key={doc.path} className="archive-card" onClick={(e) => openDoc(e, doc)} title={['pdf', 'xlsx', 'xls'].includes(doc.extension) ? `View ${doc.name}` : `Download ${doc.name}`}>
+                <div key={doc.path} className="archive-card sidebar-tree-file" onClick={(e) => openDoc(e, doc)} title={['pdf', 'xlsx', 'xls'].includes(doc.extension) ? `View ${doc.name}` : `Download ${doc.name}`}>
                   <div className="archive-card-info">
                     <div className="archive-card-name">{doc.name}</div>
                     <div className="archive-card-meta">

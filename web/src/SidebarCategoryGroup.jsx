@@ -9,8 +9,9 @@ function storageKey(universeId, panelId) {
 /**
  * Persisted map of groupKey → expanded (true/false). Missing keys default to expanded.
  * Used by SidebarCategoryTree / MobileCategoryTree for expand/collapse state.
+ * When `allGroupKeys` is provided, expandAll/collapseAll update every known folder key.
  */
-export function useSidebarGroupCollapse(universeId, panelId) {
+export function useSidebarGroupCollapse(universeId, panelId, allGroupKeys = null) {
   const key = storageKey(universeId, panelId)
   const [map, setMap] = useState({})
 
@@ -45,5 +46,29 @@ export function useSidebarGroupCollapse(universeId, panelId) {
     [key],
   )
 
-  return { isExpanded, toggle }
+  const expandAll = useCallback(() => {
+    if (!allGroupKeys?.length) return
+    setMap((prev) => {
+      const next = { ...prev }
+      for (const k of allGroupKeys) next[k] = true
+      try {
+        localStorage.setItem(key, JSON.stringify(next))
+      } catch {}
+      return next
+    })
+  }, [key, allGroupKeys])
+
+  const collapseAll = useCallback(() => {
+    if (!allGroupKeys?.length) return
+    setMap((prev) => {
+      const next = { ...prev }
+      for (const k of allGroupKeys) next[k] = false
+      try {
+        localStorage.setItem(key, JSON.stringify(next))
+      } catch {}
+      return next
+    })
+  }, [key, allGroupKeys])
+
+  return { isExpanded, toggle, expandAll, collapseAll }
 }

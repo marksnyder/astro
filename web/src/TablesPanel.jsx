@@ -1,30 +1,28 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
+import { CategoryPicker } from './CategoryTree'
 import { SidebarCategoryTree } from './SidebarCategoryTree'
 
 function TablesPanel({ categories, universeId, onPinChange, onEditTable, refreshKey, onLoaded }) {
   const [tables, setTables] = useState([])
   const [search, setSearch] = useState('')
-  const [selectedCategoryId, setSelectedCategoryId] = useState(null)
   const [editingTable, setEditingTable] = useState(null)
 
   const fetchTables = useCallback(() => {
     const params = new URLSearchParams()
     if (search) params.set('q', search)
-    if (selectedCategoryId !== null) params.set('category_id', selectedCategoryId)
     if (universeId) params.set('universe_id', universeId)
     fetch(`/api/tables?${params}`)
       .then(r => r.json())
       .then(setTables)
       .catch(() => {})
       .finally(() => onLoaded?.())
-  }, [search, selectedCategoryId, universeId])
+  }, [search, universeId])
 
   useEffect(() => { fetchTables() }, [universeId])
   useEffect(() => {
     const t = setTimeout(fetchTables, 300)
     return () => clearTimeout(t)
-  }, [search, selectedCategoryId, universeId])
+  }, [search, universeId])
 
   useEffect(() => { fetchTables() }, [refreshKey])
 
@@ -76,7 +74,7 @@ function TablesPanel({ categories, universeId, onPinChange, onEditTable, refresh
   }
 
   return (
-    <aside className="markdowns-panel">
+    <aside className="markdowns-panel sidebar-tree-panel">
       <div className="markdowns-header">
         <span className="markdowns-header-title">Tables</span>
         <button className="markdowns-add-btn" onClick={importNewFromCsv} title="Import CSV as new table" style={{ marginRight: 4 }}>
@@ -90,31 +88,27 @@ function TablesPanel({ categories, universeId, onPinChange, onEditTable, refresh
       </div>
       <div className="markdowns-search">
         <input className="markdowns-search-input" placeholder="Search tables..." value={search} onChange={e => setSearch(e.target.value)} />
-        <CategoryFilterPicker categories={categories} value={selectedCategoryId} onChange={setSelectedCategoryId} />
       </div>
       <div className="markdowns-list">
         {tables.length === 0 ? (
-          <div className="markdowns-empty">{search || selectedCategoryId ? 'No matching tables.' : 'No tables yet. Click + to create one.'}</div>
+          <div className="markdowns-empty">{search ? 'No matching tables.' : 'No tables yet. Click + to create one.'}</div>
         ) : (
           <SidebarCategoryTree
             universeId={universeId}
             panelId="tables"
             categories={categories}
             items={tables}
+            showExpandCollapse
+            itemKind="tables"
             getCategoryId={(t) => t.category_id}
             getTitle={(t) => t.title || ''}
             renderItem={(table) => {
               let colCount = 0
               try { colCount = JSON.parse(table.columns).length } catch {}
               return (
-                <div key={table.id} className={`markdown-card ${editingTable?.id === table.id ? 'selected' : ''}`} onClick={() => startEdit(table)}>
+                <div key={table.id} className={`markdown-card sidebar-tree-file ${editingTable?.id === table.id ? 'selected' : ''}`} onClick={() => startEdit(table)}>
                   <div className="markdown-card-header">
-                    <div className="markdown-card-title">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6, opacity: 0.5, flexShrink: 0 }}>
-                        <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/>
-                      </svg>
-                      {table.title || 'Untitled'}
-                    </div>
+                    <div className="markdown-card-title">{table.title || 'Untitled'}</div>
                     <button className={`pin-btn ${table.pinned ? 'pinned' : ''}`} onClick={(e) => togglePin(e, table)} title={table.pinned ? 'Unpin' : 'Pin'}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill={table.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M12 17v5" /><path d="M9 2h6l-1 7h4l-5 7H7l2-7H5l1-7z" />

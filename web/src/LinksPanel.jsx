@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
+import { CategoryPicker } from './CategoryTree'
 import { SidebarCategoryTree } from './SidebarCategoryTree'
 
 function LinksPanel({ categories, onPinChange, universeId, onLoaded }) {
   const [links, setLinks] = useState([])
   const [search, setSearch] = useState('')
-  const [selectedCategoryId, setSelectedCategoryId] = useState(null)
   const [editing, setEditing] = useState(null) // null | 'new' | link object
   const [title, setTitle] = useState('')
   const [url, setUrl] = useState('')
@@ -16,7 +15,6 @@ function LinksPanel({ categories, onPinChange, universeId, onLoaded }) {
   const fetchLinks = () => {
     const params = new URLSearchParams()
     if (search) params.set('q', search)
-    if (selectedCategoryId !== null) params.set('category_id', selectedCategoryId)
     if (universeId) params.set('universe_id', universeId)
     fetch(`/api/links?${params}`)
       .then(res => res.json())
@@ -29,13 +27,13 @@ function LinksPanel({ categories, onPinChange, universeId, onLoaded }) {
   useEffect(() => {
     const timer = setTimeout(fetchLinks, 300)
     return () => clearTimeout(timer)
-  }, [search, selectedCategoryId, universeId])
+  }, [search, universeId])
 
   const startNew = () => {
     setEditing('new')
     setTitle('')
     setUrl('')
-    setCategoryId(selectedCategoryId)
+    setCategoryId(null)
     setTimeout(() => titleRef.current?.focus(), 50)
   }
 
@@ -104,7 +102,7 @@ function LinksPanel({ categories, onPinChange, universeId, onLoaded }) {
   }
 
   return (
-    <aside className="markdowns-panel">
+    <aside className="markdowns-panel sidebar-tree-panel">
       <div className="markdowns-header">
         <span className="markdowns-header-title">Links</span>
         <div className="archive-header-actions">
@@ -117,13 +115,12 @@ function LinksPanel({ categories, onPinChange, universeId, onLoaded }) {
       </div>
       <div className="markdowns-search">
         <input className="markdowns-search-input" placeholder="Search links..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        <CategoryFilterPicker categories={categories} value={selectedCategoryId} onChange={setSelectedCategoryId} />
       </div>
       <div className="markdowns-list">
         {(() => {
           if (links.length === 0) return (
             <div className="markdowns-empty">
-              {search || selectedCategoryId ? 'No matching links.' : 'No links yet. Click + to add one.'}
+              {search ? 'No matching links.' : 'No links yet. Click + to add one.'}
             </div>
           )
           return (
@@ -132,10 +129,12 @@ function LinksPanel({ categories, onPinChange, universeId, onLoaded }) {
               panelId="links"
               categories={categories}
               items={links}
+              showExpandCollapse
+              itemKind="links"
               getCategoryId={(l) => l.category_id}
               getTitle={(l) => l.title || ''}
               renderItem={(link) => (
-                <div key={link.id} className="link-card" onClick={() => startEdit(link)} title={link.url}>
+                <div key={link.id} className="link-card sidebar-tree-file" onClick={() => startEdit(link)} title={link.url}>
                   <div className="link-card-info">
                     <div className="link-card-title">{link.title || 'Untitled'}</div>
                     <div className="link-card-url">{formatDomain(link.url)}</div>

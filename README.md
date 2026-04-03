@@ -30,9 +30,6 @@ Visual diagrams with [Excalidraw](https://excalidraw.com). Draw in the embedded 
 ### Tables
 Typed columns (string, number, boolean), inline row editing, pagination, search, categories, CSV import and export, and MCP for agents to create and query data.
 
-### Action Items
-Tasks with priorities, due dates, and categories, wired into search and agent context.
-
 ### Bookmarks
 Titled links with categories, searchable and pinnable for quick agent and human access.
 
@@ -40,7 +37,7 @@ Titled links with categories, searchable and pinnable for quick agent and human 
 Isolate content and categories per project, client, or environment so each AI app or team has a clear boundary.
 
 ### Hierarchical Categories
-Parent and child categories across markdowns, documents, tables, tasks, and links. Optional emojis for quick scanning.
+Parent and child categories across markdowns, documents, tables, and links. Optional emojis for quick scanning.
 
 ### Pinned Items Bar
 Pin markdowns, documents, diagrams, tables, links, and feeds to the header for fast access while building or operating workflows.
@@ -55,7 +52,7 @@ HTTP endpoints with per feed API keys: post markdown or files into timelines. Pi
 A [Model Context Protocol](https://modelcontextprotocol.io) server at `/mcp/` exposes tools so clients such as Claude Desktop, Cursor, or custom agents can read and write Astro data as part of an application.
 
 ### Mobile Interface
-`/mobile` offers a phone friendly UI for chat, notes, tasks, feeds, tables, library, categories, and agent tasks.
+`/mobile` offers a phone friendly UI for chat, notes, feeds, tables, library, categories, and agent tasks.
 
 ---
 
@@ -187,12 +184,6 @@ The MCP server is available at `http://localhost:8000/mcp/` and exposes 43 tools
 | `write_table_row` | Add a row to a table |
 | `update_table_row` | Update a row |
 | `delete_table_row` | Delete a row |
-| **Action Items** | |
-| `search_action_items` | List or search tasks |
-| `read_action_item` | Read a single task by ID |
-| `write_action_item` | Create a new task |
-| `update_action_item` | Update a task |
-| `delete_action_item` | Delete a task |
 | **Categories** | |
 | `list_all_categories` | List all categories |
 | `write_category` | Create a new category |

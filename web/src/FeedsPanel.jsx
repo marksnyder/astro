@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
 import { formatCategoryHierarchyLabel } from './categoryHierarchy'
-import { SidebarCategoryTree } from './SidebarCategoryTree'
+import { FeedsFlatCategoryList } from './FeedsFlatCategoryList'
 
 function feedAvatar(name, size = 32) {
   return `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(name || 'Feed')}&radius=50&fontSize=40&size=${size}`
@@ -158,9 +158,7 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
             No feeds yet. Click + to create one.
           </div>
         ) : (
-          <SidebarCategoryTree
-            universeId={universeId}
-            panelId="feeds"
+          <FeedsFlatCategoryList
             categories={categories}
             items={feeds}
             getCategoryId={(f) => f.category_id}

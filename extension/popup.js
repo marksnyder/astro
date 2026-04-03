@@ -362,16 +362,16 @@ $readLaterBtn.addEventListener('click', async () => {
   $readLaterStatus.className = 'tool-status'
 
   try {
-    const payload = { title: `Read: ${currentTabTitle || currentTabUrl}`, hot: false }
+    const payload = { title: `Read: ${currentTabTitle || currentTabUrl}`, url: currentTabUrl || 'about:blank' }
     const uid = getUniverseId()
     const qs = uid ? `?universe_id=${uid}` : ''
-    const res = await fetch(`${getServer()}/api/action-items${qs}`, {
+    const res = await fetch(`${getServer()}/api/links${qs}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    toolStatus($readLaterStatus, 'Action item created!', 'success')
+    toolStatus($readLaterStatus, 'Link saved!', 'success')
   } catch (e) {
     toolStatus($readLaterStatus, `Error: ${e.message}`, 'error')
   }

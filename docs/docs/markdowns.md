@@ -31,7 +31,6 @@ Markdowns are first-class citizens in your Universe.
 | `POST` | `/api/markdowns/{markdown_id}/images` | Upload image |
 | `DELETE` | `/api/markdown-images/{image_id}` | Delete image |
 | `GET` | `/api/markdown-images/file/{filename}` | Fetch image bytes |
-| `GET` | `/api/markdowns/{markdown_id}/action-items` | Linked action items |
 
 ## MCP tools
 

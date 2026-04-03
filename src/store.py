@@ -88,54 +88,6 @@ def delete_markdown_from_store(markdown_id: int) -> None:
         pass
 
 
-def upsert_action_item(
-    item_id: int,
-    title: str,
-    completed: bool = False,
-    hot: bool = False,
-    due_date: str | None = None,
-    category_name: str | None = None,
-    universe_id: int = 1,
-) -> None:
-    """Add or update an action item in the vector store with rich context."""
-    store = get_vectorstore()
-    doc_id = f"action-item-{item_id}"
-    try:
-        store._collection.delete(ids=[doc_id])
-    except Exception:
-        pass
-
-    status = "COMPLETED" if completed else "OPEN"
-    parts = [f"ACTION ITEM ({status}): {title}"]
-    if hot:
-        parts.append("Priority: HOT / urgent")
-    if due_date:
-        parts.append(f"Due date: {due_date}")
-    if category_name:
-        parts.append(f"Category: {category_name}")
-    content = "\n".join(parts)
-
-    doc = Document(
-        page_content=content,
-        metadata={
-            "source": f"action-item: {title}",
-            "action_item_id": item_id,
-            "completed": completed,
-            "universe_id": universe_id,
-        },
-    )
-    store.add_documents([doc], ids=[doc_id])
-
-
-def delete_action_item_from_store(item_id: int) -> None:
-    """Remove an action item from the vector store."""
-    store = get_vectorstore()
-    try:
-        store._collection.delete(ids=[f"action-item-{item_id}"])
-    except Exception:
-        pass
-
-
 def clear() -> None:
     """Delete all data from the vector store collection."""
     store = get_vectorstore()

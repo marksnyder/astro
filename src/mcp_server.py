@@ -7,10 +7,8 @@ from fastmcp import FastMCP
 from pathlib import Path
 
 from src.markdowns import (
-    action_item_to_dict,
     agent_task_to_dict,
     category_to_dict,
-    create_action_item,
     create_category,
     create_diagram,
     create_feed_post_markdown,
@@ -19,7 +17,6 @@ from src.markdowns import (
     create_link,
     create_markdown,
     create_agent_task as _db_create_agent_task,
-    delete_action_item as _db_delete_action_item,
     delete_category as _db_delete_category,
     delete_diagram as _db_delete_diagram,
     delete_document_meta,
@@ -32,7 +29,6 @@ from src.markdowns import (
     diagram_to_dict,
     feed_post_to_dict,
     feed_to_dict,
-    get_action_item,
     get_all_document_meta,
     get_diagram,
     get_table,
@@ -43,7 +39,6 @@ from src.markdowns import (
     get_markdown,
     get_setting,
     link_to_dict,
-    list_action_items,
     list_categories,
     list_diagrams,
     list_feed_posts,
@@ -60,7 +55,6 @@ from src.markdowns import (
     table_to_dict,
     set_setting,
     universe_to_dict,
-    update_action_item as _db_update_action_item,
     update_category as _db_update_category,
     update_diagram as _db_update_diagram,
     update_link as _db_update_link,
@@ -73,12 +67,10 @@ from src.agent_task_runner import ChannelCooldownError, send_agent_task_message_
 from src.ingest import load_document as _load_document, chunk_documents as _chunk_documents
 from src.store import (
     add_documents as _add_documents,
-    delete_action_item_from_store,
     delete_document_chunks,
     delete_markdown_from_store,
     doc_count,
     get_retriever,
-    upsert_action_item,
     upsert_markdown,
 )
 
@@ -116,7 +108,7 @@ mcp = FastMCP(
     name="Astro",
     instructions=(
         "Astro is a personal knowledge base and productivity app. "
-        "Use these tools to search the user's notes, action items, "
+        "Use these tools to search the user's notes, "
         "bookmarks, diagrams, and feeds. The vector store enables semantic "
         "search across all indexed content. Content is organized into "
         "Universes (isolated workspaces). Most tools accept an optional "
@@ -158,7 +150,7 @@ def set_default_universe(universe_id: int) -> dict:
 def search(query: str, k: int = 4, universe_id: int | None = None) -> list[dict]:
     """Semantic search over the user's knowledge base using the vector store.
     Returns the top-k most relevant text chunks for a given natural-language query.
-    Useful for finding notes, action items, and documents related to a topic."""
+    Useful for finding notes and documents related to a topic."""
     uid = universe_id if universe_id is not None else _default_universe()
     k = max(1, min(k, 20))
     retriever = get_retriever(k=k, universe_id=uid)
@@ -229,80 +221,13 @@ def delete_markdown(markdown_id: int) -> str:
     return "Deleted"
 
 
-# ── Action items ──────────────────────────────────────────────────────────
-
-
-@mcp.tool
-def search_action_items(
-    query: str = "", show_completed: bool = False, universe_id: int | None = None
-) -> list[dict]:
-    """List or search the user's action items (tasks / to-dos).
-    By default only open items are returned."""
-    uid = universe_id if universe_id is not None else _default_universe()
-    return [action_item_to_dict(a) for a in list_action_items(query, show_completed, uid)]
-
-
-@mcp.tool
-def read_action_item(item_id: int) -> dict | str:
-    """Read a single action item by ID."""
-    item = get_action_item(item_id)
-    if item is None:
-        return "Action item not found"
-    return action_item_to_dict(item)
-
-
-@mcp.tool
-def write_action_item(
-    title: str,
-    hot: bool = False,
-    due_date: str | None = None,
-    category_id: int | None = None,
-    universe_id: int | None = None,
-) -> dict:
-    """Create a new action item (task). Set hot=True for urgent items.
-    due_date should be ISO format (YYYY-MM-DD)."""
-    uid = universe_id if universe_id is not None else _default_universe()
-    item = create_action_item(title, hot, due_date, category_id, uid)
-    return action_item_to_dict(item)
-
-
-@mcp.tool
-def update_action_item(
-    item_id: int,
-    title: str,
-    hot: bool = False,
-    completed: bool = False,
-    due_date: str | None = None,
-    category_id: int | None = None,
-) -> dict | str:
-    """Update an existing action item. All fields are replaced."""
-    item = _db_update_action_item(item_id, title, hot, completed, due_date, category_id)
-    if item is None:
-        return "Action item not found"
-    cat_name = None
-    if item.category_id:
-        cats = list_categories()
-        cat_name = next((c.name for c in cats if c.id == item.category_id), None)
-    upsert_action_item(item.id, item.title, item.completed, item.hot, item.due_date, cat_name, item.universe_id)
-    return action_item_to_dict(item)
-
-
-@mcp.tool
-def delete_action_item(item_id: int) -> str:
-    """Permanently delete an action item by ID."""
-    if not _db_delete_action_item(item_id):
-        return "Action item not found"
-    delete_action_item_from_store(item_id)
-    return "Deleted"
-
-
 # ── Categories ────────────────────────────────────────────────────────────
 
 
 @mcp.tool
 def list_all_categories(universe_id: int | None = None) -> list[dict]:
     """List all categories in the knowledge base. Categories organize
-    markdowns, action items, links, and feeds."""
+    markdowns, links, and feeds."""
     uid = universe_id if universe_id is not None else _default_universe()
     return [category_to_dict(c) for c in list_categories(uid)]
 
