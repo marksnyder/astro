@@ -1815,7 +1815,20 @@ function MobileApp() {
   }, [ircMessages])
 
   useEffect(() => {
-    if (view === 'chat') inputRef.current?.focus()
+    if (view !== 'chat') return
+    inputRef.current?.focus()
+    const scrollToBottom = () => {
+      const area = ircChatAreaRef.current
+      if (area) {
+        area.scrollTop = area.scrollHeight
+      } else {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
+      }
+    }
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(scrollToBottom)
+    })
+    return () => cancelAnimationFrame(id)
   }, [view])
 
   // ── Chat dictation ─────────────────────

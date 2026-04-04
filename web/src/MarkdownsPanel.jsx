@@ -424,6 +424,8 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
   const isNew = !!markdown?._new
   const autosaveTimer = useRef(null)
   const initializedRef = useRef(false)
+  const latestFieldsRef = useRef({ title: '', body: '', categoryId: null })
+  const doAutosaveRef = useRef(null)
   // Only re-hydrate local state when the *document* changes, not when the parent passes a new object for the same id (e.g. after list refresh or autosave).
   // Include category for new docs so "new in category" from the sidebar updates the picker when reusing the same tab.
   const newDocCategoryKey =
@@ -460,7 +462,8 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
     // Intentionally depend on document identity only — `markdown` reference often changes without a real navigation.
   }, [markdownSyncKey])
 
-  const doAutosave = useCallback(async (t, b, catId) => {
+  const doAutosave = useCallback(async (t, b, catId, opts = {}) => {
+    const { silent } = opts
     if (!t.trim() && !b.trim()) return
     const payload = { title: t, body: b, category_id: catId }
     const effectiveId = createdId || (!isNew ? markdown.id : null)
@@ -478,7 +481,7 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
         body: JSON.stringify(payload),
       })
       const created = await res.json()
-      setCreatedId(created.id)
+      if (!silent) setCreatedId(created.id)
       onSaved?.(created, false)
     }
   }, [markdown?.id, markdown?.universeId, isNew, onSaved, createdId])
@@ -489,6 +492,20 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
     autosaveTimer.current = setTimeout(() => doAutosave(title, body, categoryId), 800)
     return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current) }
   }, [title, body, categoryId, doAutosave])
+
+  latestFieldsRef.current = { title, body, categoryId }
+  doAutosaveRef.current = doAutosave
+
+  useEffect(() => {
+    return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
+      if (!initializedRef.current) return
+      const { title: t, body: b, categoryId: c } = latestFieldsRef.current
+      if (!t.trim() && !b.trim()) return
+      const save = doAutosaveRef.current
+      if (save) void save(t, b, c, { silent: true })
+    }
+  }, [])
 
   const currentId = createdId || (isNew ? null : markdown.id)
 

@@ -1213,8 +1213,18 @@ function App() {
   }, [])
 
   const closeTab = useCallback((tabId) => {
-    setTabs(prev => prev.filter(t => t.id !== tabId))
-    setActiveTabId(prev => prev === tabId ? 'irc' : prev)
+    setTabs((prevTabs) => {
+      const idx = prevTabs.findIndex((t) => t.id === tabId)
+      if (idx === -1) return prevTabs
+      const nextTabs = prevTabs.filter((t) => t.id !== tabId)
+      setActiveTabId((active) => {
+        if (active !== tabId) return active
+        if (idx > 0) return prevTabs[idx - 1].id
+        if (nextTabs.length > 0) return nextTabs[0].id
+        return 'irc'
+      })
+      return nextTabs
+    })
   }, [])
 
   const updateTabsOverflow = useCallback(() => {
@@ -1326,6 +1336,22 @@ function App() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [ircMessages])
+
+  useEffect(() => {
+    if (activeTabId !== 'irc') return
+    const scrollToBottom = () => {
+      const area = ircChatAreaRef.current
+      if (area) {
+        area.scrollTop = area.scrollHeight
+      } else {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
+      }
+    }
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(scrollToBottom)
+    })
+    return () => cancelAnimationFrame(id)
+  }, [activeTabId])
 
   useEffect(() => {
     inputRef.current?.focus()
