@@ -1856,11 +1856,26 @@ def api_toggle_table_pin(table_id: int, pinned: bool = True):
 
 
 @app.get("/api/tables/{table_id}/rows")
-def api_list_table_rows(table_id: int, search: str = "", page: int = 1, page_size: int = 50):
+def api_list_table_rows(
+    table_id: int,
+    search: str = "",
+    page: int = 1,
+    page_size: int = 50,
+    sort_by: str = "",
+    sort_dir: str = "asc",
+):
     if not get_table(table_id):
         raise HTTPException(status_code=404, detail="Table not found")
     page_size = min(page_size, 200)
-    rows, total = list_table_rows(table_id, search, page=page, page_size=page_size)
+    sort_key = sort_by.strip() or None
+    rows, total = list_table_rows(
+        table_id,
+        search,
+        page=page,
+        page_size=page_size,
+        sort_by=sort_key,
+        sort_dir=sort_dir,
+    )
     return {
         "rows": [table_row_to_dict(r) for r in rows],
         "total": total,
@@ -1943,6 +1958,8 @@ async def api_import_table_csv(table_id: int, file: UploadFile):
                     data[key] = 0
             elif ctype == "boolean":
                 data[key] = val.lower() in ("true", "1", "yes") if val else False
+            elif ctype == "datetime":
+                data[key] = val or ""
             else:
                 data[key] = val or ""
         create_table_row(table_id, json.dumps(data), count)
@@ -1979,7 +1996,16 @@ async def api_import_csv_new_table(file: UploadFile, universe_id: int = 1):
                         float(v)
                     ctype = "number"
                 except ValueError:
-                    pass
+                    import re
+
+                    if all(
+                        re.match(
+                            r"^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?)?$",
+                            v.strip(),
+                        )
+                        for v in sample_vals
+                    ):
+                        ctype = "datetime"
         columns.append({"name": fn, "type": ctype})
     title = file.filename.rsplit(".", 1)[0] if "." in file.filename else file.filename
     t = create_table(title, json.dumps(columns), universe_id=universe_id)

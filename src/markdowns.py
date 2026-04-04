@@ -1,5 +1,6 @@
 """SQLite-backed markdowns, document-metadata, and category storage."""
 
+import json
 import sqlite3
 import uuid
 from dataclasses import asdict, dataclass
@@ -1661,7 +1662,16 @@ def table_to_dict(t: Table) -> dict:
 # ── Table rows CRUD ──────────────────────────────────────────────────────
 
 
-def list_table_rows(table_id: int, search: str = "", page: int = 1, page_size: int = 50) -> tuple[list[TableRow], int]:
+def list_table_rows(
+    table_id: int,
+    search: str = "",
+    page: int = 1,
+    page_size: int = 50,
+    sort_by: str | None = None,
+    sort_dir: str = "asc",
+) -> tuple[list[TableRow], int]:
+    """List rows. When sort_by matches a column name from the table schema, order by that
+    JSON field via json_each (arbitrary keys, SQL-safe bound parameters)."""
     conn = _get_conn()
     base = "FROM table_rows WHERE table_id = ?"
     params: list = [table_id]
@@ -1670,9 +1680,34 @@ def list_table_rows(table_id: int, search: str = "", page: int = 1, page_size: i
         params.append(f"%{search}%")
     total = conn.execute(f"SELECT COUNT(*) {base}", params).fetchone()[0]
     offset = (page - 1) * page_size
+
+    t = get_table(table_id)
+    order_sql = "sort_order, id"
+    order_extra: list = []
+    if sort_by and t:
+        try:
+            cols = json.loads(t.columns)
+        except json.JSONDecodeError:
+            cols = []
+        col_meta = next((c for c in cols if isinstance(c, dict) and c.get("name") == sort_by), None)
+        if col_meta:
+            ctype = col_meta.get("type") or "string"
+            direction = "DESC" if str(sort_dir).lower() == "desc" else "ASC"
+            if ctype == "number":
+                sub = (
+                    "(SELECT COALESCE(CAST(value AS REAL), 0.0) FROM json_each(data) WHERE key = ? LIMIT 1)"
+                )
+            elif ctype == "boolean":
+                sub = "(SELECT COALESCE(CAST(value AS INTEGER), 0) FROM json_each(data) WHERE key = ? LIMIT 1)"
+            else:
+                # string, datetime — ISO-8601 strings sort lexicographically
+                sub = "(SELECT COALESCE(value, '') FROM json_each(data) WHERE key = ? LIMIT 1)"
+            order_sql = f"{sub} {direction}, id ASC"
+            order_extra = [sort_by]
+
     rows = conn.execute(
-        f"SELECT * {base} ORDER BY sort_order, id LIMIT ? OFFSET ?",
-        params + [page_size, offset],
+        f"SELECT * {base} ORDER BY {order_sql} LIMIT ? OFFSET ?",
+        params + order_extra + [page_size, offset],
     ).fetchall()
     conn.close()
     return [_row_to_table_row(r) for r in rows], total

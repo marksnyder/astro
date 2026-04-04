@@ -3,6 +3,40 @@ import { CategoryPicker } from './CategoryTree'
 import { SidebarCategoryTree } from './SidebarCategoryTree'
 import { MoveToUniverseButton } from './MoveToUniverseButton'
 
+function toDatetimeLocalValue(isoStr) {
+  if (!isoStr) return ''
+  const d = new Date(isoStr)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function fromDatetimeLocalToIso(localStr) {
+  if (!localStr) return ''
+  const d = new Date(localStr)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toISOString()
+}
+
+function formatDatetimeDisplay(isoStr) {
+  if (!isoStr) return ''
+  const d = new Date(isoStr)
+  if (Number.isNaN(d.getTime())) return String(isoStr)
+  return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
+}
+
+function columnTypeLabel(type) {
+  if (type === 'datetime') return 'DateTime'
+  return type
+}
+
+function columnTypeHint(type) {
+  if (type === 'boolean') return '✓'
+  if (type === 'number') return '#'
+  if (type === 'datetime') return '⏱'
+  return 'Aa'
+}
+
 function TablesPanel({ categories, universeId, universes, onPinChange, onEditTable, refreshKey, onLoaded }) {
   const [tables, setTables] = useState([])
   const [search, setSearch] = useState('')
@@ -168,6 +202,8 @@ function TableEditorView({ table, categories, onSaved }) {
   const [page, setPage] = useState(1)
   const [pageSize] = useState(50)
   const [rowSearch, setRowSearch] = useState('')
+  const [sortBy, setSortBy] = useState(null)
+  const [sortDir, setSortDir] = useState('asc')
   const [tableId, setTableId] = useState(null)
   const [editingCell, setEditingCell] = useState(null)
   const [newColName, setNewColName] = useState('')
@@ -187,6 +223,8 @@ function TableEditorView({ table, categories, onSaved }) {
       setTotalRows(0)
       setPage(1)
       setTableId(null)
+      setSortBy(null)
+      setSortDir('asc')
       setTimeout(() => titleRef.current?.focus(), 50)
     } else if (table) {
       setTitle(table.title || '')
@@ -194,6 +232,8 @@ function TableEditorView({ table, categories, onSaved }) {
       try { setColumns(JSON.parse(table.columns)) } catch { setColumns([]) }
       setTableId(table.id)
       setPage(1)
+      setSortBy(null)
+      setSortDir('asc')
     }
     setTimeout(() => { initRef.current = true }, 0)
     return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current) }
@@ -203,11 +243,15 @@ function TableEditorView({ table, categories, onSaved }) {
     if (!tableId) return
     const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
     if (rowSearch) params.set('search', rowSearch)
+    if (sortBy) {
+      params.set('sort_by', sortBy)
+      params.set('sort_dir', sortDir)
+    }
     fetch(`/api/tables/${tableId}/rows?${params}`)
       .then(r => r.json())
       .then(data => { setRows(data.rows || []); setTotalRows(data.total || 0) })
       .catch(() => {})
-  }, [tableId, page, pageSize, rowSearch])
+  }, [tableId, page, pageSize, rowSearch, sortBy, sortDir])
 
   useEffect(() => { fetchRows() }, [fetchRows])
 
@@ -252,6 +296,7 @@ function TableEditorView({ table, categories, onSaved }) {
     for (const col of columns) {
       if (col.type === 'number') data[col.name] = 0
       else if (col.type === 'boolean') data[col.name] = false
+      else if (col.type === 'datetime') data[col.name] = ''
       else data[col.name] = ''
     }
     await fetch(`/api/tables/${tableId}/rows`, {
@@ -323,6 +368,7 @@ function TableEditorView({ table, categories, onSaved }) {
               <option value="string">Text</option>
               <option value="number">Number</option>
               <option value="boolean">Boolean</option>
+              <option value="datetime">DateTime</option>
             </select>
             <button className="table-small-btn primary" onClick={addColumn} disabled={!newColName.trim()}>Add</button>
           </div>
@@ -331,7 +377,7 @@ function TableEditorView({ table, categories, onSaved }) {
           {columns.map((col, i) => (
             <div key={i} className="table-column-chip">
               <span className="table-column-name">{col.name}</span>
-              <span className="table-column-type">{col.type}</span>
+              <span className="table-column-type">{columnTypeLabel(col.type)}</span>
               <button className="table-column-remove" onClick={() => removeColumn(i)} title="Remove column">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
@@ -362,8 +408,25 @@ function TableEditorView({ table, categories, onSaved }) {
                 <tr>
                   {columns.map((col, i) => (
                     <th key={i}>
-                      {col.name}
-                      <span className="table-th-type">{col.type === 'boolean' ? '✓' : col.type === 'number' ? '#' : 'Aa'}</span>
+                      <button
+                        type="button"
+                        className={`table-th-sort ${sortBy === col.name ? 'active' : ''}`}
+                        title="Sort by this column"
+                        onClick={() => {
+                          if (sortBy === col.name) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
+                          else {
+                            setSortBy(col.name)
+                            setSortDir('asc')
+                          }
+                          setPage(1)
+                        }}
+                      >
+                        <span className="table-th-name">{col.name}</span>
+                        <span className="table-th-type">{columnTypeHint(col.type)}</span>
+                        {sortBy === col.name && (
+                          <span className="table-sort-indicator" aria-hidden>{sortDir === 'asc' ? '▲' : '▼'}</span>
+                        )}
+                      </button>
                     </th>
                   ))}
                   <th className="table-actions-th"></th>
@@ -388,6 +451,20 @@ function TableEditorView({ table, categories, onSaved }) {
                           )
                         }
                         if (isEditing) {
+                          if (col.type === 'datetime') {
+                            return (
+                              <td key={ci} className="table-cell editing">
+                                <input
+                                  className="table-cell-input"
+                                  type="datetime-local"
+                                  defaultValue={toDatetimeLocalValue(val)}
+                                  autoFocus
+                                  onBlur={e => updateRowCell(row, col.name, fromDatetimeLocalToIso(e.target.value))}
+                                  onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditingCell(null) }}
+                                />
+                              </td>
+                            )
+                          }
                           return (
                             <td key={ci} className="table-cell editing">
                               <input
@@ -398,6 +475,15 @@ function TableEditorView({ table, categories, onSaved }) {
                                 onBlur={e => updateRowCell(row, col.name, col.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value)}
                                 onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditingCell(null) }}
                               />
+                            </td>
+                          )
+                        }
+                        if (col.type === 'datetime') {
+                          return (
+                            <td key={ci} className="table-cell" onClick={() => setEditingCell(cellKey)}>
+                              {val !== undefined && val !== null && val !== ''
+                                ? formatDatetimeDisplay(val)
+                                : <span className="table-cell-empty">—</span>}
                             </td>
                           )
                         }

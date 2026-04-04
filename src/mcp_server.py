@@ -516,7 +516,7 @@ def search_tables(
     query: str = "", category_id: int | None = None, universe_id: int | None = None
 ) -> list[dict]:
     """List or search the user's data tables. Tables are spreadsheet-like
-    structures with typed columns (string, number, boolean) and rows of data.
+    structures with typed columns (string, number, boolean, datetime) and rows of data.
     Returns id, title, columns (JSON), category, and timestamps."""
     uid = universe_id if universe_id is not None else _default_universe()
     return [table_to_dict(t) for t in list_tables(query, category_id, uid)]
@@ -541,7 +541,7 @@ def write_table(
 ) -> dict:
     """Create a new data table. The columns parameter is a JSON string array
     of column definitions, e.g. '[{"name":"Name","type":"string"},{"name":"Age","type":"number"},{"name":"Active","type":"boolean"}]'.
-    Supported column types: string, number, boolean."""
+    Supported column types: string, number, boolean, datetime."""
     uid = universe_id if universe_id is not None else _default_universe()
     t = create_table(title, columns, category_id, uid)
     return table_to_dict(t)
@@ -568,11 +568,17 @@ def delete_table(table_id: int) -> str:
 
 @mcp.tool
 def read_table_rows(
-    table_id: int, search: str = "", page: int = 1, page_size: int = 50
+    table_id: int,
+    search: str = "",
+    page: int = 1,
+    page_size: int = 50,
+    sort_by: str = "",
+    sort_dir: str = "asc",
 ) -> dict:
-    """Read rows from a table. Supports pagination and text search.
+    """Read rows from a table. Supports pagination, text search, and sorting by a column name.
     Each row has an id, data (JSON object with column values), and sort_order."""
-    rows, total = list_table_rows(table_id, search, page, page_size)
+    sk = sort_by.strip() or None
+    rows, total = list_table_rows(table_id, search, page, page_size, sort_by=sk, sort_dir=sort_dir)
     return {"rows": [table_row_to_dict(r) for r in rows], "total": total}
 
 
