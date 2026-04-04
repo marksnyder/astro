@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm'
 import { CategoryPicker, CategoryFilterPicker } from './CategoryTree'
 import { formatCategoryHierarchyLabel } from './categoryHierarchy'
 import { FeedsFlatCategoryList } from './FeedsFlatCategoryList'
+import { MoveToUniverseButton } from './MoveToUniverseButton'
 
 function feedAvatar(name, size = 32) {
   return `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(name || 'Feed')}&radius=50&fontSize=40&size=${size}`
@@ -22,7 +23,7 @@ function Sparkline({ data, width = 80, height = 20 }) {
   )
 }
 
-function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOpenFeedRequestHandled, onViewPosts, unreadCounts, recent7dCounts, onLoaded }) {
+function FeedsPanel({ categories, universeId, universes, onPinChange, openFeedRequest, onOpenFeedRequestHandled, onViewPosts, unreadCounts, recent7dCounts, onLoaded }) {
   const [feeds, setFeeds] = useState([])
   const [search, setSearch] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
@@ -113,6 +114,23 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
     if (editing && editing !== 'new' && editing.id === feedId) setEditing(null)
     fetchFeeds()
     onPinChange?.()
+  }
+
+  const moveToUniverse = async (feed, targetUniverseId, categoryId) => {
+    const res = await fetch(`/api/feeds/${feed.id}/move-universe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ universe_id: targetUniverseId, category_id: categoryId }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      const d = err.detail
+      alert(typeof d === 'string' ? d : (d != null ? JSON.stringify(d) : 'Move failed'))
+      return
+    }
+    fetchFeeds()
+    onPinChange?.()
+    if (editing && editing !== 'new' && editing.id === feed.id) setEditing(null)
   }
 
   const [pinnedCategoryIds, setPinnedCategoryIds] = useState(new Set())
@@ -212,6 +230,12 @@ function FeedsPanel({ categories, universeId, onPinChange, openFeedRequest, onOp
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                   </svg>
                 </button>
+                <MoveToUniverseButton
+                  universes={universes}
+                  currentUniverseId={universeId}
+                  itemLabel={feed.title || 'Feed'}
+                  onMove={(uid, catId) => moveToUniverse(feed, uid, catId)}
+                />
                 <button className="archive-action-btn archive-delete-btn" onClick={(e) => remove(e, feed.id)} title="Delete">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="3 6 5 6 21 6" />

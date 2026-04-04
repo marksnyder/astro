@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { CategoryPicker } from './CategoryTree'
 import { SidebarCategoryTree } from './SidebarCategoryTree'
+import { MoveToUniverseButton } from './MoveToUniverseButton'
 
-function LinksPanel({ categories, onPinChange, universeId, onLoaded }) {
+function LinksPanel({ categories, onPinChange, universeId, universes, onLoaded }) {
   const [links, setLinks] = useState([])
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState(null) // null | 'new' | link object
@@ -88,6 +89,23 @@ function LinksPanel({ categories, onPinChange, universeId, onLoaded }) {
     onPinChange?.()
   }
 
+  const moveToUniverse = async (link, targetUniverseId, categoryId) => {
+    const res = await fetch(`/api/links/${link.id}/move-universe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ universe_id: targetUniverseId, category_id: categoryId }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      const d = err.detail
+      alert(typeof d === 'string' ? d : (d != null ? JSON.stringify(d) : 'Move failed'))
+      return
+    }
+    fetchLinks()
+    onPinChange?.()
+    if (editing && editing !== 'new' && editing.id === link.id) setEditing(null)
+  }
+
   const openLink = (e, link) => {
     e.stopPropagation()
     if (link.url) window.open(link.url, '_blank', 'noopener,noreferrer')
@@ -152,6 +170,12 @@ function LinksPanel({ categories, onPinChange, universeId, onLoaded }) {
                       <line x1="10" y1="14" x2="21" y2="3" />
                     </svg>
                   </button>
+                  <MoveToUniverseButton
+                    universes={universes}
+                    currentUniverseId={universeId}
+                    itemLabel={link.title || link.url || 'Link'}
+                    onMove={(uid, catId) => moveToUniverse(link, uid, catId)}
+                  />
                   <button className="archive-action-btn archive-delete-btn" onClick={(e) => remove(e, link.id)} title="Delete">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="3 6 5 6 21 6" />

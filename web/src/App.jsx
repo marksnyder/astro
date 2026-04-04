@@ -1737,6 +1737,7 @@ function App() {
               editMarkdownRequest={editMarkdownRequest}
               onEditMarkdownRequestHandled={() => setEditMarkdownRequest(null)}
               universeId={currentUniverseId}
+              universes={universes}
               onEditMarkdown={(m) => openMarkdownTab(m._new ? { ...m, _key: 'new' } : m)}
               refreshKey={markdownRefreshKey}
               onLoaded={() => setSidebarLoading(false)}
@@ -1747,6 +1748,7 @@ function App() {
               categories={categories}
               onPinChange={fetchPinned}
               universeId={currentUniverseId}
+              universes={universes}
               onLoaded={() => setSidebarLoading(false)}
             />
           )}
@@ -1755,6 +1757,7 @@ function App() {
               categories={categories}
               onPinChange={fetchPinned}
               universeId={currentUniverseId}
+              universes={universes}
               onLoaded={() => setSidebarLoading(false)}
             />
           )}
@@ -1762,6 +1765,7 @@ function App() {
             <FeedsPanel
               categories={categories}
               universeId={currentUniverseId}
+              universes={universes}
               onPinChange={fetchPinned}
               openFeedRequest={openFeedRequest}
               onOpenFeedRequestHandled={() => setOpenFeedRequest(null)}
@@ -1775,6 +1779,7 @@ function App() {
             <DiagramsPanel
               categories={categories}
               universeId={currentUniverseId}
+              universes={universes}
               onPinChange={fetchPinned}
               onEditDiagram={(d) => openDiagramTab(d._new ? { ...d, _key: 'new' } : d)}
               refreshKey={diagramRefreshKey}
@@ -1785,6 +1790,7 @@ function App() {
             <TablesPanel
               categories={categories}
               universeId={currentUniverseId}
+              universes={universes}
               onPinChange={fetchPinned}
               onEditTable={(t) => openTableTab(t._new ? { ...t, _key: 'new' } : t)}
               refreshKey={tableRefreshKey}

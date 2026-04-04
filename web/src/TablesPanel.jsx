@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { CategoryPicker } from './CategoryTree'
 import { SidebarCategoryTree } from './SidebarCategoryTree'
+import { MoveToUniverseButton } from './MoveToUniverseButton'
 
-function TablesPanel({ categories, universeId, onPinChange, onEditTable, refreshKey, onLoaded }) {
+function TablesPanel({ categories, universeId, universes, onPinChange, onEditTable, refreshKey, onLoaded }) {
   const [tables, setTables] = useState([])
   const [search, setSearch] = useState('')
   const [editingTable, setEditingTable] = useState(null)
@@ -50,6 +51,23 @@ function TablesPanel({ categories, universeId, onPinChange, onEditTable, refresh
     await fetch(`/api/tables/${table.id}/pin?pinned=${!table.pinned}`, { method: 'PUT' })
     fetchTables()
     onPinChange?.()
+  }
+
+  const moveToUniverse = async (table, targetUniverseId, categoryId) => {
+    const res = await fetch(`/api/tables/${table.id}/move-universe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ universe_id: targetUniverseId, category_id: categoryId }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      const d = err.detail
+      alert(typeof d === 'string' ? d : (d != null ? JSON.stringify(d) : 'Move failed'))
+      return
+    }
+    fetchTables()
+    onPinChange?.()
+    if (editingTable?.id === table.id) setEditingTable(null)
   }
 
   const importNewFromCsv = () => {
@@ -114,6 +132,12 @@ function TablesPanel({ categories, universeId, onPinChange, onEditTable, refresh
                         <path d="M12 17v5" /><path d="M9 2h6l-1 7h4l-5 7H7l2-7H5l1-7z" />
                       </svg>
                     </button>
+                    <MoveToUniverseButton
+                      universes={universes}
+                      currentUniverseId={universeId}
+                      itemLabel={table.title || 'Table'}
+                      onMove={(uid, catId) => moveToUniverse(table, uid, catId)}
+                    />
                     <button className="markdown-card-delete-btn" onClick={(e) => { e.stopPropagation(); remove(table.id) }} title="Delete table">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />

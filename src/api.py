@@ -75,11 +75,17 @@ from src.markdowns import (
     list_pinned_documents,
     list_pinned_links,
     list_pinned_markdowns,
+    category_in_universe,
     list_universes,
     link_to_dict,
     markdown_image_to_dict,
     markdown_to_dict,
     move_category,
+    move_diagram_to_universe,
+    move_feed_to_universe,
+    move_link_to_universe,
+    move_markdown_to_universe,
+    move_table_to_universe,
     update_category,
     update_feed,
     rename_universe,
@@ -252,6 +258,11 @@ class MarkdownResponse(BaseModel):
     created_at: str
     updated_at: str
     universe_id: int = 1
+
+
+class MoveToUniverseRequest(BaseModel):
+    universe_id: int
+    category_id: Optional[int] = None
 
 
 class CategoryRequest(BaseModel):
@@ -445,6 +456,22 @@ def api_update_markdown(markdown_id: int, req: MarkdownRequest):
     return markdown_to_dict(markdown)
 
 
+def _validate_move_category(req: MoveToUniverseRequest) -> None:
+    if not category_in_universe(req.category_id, req.universe_id):
+        raise HTTPException(status_code=400, detail="Category does not belong to the target universe")
+
+
+@app.post("/api/markdowns/{markdown_id}/move-universe", response_model=MarkdownResponse)
+def api_move_markdown_universe(markdown_id: int, req: MoveToUniverseRequest):
+    if not get_universe(req.universe_id):
+        raise HTTPException(status_code=400, detail="Universe not found")
+    _validate_move_category(req)
+    markdown = move_markdown_to_universe(markdown_id, req.universe_id, req.category_id)
+    if not markdown:
+        raise HTTPException(status_code=404, detail="Markdown not found")
+    return markdown_to_dict(markdown)
+
+
 @app.delete("/api/markdowns/{markdown_id}")
 def api_delete_markdown(markdown_id: int):
     delete_all_markdown_images(markdown_id)
@@ -521,6 +548,17 @@ def api_create_link(req: LinkRequest, universe_id: int = 1):
 @app.put("/api/links/{link_id}", response_model=LinkResponse)
 def api_update_link(link_id: int, req: LinkRequest):
     link = update_link(link_id, req.title, req.url, req.category_id)
+    if not link:
+        raise HTTPException(status_code=404, detail="Link not found")
+    return link_to_dict(link)
+
+
+@app.post("/api/links/{link_id}/move-universe", response_model=LinkResponse)
+def api_move_link_universe(link_id: int, req: MoveToUniverseRequest):
+    if not get_universe(req.universe_id):
+        raise HTTPException(status_code=400, detail="Universe not found")
+    _validate_move_category(req)
+    link = move_link_to_universe(link_id, req.universe_id, req.category_id)
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")
     return link_to_dict(link)
@@ -716,6 +754,28 @@ def api_set_document_category(path: str, req: DocumentCategoryRequest):
         raise HTTPException(status_code=404, detail="File not found")
     set_document_category(path, req.category_id)
     return {"ok": True}
+
+
+@app.post("/api/documents/move-universe")
+def api_move_document_universe(path: str, req: MoveToUniverseRequest):
+    """Move an archived document to another universe; optional category; re-ingests vector chunks."""
+    if not get_universe(req.universe_id):
+        raise HTTPException(status_code=400, detail="Universe not found")
+    _validate_move_category(req)
+    safe = (DOCUMENTS_DIR / path).resolve()
+    if not str(safe).startswith(str(DOCUMENTS_DIR)) or not safe.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    documents = load_document(str(safe))
+    if not documents:
+        raise HTTPException(status_code=400, detail="Could not extract content from file for re-indexing")
+    delete_document_chunks(str(safe))
+    for doc in documents:
+        doc.metadata["source"] = str(safe)
+    chunks = chunk_documents(documents)
+    add_documents(chunks, universe_id=req.universe_id)
+    set_document_universe(path, req.universe_id)
+    set_document_category(path, req.category_id, req.universe_id)
+    return {"ok": True, "path": path}
 
 
 @app.delete("/api/documents")
@@ -1157,6 +1217,17 @@ def api_create_feed(req: FeedRequest, universe_id: int = 1):
 @app.put("/api/feeds/{feed_id}", response_model=FeedResponse)
 def api_update_feed(feed_id: int, req: FeedRequest):
     feed = update_feed(feed_id, req.title, req.category_id)
+    if not feed:
+        raise HTTPException(status_code=404, detail="Feed not found")
+    return feed_to_dict(feed)
+
+
+@app.post("/api/feeds/{feed_id}/move-universe", response_model=FeedResponse)
+def api_move_feed_universe(feed_id: int, req: MoveToUniverseRequest):
+    if not get_universe(req.universe_id):
+        raise HTTPException(status_code=400, detail="Universe not found")
+    _validate_move_category(req)
+    feed = move_feed_to_universe(feed_id, req.universe_id, req.category_id)
     if not feed:
         raise HTTPException(status_code=404, detail="Feed not found")
     return feed_to_dict(feed)
@@ -1671,6 +1742,17 @@ def api_update_diagram(diagram_id: int, req: DiagramRequest):
     return diagram_to_dict(diagram)
 
 
+@app.post("/api/diagrams/{diagram_id}/move-universe", response_model=DiagramResponse)
+def api_move_diagram_universe(diagram_id: int, req: MoveToUniverseRequest):
+    if not get_universe(req.universe_id):
+        raise HTTPException(status_code=400, detail="Universe not found")
+    _validate_move_category(req)
+    diagram = move_diagram_to_universe(diagram_id, req.universe_id, req.category_id)
+    if not diagram:
+        raise HTTPException(status_code=404, detail="Diagram not found")
+    return diagram_to_dict(diagram)
+
+
 @app.delete("/api/diagrams/{diagram_id}")
 def api_delete_diagram(diagram_id: int):
     if not delete_diagram(diagram_id):
@@ -1740,6 +1822,17 @@ def api_create_table(req: TableRequest, universe_id: int = 1):
 @app.put("/api/tables/{table_id}", response_model=TableResponse)
 def api_update_table(table_id: int, req: TableRequest):
     t = update_table(table_id, req.title, req.columns, req.category_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Table not found")
+    return table_to_dict(t)
+
+
+@app.post("/api/tables/{table_id}/move-universe", response_model=TableResponse)
+def api_move_table_universe(table_id: int, req: MoveToUniverseRequest):
+    if not get_universe(req.universe_id):
+        raise HTTPException(status_code=400, detail="Universe not found")
+    _validate_move_category(req)
+    t = move_table_to_universe(table_id, req.universe_id, req.category_id)
     if not t:
         raise HTTPException(status_code=404, detail="Table not found")
     return table_to_dict(t)

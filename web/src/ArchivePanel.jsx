@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { CategoryPicker } from './CategoryTree'
 import { SidebarCategoryTree } from './SidebarCategoryTree'
+import { MoveToUniverseButton } from './MoveToUniverseButton'
 
 function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`
@@ -75,7 +76,7 @@ const EXT_ICONS = {
 EXT_ICONS.xls = EXT_ICONS.xlsx
 EXT_ICONS.doc = EXT_ICONS.docx
 
-function ArchivePanel({ categories, onPinChange, universeId, onLoaded }) {
+function ArchivePanel({ categories, onPinChange, universeId, universes, onLoaded }) {
   const [docs, setDocs] = useState([])
   const [search, setSearch] = useState('')
   const [uploading, setUploading] = useState(false)
@@ -182,6 +183,22 @@ function ArchivePanel({ categories, onPinChange, universeId, onLoaded }) {
     fetchDocs()
   }
 
+  const moveDocToUniverse = async (doc, targetUniverseId, categoryId) => {
+    const res = await fetch(`/api/documents/move-universe?path=${encodeURIComponent(doc.path)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ universe_id: targetUniverseId, category_id: categoryId }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      const d = err.detail
+      alert(typeof d === 'string' ? d : (d != null ? JSON.stringify(d) : 'Move failed'))
+      return
+    }
+    fetchDocs()
+    onPinChange?.()
+  }
+
   return (
     <div className="markdowns-panel sidebar-tree-panel">
       <div className="markdowns-header">
@@ -260,6 +277,12 @@ function ArchivePanel({ categories, onPinChange, universeId, onLoaded }) {
                       <line x1="12" y1="15" x2="12" y2="3" />
                     </svg>
                   </button>
+                  <MoveToUniverseButton
+                    universes={universes}
+                    currentUniverseId={universeId}
+                    itemLabel={doc.name}
+                    onMove={(uid, catId) => moveDocToUniverse(doc, uid, catId)}
+                  />
                   <button className="archive-action-btn archive-delete-btn" onClick={(e) => remove(e, doc)} title="Remove">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="3 6 5 6 21 6" />

@@ -3,6 +3,7 @@ import { Excalidraw } from '@excalidraw/excalidraw'
 import '@excalidraw/excalidraw/index.css'
 import { CategoryPicker } from './CategoryTree'
 import { SidebarCategoryTree } from './SidebarCategoryTree'
+import { MoveToUniverseButton } from './MoveToUniverseButton'
 import { parseDiagramData, EMPTY_DIAGRAM_JSON as EMPTY_DIAGRAM } from './diagramParse'
 
 const EXCALIDRAW_SOURCE = 'https://excalidraw.com'
@@ -283,7 +284,7 @@ export function DiagramEditorView({ diagram, categories, onClose, onSaved }) {
 
 /* ── Sidebar panel (list of diagrams) ─────────────────── */
 
-function DiagramsPanel({ categories, onPinChange, universeId, onEditDiagram, refreshKey, onLoaded }) {
+function DiagramsPanel({ categories, onPinChange, universeId, universes, onEditDiagram, refreshKey, onLoaded }) {
   const [diagrams, setDiagrams] = useState([])
   const [search, setSearch] = useState('')
 
@@ -317,6 +318,22 @@ function DiagramsPanel({ categories, onPinChange, universeId, onEditDiagram, ref
   const togglePin = async (e, d) => {
     e.stopPropagation()
     await fetch(`/api/diagrams/${d.id}/pin?pinned=${!d.pinned}`, { method: 'PUT' })
+    fetchDiagrams()
+    onPinChange?.()
+  }
+
+  const moveToUniverse = async (d, targetUniverseId, categoryId) => {
+    const res = await fetch(`/api/diagrams/${d.id}/move-universe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ universe_id: targetUniverseId, category_id: categoryId }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      const detail = err.detail
+      alert(typeof detail === 'string' ? detail : (detail != null ? JSON.stringify(detail) : 'Move failed'))
+      return
+    }
     fetchDiagrams()
     onPinChange?.()
   }
@@ -358,6 +375,12 @@ function DiagramsPanel({ categories, onPinChange, universeId, onEditDiagram, ref
                       <path d="M12 17v5" /><path d="M9 2h6l-1 7h4l-5 7H7l2-7H5l1-7z" />
                     </svg>
                   </button>
+                  <MoveToUniverseButton
+                    universes={universes}
+                    currentUniverseId={universeId}
+                    itemLabel={d.title || 'Diagram'}
+                    onMove={(uid, catId) => moveToUniverse(d, uid, catId)}
+                  />
                   <button className="markdown-card-delete-btn" onClick={(e) => { e.stopPropagation(); remove(d.id) }} title="Delete diagram">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />

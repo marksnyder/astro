@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { CategoryPicker } from './CategoryTree'
 import { SidebarCategoryTree } from './SidebarCategoryTree'
+import { MoveToUniverseButton } from './MoveToUniverseButton'
 
 // ── MCP tool templates ────────────────────────────────
 
@@ -532,7 +533,7 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
   )
 }
 
-function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMarkdownRequestHandled, universeId, onEditMarkdown, refreshKey, onLoaded }) {
+function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMarkdownRequestHandled, universeId, universes, onEditMarkdown, refreshKey, onLoaded }) {
   const [markdowns, setMarkdowns] = useState([])
   const [search, setSearch] = useState('')
 
@@ -582,6 +583,22 @@ function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMa
     e.stopPropagation()
     const newPinned = !markdown.pinned
     await fetch(`/api/markdowns/${markdown.id}/pin?pinned=${newPinned}`, { method: 'PUT' })
+    fetchMarkdowns()
+    onPinChange?.()
+  }
+
+  const moveToUniverse = async (markdown, targetUniverseId, categoryId) => {
+    const res = await fetch(`/api/markdowns/${markdown.id}/move-universe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ universe_id: targetUniverseId, category_id: categoryId }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      const d = err.detail
+      alert(typeof d === 'string' ? d : (d != null ? JSON.stringify(d) : 'Move failed'))
+      return
+    }
     fetchMarkdowns()
     onPinChange?.()
   }
@@ -649,6 +666,12 @@ function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMa
                         <path d="M9 2h6l-1 7h4l-5 7H7l2-7H5l1-7z" />
                       </svg>
                     </button>
+                    <MoveToUniverseButton
+                      universes={universes}
+                      currentUniverseId={universeId}
+                      itemLabel={markdown.title || 'Untitled'}
+                      onMove={(uid, catId) => moveToUniverse(markdown, uid, catId)}
+                    />
                     <button
                       className="markdown-card-delete-btn"
                       onClick={(e) => { e.stopPropagation(); remove(markdown.id) }}

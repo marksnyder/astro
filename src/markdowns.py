@@ -1497,6 +1497,136 @@ def update_table(table_id: int, title: str, columns: str, category_id: int | Non
     return _row_to_table(row)
 
 
+def category_in_universe(category_id: int | None, universe_id: int) -> bool:
+    """True if category_id is None, or the category exists in the given universe."""
+    if category_id is None:
+        return True
+    conn = _get_conn()
+    row = conn.execute(
+        "SELECT 1 FROM categories WHERE id = ? AND universe_id = ?",
+        (category_id, universe_id),
+    ).fetchone()
+    conn.close()
+    return row is not None
+
+
+def move_markdown_to_universe(markdown_id: int, universe_id: int, category_id: int | None = None) -> Markdown | None:
+    """Move a markdown to another universe; optional category in the destination. Updates vector store and agent tasks."""
+    if get_universe(universe_id) is None:
+        return None
+    md = get_markdown(markdown_id)
+    if not md:
+        return None
+    if md.universe_id == universe_id:
+        return md
+    now = _now()
+    conn = _get_conn()
+    conn.execute(
+        "UPDATE markdowns SET universe_id = ?, category_id = ?, updated_at = ? WHERE id = ?",
+        (universe_id, category_id, now, markdown_id),
+    )
+    conn.execute(
+        "UPDATE agent_tasks SET universe_id = ?, updated_at = ? WHERE markdown_id = ?",
+        (universe_id, now, markdown_id),
+    )
+    conn.commit()
+    conn.close()
+    md = get_markdown(markdown_id)
+    if not md:
+        return None
+    from src.store import upsert_markdown
+
+    try:
+        upsert_markdown(md.id, f"{md.title}\n\n{md.body}", md.title, universe_id=universe_id)
+    except Exception as e:
+        print(f"[Astro] WARNING: Failed to upsert markdown {markdown_id} after universe move: {e}")
+    return md
+
+
+def move_link_to_universe(link_id: int, universe_id: int, category_id: int | None = None) -> Link | None:
+    if get_universe(universe_id) is None:
+        return None
+    link = get_link(link_id)
+    if not link:
+        return None
+    if link.universe_id == universe_id:
+        return link
+    now = _now()
+    conn = _get_conn()
+    cur = conn.execute(
+        "UPDATE links SET universe_id = ?, category_id = ?, updated_at = ? WHERE id = ?",
+        (universe_id, category_id, now, link_id),
+    )
+    conn.commit()
+    conn.close()
+    if cur.rowcount == 0:
+        return None
+    return get_link(link_id)
+
+
+def move_feed_to_universe(feed_id: int, universe_id: int, category_id: int | None = None) -> Feed | None:
+    if get_universe(universe_id) is None:
+        return None
+    feed = get_feed(feed_id)
+    if not feed:
+        return None
+    if feed.universe_id == universe_id:
+        return feed
+    now = _now()
+    conn = _get_conn()
+    cur = conn.execute(
+        "UPDATE feeds SET universe_id = ?, category_id = ?, updated_at = ? WHERE id = ?",
+        (universe_id, category_id, now, feed_id),
+    )
+    conn.commit()
+    conn.close()
+    if cur.rowcount == 0:
+        return None
+    return get_feed(feed_id)
+
+
+def move_diagram_to_universe(diagram_id: int, universe_id: int, category_id: int | None = None) -> Diagram | None:
+    if get_universe(universe_id) is None:
+        return None
+    d = get_diagram(diagram_id)
+    if not d:
+        return None
+    if d.universe_id == universe_id:
+        return d
+    now = _now()
+    conn = _get_conn()
+    cur = conn.execute(
+        "UPDATE diagrams SET universe_id = ?, category_id = ?, updated_at = ? WHERE id = ?",
+        (universe_id, category_id, now, diagram_id),
+    )
+    conn.commit()
+    conn.close()
+    if cur.rowcount == 0:
+        return None
+    return get_diagram(diagram_id)
+
+
+def move_table_to_universe(table_id: int, universe_id: int, category_id: int | None = None) -> Table | None:
+    if get_universe(universe_id) is None:
+        return None
+    t = get_table(table_id)
+    if not t:
+        return None
+    if t.universe_id == universe_id:
+        return t
+    now = _now()
+    conn = _get_conn()
+    cur = conn.execute(
+        "UPDATE tables_ SET universe_id = ?, category_id = ?, updated_at = ? WHERE id = ?",
+        (universe_id, category_id, now, table_id),
+    )
+    conn.commit()
+    conn.close()
+    if cur.rowcount == 0:
+        return None
+    return get_table(table_id)
+
+
 def delete_table(table_id: int) -> bool:
     conn = _get_conn()
     conn.execute("DELETE FROM table_rows WHERE table_id = ?", (table_id,))
