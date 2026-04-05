@@ -194,15 +194,34 @@ def write_markdown(
     """Create a new markdown note. Returns the created note."""
     uid = universe_id if universe_id is not None else _default_universe()
     md = create_markdown(title, body, category_id, uid)
+    try:
+        upsert_markdown(md.id, f"{md.title}\n\n{md.body}", md.title, md.universe_id)
+    except Exception as e:
+        print(f"[Astro] WARNING: Failed to upsert markdown {md.id} into vector store: {e}")
     return markdown_to_dict(md)
 
 
 @mcp.tool
 def update_markdown(
-    markdown_id: int, title: str, body: str, category_id: int | None = None
+    markdown_id: int,
+    title: str,
+    body: str,
+    category_id: int | None = None,
+    clear_category: bool = False,
 ) -> dict | str:
-    """Update an existing markdown note. All fields are replaced."""
-    md = _db_update_markdown(markdown_id, title, body, category_id)
+    """Update an existing markdown note. Title and body are replaced.
+    If category_id is omitted and clear_category is false, the note keeps
+    its current category. Set clear_category to true to remove the category."""
+    existing = get_markdown(markdown_id)
+    if existing is None:
+        return "Markdown not found"
+    if clear_category:
+        cat: int | None = None
+    elif category_id is not None:
+        cat = category_id
+    else:
+        cat = existing.category_id
+    md = _db_update_markdown(markdown_id, title, body, cat)
     if md is None:
         return "Markdown not found"
     try:

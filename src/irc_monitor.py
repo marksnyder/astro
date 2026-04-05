@@ -13,6 +13,9 @@ import threading
 import time
 from pathlib import Path
 
+from src.agent_task_runner import TASK_RUNNER_NICK
+from src.irc_client import IRC_NICK
+
 IRC_HOST = "127.0.0.1"
 IRC_PORT = 6667
 MONITOR_NICK = "astro-log"
@@ -143,15 +146,19 @@ def get_unread_counts(since: dict[str, float]) -> dict[str, int]:
     """Return message counts per channel for messages newer than given timestamps.
 
     `since` maps channel name -> unix timestamp. Only 'message' kind counts.
+    Messages from Astro itself (UI client and scheduled agent tasks) are excluded.
     """
     conn = _db()
     try:
+        ui_nick = IRC_NICK.lower()
+        runner_nick = TASK_RUNNER_NICK.lower()
         counts: dict[str, int] = {}
         for ch, ts in since.items():
             row = conn.execute(
                 "SELECT COUNT(*) AS cnt FROM irc_history "
-                "WHERE channel = ? AND timestamp > ? AND kind = 'message'",
-                (ch, ts),
+                "WHERE channel = ? AND timestamp > ? AND kind = 'message' "
+                "AND LOWER(sender) NOT IN (?, ?)",
+                (ch, ts, ui_nick, runner_nick),
             ).fetchone()
             counts[ch] = row["cnt"] if row else 0
         return counts
