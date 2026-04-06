@@ -2179,15 +2179,23 @@
   overflow-y: auto;
   min-height: 200px;
   tab-size: 2;
+  scrollbar-color: var(--border) transparent;
+  scrollbar-width: auto;
 }
 
 .md-textarea::placeholder {
   color: var(--text-secondary);
 }
 
-.md-textarea::-webkit-scrollbar { width: 4px; }
+.md-textarea::-webkit-scrollbar { width: 12px; }
 .md-textarea::-webkit-scrollbar-track { background: transparent; }
-.md-textarea::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.md-textarea::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 6px;
+}
+.md-textarea::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
 
 .markdown-editor-actions {
   display: flex;
