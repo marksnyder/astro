@@ -1,4 +1,4 @@
-const CACHE_NAME = 'astro-v1'
+const CACHE_NAME = 'astro-v2'
 const PRECACHE_URLS = [
   '/mobile',
   '/logo.png',
@@ -30,10 +30,17 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return
 
+  const url = new URL(event.request.url)
+  // Never cache API or MCP: offline fallback would show stale data and hide real failures.
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/mcp')) {
+    event.respondWith(fetch(event.request))
+    return
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        if (response.ok && event.request.url.startsWith(self.location.origin)) {
+        if (response.ok && url.origin === self.location.origin) {
           const clone = response.clone()
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone))
         }

@@ -68,7 +68,7 @@ layout: default
   <div class="pillars-inner">
     <div class="pillars-heading">
       <h2>Core Features</h2>
-      <p>Agents, retrieval, MCP tools, and data planes in one place so you can ship AI backed experiences.</p>
+      <p>Agents, semantic retrieval, structured data, and integrations in one stack so you can ship AI-backed experiences without gluing half a dozen services together.</p>
     </div>
     <div class="carousel-wrapper">
       <button class="carousel-btn carousel-prev" onclick="carouselMove(-1)" aria-label="Previous feature">
@@ -82,9 +82,8 @@ layout: default
             </div>
             <h3>Vector Store</h3>
             <p>
-              All markdowns and documents are automatically embedded
-              into a local ChromaDB vector store using CPU based embeddings.
-              No API keys required. Semantic search across your entire knowledge base.
+              Markdowns and documents embed into local ChromaDB with CPU-based vectors—no cloud embedding keys.
+              Semantic search spans the full corpus so retrieval stays private, fast, and grounded in your content.
             </p>
           </div>
           <div class="pillar">
@@ -93,9 +92,8 @@ layout: default
             </div>
             <h3>Markdowns</h3>
             <p>
-              Structured notes with rich formatting, embedded images,
-              categories, and full text search. Every markdown is included in
-              AI retrieval context automatically.
+              Rich notes with formatting, images, categories, and full-text search.
+              Each note feeds retrieval automatically so agents draw from the same material you see in the UI.
             </p>
           </div>
           <div class="pillar">
@@ -104,9 +102,8 @@ layout: default
             </div>
             <h3>Documents</h3>
             <p>
-              Upload PDF, DOCX, XLSX, PPTX, TXT, MD, and CSV files. Documents are
-              automatically ingested and embedded so they become queryable memory,
-              not just storage.
+              Upload PDF, DOCX, XLSX, PPTX, TXT, MD, or CSV; Astro ingests and embeds each file.
+              Uploads become searchable memory instead of passive attachments on disk.
             </p>
           </div>
           <div class="pillar">
@@ -115,11 +112,10 @@ layout: default
             </div>
             <h3>Diagrams</h3>
             <p>
-              Create and edit visual diagrams powered by
-              <a href="https://excalidraw.com" style="color: inherit; text-decoration: underline;">Excalidraw</a>.
-              Draw shapes, arrows, and freehand sketches with a full embedded editor.
-              Import and export <code>.excalidraw</code> files, and let AI agents
-              create diagrams programmatically via MCP.
+              Create and edit diagrams with
+              <a href="https://excalidraw.com" style="color: inherit; text-decoration: underline;">Excalidraw</a>:
+              shapes, arrows, and sketches in a full embedded editor.
+              Import and export <code>.excalidraw</code> files and keep visuals next to your specs.
             </p>
           </div>
           <div class="pillar">
@@ -128,10 +124,8 @@ layout: default
             </div>
             <h3>Tables</h3>
             <p>
-              Build structured data with spreadsheet style tables. Define typed
-              columns (text, number, boolean), manage rows with inline editing,
-              and import or export CSV. Full MCP integration lets agents create
-              and query tables programmatically.
+              Spreadsheet-style grids with typed columns, inline row editing, and CSV import or export.
+              Model structured datasets that both people and automation can read and update reliably.
             </p>
           </div>
           <div class="pillar">
@@ -140,8 +134,8 @@ layout: default
             </div>
             <h3>Bookmarks</h3>
             <p>
-              Save links with titles, URLs, and
-              categories. Links join your searchable knowledge base for humans and agents.
+              Save URLs with titles and categories beside notes and documents.
+              Links stay discoverable in search so references surface without digging through browser history.
             </p>
           </div>
           <div class="pillar">
@@ -150,9 +144,8 @@ layout: default
             </div>
             <h3>Agent Network</h3>
             <p>
-              A built in IRC server enables communication with AI agents across
-              platforms. Coordinate agents, communicate across systems, and integrate
-              with external AI platforms from one central hub.
+              A built-in IRC server connects people and AI clients on one network.
+              Coordinate agents, route traffic across systems, and keep conversations in a single hub.
             </p>
           </div>
           <div class="pillar">
@@ -161,12 +154,8 @@ layout: default
             </div>
             <h3>Agent Tasks</h3>
             <p>
-              Point tasks at a markdown note and an IRC channel: run on demand, on a cron schedule,
-              or once at a future time. Instructions are sent through a dedicated runner with a
-              configurable template (default includes API read URL and markdown ID). Manage tasks in
-              the app or via MCP: <code>list_agent_tasks</code>, <code>read_agent_task</code>,
-              <code>write_agent_task</code>, <code>update_agent_task</code>, <code>delete_agent_task</code>,
-              and <code>run_agent_task_now</code>.
+              Bind a task to a markdown note and channel: run now, on a cron schedule, or once later.
+              A dedicated runner sends instructions through a configurable template with API context and note IDs.
             </p>
           </div>
           <div class="pillar">
@@ -175,9 +164,8 @@ layout: default
             </div>
             <h3>Feeds</h3>
             <p>
-              Ingest data from external services through authenticated API endpoints.
-              Push markdown or files into a timeline view. Ideal for CI reports,
-              monitoring alerts, and automated agent output.
+              Authenticated HTTP endpoints push markdown or files into timeline views—ideal for CI, alerts, and bots.
+              Watch streams inside Astro instead of building a separate dashboard for every source.
             </p>
           </div>
           <div class="pillar">
@@ -186,10 +174,9 @@ layout: default
             </div>
             <h3>MCP Server</h3>
             <p>
-              A built in <a href="https://modelcontextprotocol.io" style="color: inherit; text-decoration: underline;">Model Context Protocol</a>
-              server exposes 49 tools covering search, notes, tables, diagrams,
-              tasks, categories, links, documents, feeds, and agent tasks. Any
-              MCP-compatible AI agent can read, write, and search your knowledge base.
+              A built-in <a href="https://modelcontextprotocol.io" style="color: inherit; text-decoration: underline;">Model Context Protocol</a>
+              server exposes dozens of tools for search, notes, tables, diagrams, tasks, categories, links, documents, feeds, and more.
+              Point any MCP-compatible client at your instance so agents can read, write, and search the same knowledge base.
             </p>
           </div>
         </div>
@@ -347,6 +334,24 @@ layout: default
         <div>
           <strong>Pinned items bar</strong>
           <p>Markdowns, documents, and links in one header strip.</p>
+        </div>
+      </div>
+      <div class="org-feature">
+        <div class="org-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
+        </div>
+        <div>
+          <strong>Feeds &amp; timelines</strong>
+          <p>CI, alerts, and agent output in streams humans and models can scan.</p>
+        </div>
+      </div>
+      <div class="org-feature">
+        <div class="org-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+        </div>
+        <div>
+          <strong>Agent tasks</strong>
+          <p>Scheduled prompts and webhooks wired into the same knowledge base.</p>
         </div>
       </div>
     </div>

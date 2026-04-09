@@ -119,6 +119,12 @@ function MobileMarkdowns({ categories, universeId }) {
   const wakeLockRef = useRef(null)
   const titleRef = useRef(null)
   const createdIdRef = useRef(null)
+  /** Live id for the open document — avoids stale `editing` in debounced autosave. */
+  const editingIdRef = useRef(null)
+  /** Bumped when starting/canceling edit so a late POST cannot apply `createdIdRef` to the wrong session. */
+  const saveSessionRef = useRef(0)
+  /** In-flight first POST for a new doc — concurrent autosaves must await this or they duplicate rows. */
+  const pendingCreateRef = useRef(null)
   const autosaveTimer = useRef(null)
   const autosaveInitRef = useRef(false)
 
@@ -224,6 +230,12 @@ function MobileMarkdowns({ categories, universeId }) {
     return () => { wantListeningRef.current = false; releaseWakeLock(); if (recognitionRef.current) recognitionRef.current.stop() }
   }, [editing])
 
+  useEffect(() => {
+    if (!editing || editing === 'new') editingIdRef.current = null
+    else if (typeof editing === 'object' && editing.id != null) editingIdRef.current = editing.id
+    else editingIdRef.current = null
+  }, [editing])
+
   const fetchMarkdowns = useCallback(() => {
     const params = new URLSearchParams()
     if (search) params.set('q', search)
@@ -246,7 +258,12 @@ function MobileMarkdowns({ categories, universeId }) {
     return () => clearTimeout(t)
   }, [search, filterCatId, universeId])
 
+  const bumpSaveSession = () => {
+    saveSessionRef.current += 1
+  }
+
   const startNew = (presetCategoryId) => {
+    bumpSaveSession()
     autosaveInitRef.current = false
     createdIdRef.current = null
     setEditing('new')
@@ -265,6 +282,7 @@ function MobileMarkdowns({ categories, universeId }) {
   }
 
   const startEdit = (markdown) => {
+    bumpSaveSession()
     autosaveInitRef.current = false
     createdIdRef.current = null
     setViewing(null)
@@ -276,7 +294,9 @@ function MobileMarkdowns({ categories, universeId }) {
   }
 
   const cancelEdit = () => {
+    bumpSaveSession()
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
+    createdIdRef.current = null
     setEditing(null)
     fetchMarkdowns()
     window.scrollTo(0, 0)
@@ -286,20 +306,44 @@ function MobileMarkdowns({ categories, universeId }) {
 
   const doAutosave = useCallback(async (t, b, catId) => {
     if (!t.trim() && !b.trim()) return
+
+    if (pendingCreateRef.current) {
+      try {
+        await pendingCreateRef.current
+      } catch {
+        /* first create failed; may retry below */
+      }
+    }
+
+    const payload = { title: t, body: b, category_id: catId }
+    const effectiveId = createdIdRef.current ?? editingIdRef.current
+
     setSaving(true)
     try {
-      const payload = { title: t, body: b, category_id: catId }
-      const effectiveId = createdIdRef.current || (editing !== 'new' && editing?.id ? editing.id : null)
-      if (effectiveId) {
+      if (effectiveId != null) {
         await fetch(`/api/markdowns/${effectiveId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       } else {
-        const res = await fetch(`/api/markdowns?universe_id=${universeId || 1}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-        const created = await res.json()
-        createdIdRef.current = created.id
+        const session = saveSessionRef.current
+        const p = (async () => {
+          const res = await fetch(`/api/markdowns?universe_id=${universeId || 1}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+          if (!res.ok) throw new Error('create failed')
+          const created = await res.json()
+          if (session === saveSessionRef.current) {
+            createdIdRef.current = created.id
+          }
+        })()
+        pendingCreateRef.current = p
+        try {
+          await p
+        } finally {
+          if (pendingCreateRef.current === p) pendingCreateRef.current = null
+        }
       }
       saveLastCategoryId(catId)
-    } finally { setSaving(false) }
-  }, [editing, universeId])
+    } finally {
+      setSaving(false)
+    }
+  }, [universeId])
 
   useEffect(() => {
     if (!autosaveInitRef.current) return

@@ -367,6 +367,13 @@ def set_category_pinned(cat_id: int, pinned: bool) -> bool:
     return cur.rowcount > 0
 
 
+def set_category_sort_order(cat_id: int, sort_order: int) -> None:
+    conn = _get_conn()
+    conn.execute("UPDATE categories SET sort_order = ? WHERE id = ?", (sort_order, cat_id))
+    conn.commit()
+    conn.close()
+
+
 def list_pinned_categories(universe_id: int | None = None) -> list[Category]:
     conn = _get_conn()
     if universe_id is not None:
@@ -1711,6 +1718,16 @@ def list_table_rows(
     ).fetchall()
     conn.close()
     return [_row_to_table_row(r) for r in rows], total
+
+
+def list_all_table_rows(table_id: int) -> list[TableRow]:
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT * FROM table_rows WHERE table_id = ? ORDER BY sort_order, id",
+        (table_id,),
+    ).fetchall()
+    conn.close()
+    return [_row_to_table_row(r) for r in rows]
 
 
 def get_table_row(row_id: int) -> TableRow | None:

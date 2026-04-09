@@ -7,7 +7,7 @@ from typing import Optional
 from datetime import datetime, timezone
 
 import fastapi
-from fastapi import FastAPI, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -137,6 +137,7 @@ from src.store import (
     get_retriever,
     upsert_markdown,
 )
+from src.universe_pack import build_universe_export_zip, import_universe_bundle_from_bytes
 
 DOCUMENTS_DIR = Path(__file__).resolve().parent.parent / "documents"
 
@@ -370,6 +371,79 @@ def api_delete_universe(uid: int):
     if not delete_universe(uid):
         raise HTTPException(status_code=400, detail="Cannot delete the last universe")
     return {"ok": True}
+
+
+class UniverseExportRequest(BaseModel):
+    markdowns: bool = False
+    markdown_ids: list[int] = []
+    links: bool = False
+    link_ids: list[int] = []
+    tables: bool = False
+    table_ids: list[int] = []
+    diagrams: bool = False
+    diagram_ids: list[int] = []
+    feeds: bool = False
+    feed_ids: list[int] = []
+    documents: bool = False
+    document_paths: list[str] = []
+
+
+@app.post("/api/universes/{universe_id}/export")
+def api_export_universe(universe_id: int, body: UniverseExportRequest, background_tasks: BackgroundTasks):
+    """Export selected content from a universe as a ZIP with manifest.json for re-import."""
+    if not any(
+        [
+            body.markdowns,
+            body.links,
+            body.tables,
+            body.diagrams,
+            body.feeds,
+            body.documents,
+        ]
+    ):
+        raise HTTPException(status_code=400, detail="Select at least one content type")
+    try:
+        path = build_universe_export_zip(
+            universe_id,
+            markdowns=body.markdowns,
+            markdown_ids=body.markdown_ids if body.markdowns else None,
+            links=body.links,
+            link_ids=body.link_ids if body.links else None,
+            tables=body.tables,
+            table_ids=body.table_ids if body.tables else None,
+            diagrams=body.diagrams,
+            diagram_ids=body.diagram_ids if body.diagrams else None,
+            feeds=body.feeds,
+            feed_ids=body.feed_ids if body.feeds else None,
+            documents=body.documents,
+            document_paths=body.document_paths if body.documents else None,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    u = get_universe(universe_id)
+    safe_name = "".join(c if c.isalnum() or c in "._-" else "_" for c in (u.name if u else "universe"))[:80]
+    fname = f"astro-universe-{safe_name}-{universe_id}.zip"
+    background_tasks.add_task(lambda p=path: p.unlink(missing_ok=True))
+    return FileResponse(path, media_type="application/zip", filename=fname)
+
+
+@app.post("/api/universes/import", response_model=UniverseResponse, status_code=201)
+async def api_import_universe_bundle(
+    file: UploadFile = File(...),
+    name: str = Form(...),
+):
+    """Import a bundle ZIP (from export) into a new universe."""
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file")
+    try:
+        uid = import_universe_bundle_from_bytes(data, name.strip())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    u = get_universe(uid)
+    if not u:
+        raise HTTPException(status_code=500, detail="Import failed")
+    return universe_to_dict(u)
 
 
 # ── Categories ────────────────────────────────────────────────────────────

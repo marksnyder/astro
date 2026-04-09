@@ -156,11 +156,451 @@ function QuickView({ item, onClose }) {
   )
 }
 
+function UniverseBundleSection({ universes, currentId, onRefresh, onSwitch, onClose }) {
+  const [tab, setTab] = useState('export')
+  const [exportUid, setExportUid] = useState(currentId)
+  const [inc, setInc] = useState({
+    markdowns: false, links: false, tables: false, diagrams: false, feeds: false, documents: false,
+  })
+  /** 'all' = export every item of that type; 'pick' = only checked rows */
+  const [selMode, setSelMode] = useState({
+    markdowns: 'all',
+    links: 'all',
+    tables: 'all',
+    diagrams: 'all',
+    feeds: 'all',
+    documents: 'all',
+  })
+  const [pick, setPick] = useState({
+    markdowns: [], links: [], tables: [], diagrams: [], feeds: [], documents: [],
+  })
+  const [itemFilter, setItemFilter] = useState({
+    markdowns: '', links: '', tables: '', diagrams: '', feeds: '', documents: '',
+  })
+  const [lists, setLists] = useState({
+    markdowns: [], links: [], tables: [], diagrams: [], feeds: [], documents: [],
+  })
+  const [busy, setBusy] = useState(false)
+  const [impName, setImpName] = useState('')
+  const [impFile, setImpFile] = useState(null)
+  const [importDropActive, setImportDropActive] = useState(false)
+  const importFileRef = useRef(null)
+  const importDragDepth = useRef(0)
+
+  useEffect(() => { setExportUid(currentId) }, [currentId])
+
+  const loadLists = useCallback(async () => {
+    const uid = exportUid
+    if (!uid) return
+    try {
+      const q = `universe_id=${uid}`
+      const [md, lk, tb, dg, fd, docs] = await Promise.all([
+        fetch(`/api/markdowns?${q}`).then(r => r.json()),
+        fetch(`/api/links?${q}`).then(r => r.json()),
+        fetch(`/api/tables?${q}`).then(r => r.json()),
+        fetch(`/api/diagrams?${q}`).then(r => r.json()),
+        fetch(`/api/feeds?${q}`).then(r => r.json()),
+        fetch(`/api/documents?${q}`).then(r => r.json()),
+      ])
+      setLists({ markdowns: md, links: lk, tables: tb, diagrams: dg, feeds: fd, documents: docs })
+    } catch {
+      setLists({ markdowns: [], links: [], tables: [], diagrams: [], feeds: [], documents: [] })
+    }
+  }, [exportUid])
+
+  useEffect(() => { if (tab === 'export') loadLists() }, [tab, loadLists])
+
+  const toggleInc = (k) => setInc((p) => ({ ...p, [k]: !p[k] }))
+
+  const filterItems = (key, list, q) => {
+    const s = (q || '').trim().toLowerCase()
+    if (!s) return list
+    return list.filter((item) => {
+      if (key === 'documents') {
+        return (
+          String(item.path || '').toLowerCase().includes(s) ||
+          String(item.name || '').toLowerCase().includes(s)
+        )
+      }
+      if (key === 'links') {
+        return (
+          String(item.title || '').toLowerCase().includes(s) ||
+          String(item.url || '').toLowerCase().includes(s)
+        )
+      }
+      return (
+        String(item.title || item.name || '').toLowerCase().includes(s) ||
+        String(item.id).includes(s)
+      )
+    })
+  }
+
+  const togglePick = (key, item) => {
+    const id = key === 'documents' ? item.path : item.id
+    setPick((p) => {
+      const cur = p[key] || []
+      const has = cur.some((x) => x === id)
+      const next = has ? cur.filter((x) => x !== id) : [...cur, id]
+      return { ...p, [key]: next }
+    })
+  }
+
+  const isPicked = (key, item) => {
+    const id = key === 'documents' ? item.path : item.id
+    return (pick[key] || []).some((x) => x === id)
+  }
+
+  const selectAllInList = (key) => {
+    const raw = lists[key] || []
+    const vis = filterItems(key, raw, itemFilter[key])
+    const ids = key === 'documents' ? vis.map((i) => i.path) : vis.map((i) => i.id)
+    setPick((p) => ({ ...p, [key]: ids }))
+  }
+
+  const clearPickList = (key) => setPick((p) => ({ ...p, [key]: [] }))
+
+  const doExport = async () => {
+    if (!exportUid) return
+    if (!Object.values(inc).some(Boolean)) {
+      alert('Select at least one content type to export.')
+      return
+    }
+    const keys = ['markdowns', 'links', 'tables', 'diagrams', 'feeds', 'documents']
+    for (const k of keys) {
+      if (inc[k] && selMode[k] === 'pick' && (!pick[k] || pick[k].length === 0)) {
+        alert(`Choose at least one item for "${k}", or switch to "All in universe".`)
+        return
+      }
+    }
+    const idsFor = (k) => (selMode[k] === 'all' ? [] : pick[k])
+    const body = {
+      markdowns: inc.markdowns,
+      markdown_ids: inc.markdowns ? idsFor('markdowns') : [],
+      links: inc.links,
+      link_ids: inc.links ? idsFor('links') : [],
+      tables: inc.tables,
+      table_ids: inc.tables ? idsFor('tables') : [],
+      diagrams: inc.diagrams,
+      diagram_ids: inc.diagrams ? idsFor('diagrams') : [],
+      feeds: inc.feeds,
+      feed_ids: inc.feeds ? idsFor('feeds') : [],
+      documents: inc.documents,
+      document_paths: inc.documents ? idsFor('documents') : [],
+    }
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/universes/${exportUid}/export`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        const t = await res.text()
+        alert(t || 'Export failed')
+        return
+      }
+      const blob = await res.blob()
+      const dispo = res.headers.get('Content-Disposition')
+      let fname = 'astro-universe-export.zip'
+      const m = dispo && /filename="?([^";]+)"?/.exec(dispo)
+      if (m) fname = m[1]
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = fname
+      a.click()
+      URL.revokeObjectURL(a.href)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const pickImportFile = (file) => {
+    if (!file) return
+    const ok =
+      file.name.toLowerCase().endsWith('.zip') ||
+      file.type === 'application/zip' ||
+      file.type === 'application/x-zip-compressed' ||
+      file.type === ''
+    if (!ok) {
+      alert('Please choose a .zip bundle file.')
+      return
+    }
+    setImpFile(file)
+  }
+
+  const clearImportFile = (e) => {
+    e.stopPropagation()
+    setImpFile(null)
+    if (importFileRef.current) importFileRef.current.value = ''
+  }
+
+  const onImportDragOver = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = 'copy'
+  }
+
+  const onImportDragEnter = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    importDragDepth.current += 1
+    setImportDropActive(true)
+  }
+
+  const onImportDragLeave = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    importDragDepth.current -= 1
+    if (importDragDepth.current <= 0) {
+      importDragDepth.current = 0
+      setImportDropActive(false)
+    }
+  }
+
+  const onImportDrop = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    importDragDepth.current = 0
+    setImportDropActive(false)
+    const f = e.dataTransfer.files?.[0]
+    pickImportFile(f)
+  }
+
+  const openImportFilePicker = () => importFileRef.current?.click()
+
+  const doImport = async () => {
+    const name = impName.trim()
+    if (!name) {
+      alert('Enter a name for the new universe.')
+      return
+    }
+    if (!impFile) {
+      alert('Choose a bundle ZIP file.')
+      return
+    }
+    setBusy(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', impFile)
+      fd.append('name', name)
+      const res = await fetch('/api/universes/import', { method: 'POST', body: fd })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        const d = err.detail
+        const msg = typeof d === 'string' ? d : (Array.isArray(d) ? d.map((x) => x.msg || x).join(' ') : JSON.stringify(err))
+        alert(msg || (await res.text()) || 'Import failed')
+        return
+      }
+      const u = await res.json()
+      onRefresh()
+      onSwitch(u.id)
+      onClose()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const typeRow = (key, label, optLabel) => {
+    const rawList = lists[key] || []
+    const filtered = filterItems(key, rawList, itemFilter[key])
+    return (
+      <div key={key} className="universe-bundle-type">
+        <label className="universe-bundle-cb">
+          <input type="checkbox" checked={inc[key]} onChange={() => toggleInc(key)} />
+          <span>{label}</span>
+        </label>
+        {inc[key] && (
+          <div className="universe-bundle-type-inner">
+            <div className="universe-bundle-scope" role="radiogroup" aria-label={`${label} export scope`}>
+              <label className="universe-bundle-scope-opt">
+                <input
+                  type="radio"
+                  name={`bundle-scope-${key}`}
+                  checked={selMode[key] === 'all'}
+                  onChange={() => setSelMode((p) => ({ ...p, [key]: 'all' }))}
+                />
+                <span>All in universe</span>
+              </label>
+              <label className="universe-bundle-scope-opt">
+                <input
+                  type="radio"
+                  name={`bundle-scope-${key}`}
+                  checked={selMode[key] === 'pick'}
+                  onChange={() => setSelMode((p) => ({ ...p, [key]: 'pick' }))}
+                />
+                <span>Selected only</span>
+              </label>
+            </div>
+            {selMode[key] === 'pick' && (
+              <div className="universe-bundle-pick">
+                <input
+                  type="search"
+                  className="universe-bundle-filter"
+                  placeholder={`Search ${label.toLowerCase()}…`}
+                  value={itemFilter[key]}
+                  onChange={(e) => setItemFilter((p) => ({ ...p, [key]: e.target.value }))}
+                />
+                <div className="universe-bundle-item-toolbar">
+                  <button type="button" className="universe-bundle-item-btn" onClick={() => selectAllInList(key)}>
+                    {(itemFilter[key] || '').trim() ? 'Select visible' : 'Select all'}
+                  </button>
+                  <button type="button" className="universe-bundle-item-btn" onClick={() => clearPickList(key)}>
+                    Clear
+                  </button>
+                  <span className="universe-bundle-item-count">
+                    {(pick[key] || []).length} selected
+                  </span>
+                </div>
+                <div className="universe-bundle-item-list">
+                  {filtered.length === 0 ? (
+                    <div className="universe-bundle-item-empty">No items match.</div>
+                  ) : (
+                    filtered.map((item) => (
+                      <label key={key === 'documents' ? item.path : item.id} className="universe-bundle-item-row">
+                        <input
+                          type="checkbox"
+                          checked={isPicked(key, item)}
+                          onChange={() => togglePick(key, item)}
+                        />
+                        <span className="universe-bundle-item-label">
+                          {key === 'documents'
+                            ? (item.path || item.name)
+                            : (item.title || item.name || item.url || `#${item.id}`)}
+                        </span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+            <p className="universe-bundle-hint">
+              {selMode[key] === 'all'
+                ? `Exports every ${optLabel} in this universe (categories are included automatically).`
+                : `Check the ${optLabel} to include. Use search to narrow the list.`}
+            </p>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="universe-bundle">
+      <div className="universe-bundle-tabs">
+        <button type="button" className={tab === 'export' ? 'active' : ''} onClick={() => setTab('export')}>Export bundle</button>
+        <button type="button" className={tab === 'import' ? 'active' : ''} onClick={() => setTab('import')}>Import bundle</button>
+      </div>
+      {tab === 'export' && (
+        <div className="universe-bundle-panel">
+          <p className="universe-bundle-lead">
+            Build a ZIP with <code>manifest.json</code> plus files. Import it here or on another Astro instance to recreate content under a <strong>new</strong> universe.
+          </p>
+          <label className="universe-bundle-field">
+            <span>Universe to export</span>
+            <select
+              className="universe-bundle-select"
+              value={exportUid ?? ''}
+              onChange={(e) => setExportUid(parseInt(e.target.value, 10))}
+            >
+              {universes.map((u) => (
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
+            </select>
+          </label>
+          {typeRow('markdowns', 'Markdowns', 'markdown')}
+          {typeRow('links', 'Links', 'link')}
+          {typeRow('tables', 'Tables', 'table')}
+          {typeRow('diagrams', 'Diagrams', 'diagram')}
+          {typeRow('feeds', 'Feeds', 'feed (including posts & comments)')}
+          {typeRow('documents', 'Documents', 'document file')}
+          <button type="button" className="markdown-save-btn universe-bundle-download" onClick={doExport} disabled={busy || !exportUid}>
+            {busy ? 'Preparing…' : 'Download ZIP'}
+          </button>
+        </div>
+      )}
+      {tab === 'import' && (
+        <div className="universe-bundle-panel">
+          <p className="universe-bundle-lead">
+            Select an <code>astro-universe-*.zip</code> from export. A <strong>new</strong> universe is created; nothing is merged into an existing one.
+          </p>
+          <label className="universe-bundle-field">
+            <span>New universe name</span>
+            <input
+              className="markdown-title-input"
+              value={impName}
+              onChange={(e) => setImpName(e.target.value)}
+              placeholder="Imported workspace"
+            />
+          </label>
+          <div className="universe-bundle-field universe-bundle-field--drop">
+            <span>Bundle file</span>
+            <div
+              className={`universe-bundle-dropzone${importDropActive ? ' universe-bundle-dropzone--active' : ''}${impFile ? ' universe-bundle-dropzone--has-file' : ''}`}
+              onClick={openImportFilePicker}
+              onDragEnter={onImportDragEnter}
+              onDragLeave={onImportDragLeave}
+              onDragOver={onImportDragOver}
+              onDrop={onImportDrop}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  openImportFilePicker()
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              aria-label="Drop a ZIP bundle here or click to browse"
+            >
+              <input
+                ref={importFileRef}
+                type="file"
+                accept=".zip,application/zip,application/x-zip-compressed"
+                className="universe-bundle-file-input"
+                onChange={(e) => pickImportFile(e.target.files?.[0] || null)}
+              />
+              <div className="universe-bundle-dropzone-graphic" aria-hidden>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+              </div>
+              {impFile ? (
+                <div className="universe-bundle-dropzone-body">
+                  <span className="universe-bundle-dropzone-name">{impFile.name}</span>
+                  <span className="universe-bundle-dropzone-meta">
+                    {(impFile.size / 1024).toFixed(1)} KB · click or drop another file to replace
+                  </span>
+                  <button
+                    type="button"
+                    className="universe-bundle-dropzone-clear"
+                    onClick={clearImportFile}
+                  >
+                    Remove file
+                  </button>
+                </div>
+              ) : (
+                <div className="universe-bundle-dropzone-body">
+                  <span className="universe-bundle-dropzone-title">Drop ZIP here or click to browse</span>
+                  <span className="universe-bundle-dropzone-sub">Astro universe export bundles only (.zip)</span>
+                </div>
+              )}
+            </div>
+          </div>
+          <button type="button" className="markdown-save-btn" onClick={doImport} disabled={busy || !impName.trim() || !impFile}>
+            {busy ? 'Importing…' : 'Import as new universe'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function UniverseManager({ universes, currentId, onSwitch, onClose, onRefresh }) {
   const [newName, setNewName] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [editName, setEditName] = useState('')
+  const [section, setSection] = useState('manage')
 
   const handleCreate = async () => {
     const name = newName.trim()
@@ -209,7 +649,7 @@ function UniverseManager({ universes, currentId, onSwitch, onClose, onRefresh })
 
   return (
     <div className="quickview-overlay">
-      <div className="save-chat-modal">
+      <div className={`save-chat-modal${section === 'bundle' ? ' save-chat-modal--universe-bundle' : ''}`}>
         <div className="quickview-header">
           <span className="quickview-type">Manage</span>
           <h3 className="quickview-title">Universes</h3>
@@ -219,7 +659,21 @@ function UniverseManager({ universes, currentId, onSwitch, onClose, onRefresh })
             </svg>
           </button>
         </div>
+        <div className="universe-manager-tabs">
+          <button type="button" className={`universe-manager-tab${section === 'manage' ? ' active' : ''}`} onClick={() => setSection('manage')}>Universes</button>
+          <button type="button" className={`universe-manager-tab${section === 'bundle' ? ' active' : ''}`} onClick={() => setSection('bundle')}>Export / Import</button>
+        </div>
         <div className="save-chat-body">
+          {section === 'bundle' ? (
+            <UniverseBundleSection
+              universes={universes}
+              currentId={currentId}
+              onRefresh={onRefresh}
+              onSwitch={onSwitch}
+              onClose={onClose}
+            />
+          ) : (
+          <>
           <div className="universe-list">
             {universes.map(u => (
               <div key={u.id} className={`universe-row${u.id === currentId ? ' universe-active' : ''}`}>
@@ -263,6 +717,8 @@ function UniverseManager({ universes, currentId, onSwitch, onClose, onRefresh })
               <button className="markdown-save-btn" onClick={handleCreate} disabled={!newName.trim()}>Create Blank</button>
             </div>
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>
