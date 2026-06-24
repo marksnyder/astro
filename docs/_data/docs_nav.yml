@@ -3,7 +3,7 @@ pages:
     title: Docs home
     path: /docs/
   - id: agent-network
-    title: AI Agent Network
+    title: Discord Integration
     path: /docs/agent-network/
   - id: agent-tasks
     title: Agent Tasks

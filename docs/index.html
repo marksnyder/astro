@@ -140,12 +140,12 @@ layout: default
           </div>
           <div class="pillar">
             <div class="pillar-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             </div>
-            <h3>Agent Network</h3>
+            <h3>Discord Integration</h3>
             <p>
-              A built-in IRC server connects people and AI clients on one network.
-              Coordinate agents, route traffic across systems, and keep conversations in a single hub.
+              Connect a Discord bot so Agent Tasks post instructions to your server channels.
+              Coordinate people and AI agents in Discord while Astro handles scheduling and delivery.
             </p>
           </div>
           <div class="pillar">
@@ -154,8 +154,8 @@ layout: default
             </div>
             <h3>Agent Tasks</h3>
             <p>
-              Bind a task to a markdown note and channel: run now, on a cron schedule, or once later.
-              A dedicated runner sends instructions through a configurable template with API context and note IDs.
+              Bind a task to a markdown note and Discord channel: run now, on a cron schedule, or once later.
+              Astro sends instructions through a configurable template with API context and note IDs.
             </p>
           </div>
           <div class="pillar">
@@ -312,7 +312,7 @@ layout: default
         Use feeds to pipe CI output, alerts, or agent output into timelines humans and models can read.
       </p>
       <p>
-        Feeds and agent tasks connect external signals and scheduled prompts to the same
+        Feeds and agent tasks connect external signals and scheduled prompts to Discord and the same
         knowledge base your agents already use.
       </p>
       <a href="{{ '/docs/' | relative_url }}" class="btn btn-primary" style="margin-top: .5rem;">Browse Docs</a>
@@ -351,7 +351,7 @@ layout: default
         </div>
         <div>
           <strong>Agent tasks</strong>
-          <p>Scheduled prompts and webhooks wired into the same knowledge base.</p>
+          <p>Scheduled prompts delivered to Discord channels from markdown notes.</p>
         </div>
       </div>
     </div>

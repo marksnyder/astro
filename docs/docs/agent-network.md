@@ -1,42 +1,37 @@
 ---
 layout: docs
-title: AI Agent Network
-subtitle: Built-in IRC for agent coordination
+title: Discord Integration
+subtitle: Agent coordination via Discord
 nav_id: agent-network
 permalink: /docs/agent-network/
 ---
 
-Agent Network is a core part of Astro: a **built-in IRC server** that lets you orchestrate agents across platforms from one place.
+Astro delivers **Agent Tasks** to Discord channels using a bot you configure. Use Discord as the shared coordination layer between you, your team, and AI agents.
 
-Use Astro as a central hub to:
+## Setup
 
-- Coordinate agents
-- Communicate across systems
-- Integrate with external AI platforms
+1. Create a [Discord application](https://discord.com/developers/applications) and add a **Bot**.
+2. Copy the bot token and enable **Message Content Intent** if your agents need to read messages.
+3. Invite the bot to your server with permission to **Send Messages** in target channels.
+4. Configure Astro with environment variables (recommended) or Settings in the web UI:
 
-Astro becomes the shared control plane between you and your agents, routing messages, handoffs, and status without scattering tools across services.
+| Variable | Purpose |
+|----------|---------|
+| `DISCORD_BOT_TOKEN` | Bot token from the Discord developer portal |
+| `DISCORD_GUILD_ID` | Server (guild) ID — required to list channels in the UI |
+| `DISCORD_DEFAULT_CHANNEL_ID` | Default channel for new agent tasks |
 
-There is **no separate MCP tool for IRC**. Agents reach the network the same way you do: connect an IRC client to Astro’s server, or use the **HTTP API** below from scripts and integrations.
+Enable **Developer Mode** in Discord (Settings → Advanced), then right-click a channel → **Copy Channel ID**.
 
-## HTTP API (IRC)
+## HTTP API
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| `GET` | `/api/irc/status` | Connection status, current channel, nick |
-| `GET` | `/api/irc/messages` | Recent messages |
-| `GET` | `/api/irc/history` | Channel history |
-| `GET` | `/api/irc/users` | Users visible in context |
-| `GET` | `/api/irc/channels` | Channel list |
-| `POST` | `/api/irc/channels` | Join / add channel |
-| `POST` | `/api/irc/switch` | Switch active channel |
-| `POST` | `/api/irc/send` | Send a message to the active channel |
-| `POST` | `/api/irc/unread` | Mark unread state |
-| `POST` | `/api/irc/channels/{name}/hide` | Hide a channel |
-| `DELETE` | `/api/irc/channels/{name}/history` | Purge history for a channel |
-| `DELETE` | `/api/irc/channels/{name}` | Delete channel metadata |
+| `GET` | `/api/discord/status` | Bot connection status |
+| `GET` | `/api/discord/channels` | Text channels in the configured guild |
 
-Query parameters and bodies follow the live OpenAPI behavior of your Astro instance. Authenticated deployments may require the `X-API-Key` header (same as other `/api/*` routes).
+Agent task delivery uses the same `/api/agent-tasks` routes documented on [Agent Tasks](/docs/agent-tasks/).
 
 ## MCP tools
 
-IRC itself is **not** wrapped as an MCP tool. Use MCP tools on other doc pages (for example [Markdowns](/docs/markdowns/), [Agent Tasks](/docs/agent-tasks/)) to read or write content that agents then discuss on IRC.
+Discord messaging is **not** a separate MCP tool. Use [Agent Tasks](/docs/agent-tasks/) MCP tools (`write_agent_task`, `run_agent_task_now`, etc.) to send markdown instructions to Discord channels.

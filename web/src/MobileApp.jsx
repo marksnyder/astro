@@ -5,7 +5,6 @@ import { Excalidraw } from '@excalidraw/excalidraw'
 import '@excalidraw/excalidraw/index.css'
 import './MobileApp.css'
 import './App.css'
-import BACKGROUNDS from './backgrounds'
 import { parseDiagramData, EMPTY_DIAGRAM_JSON } from './diagramParse'
 import CategoryTree from './CategoryTree'
 import AgentTasksPanel from './AgentTasksPanel'
@@ -13,62 +12,6 @@ import { sortCategoriesForTree } from './categorySidebarOrder'
 import { formatCategoryHierarchyLabel } from './categoryHierarchy'
 import { MobileCategoryTree } from './SidebarCategoryTree'
 import { FeedsFlatCategoryList } from './FeedsFlatCategoryList'
-
-const LOGO_URL = '/logo.png'
-
-function ircTimestamp(ts) {
-  if (!ts) return ''
-  const d = new Date(ts * 1000)
-  const mon = d.toLocaleString(undefined, { month: 'short' })
-  const day = d.getDate()
-  const h = d.getHours()
-  const m = String(d.getMinutes()).padStart(2, '0')
-  const ampm = h >= 12 ? 'pm' : 'am'
-  return `${mon} ${day} ${h % 12 || 12}:${m}${ampm}`
-}
-
-function dicebearAvatar(seed, size = 28) {
-  return `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(seed)}&radius=50&fontSize=40&size=${size}`
-}
-
-function groupIrcMessages(messages) {
-  const groups = []
-  for (const msg of messages) {
-    if (msg.kind === 'join' || msg.kind === 'part' || msg.kind === 'quit') {
-      groups.push({ type: 'event', msg })
-      continue
-    }
-    const last = groups[groups.length - 1]
-    if (last && last.type === 'group' && last.sender === msg.sender && last.self === msg.self) {
-      last.messages.push(msg)
-    } else {
-      groups.push({ type: 'group', sender: msg.sender, self: msg.self, timestamp: msg.timestamp, messages: [msg] })
-    }
-  }
-  return groups
-}
-
-function MobileIrcMessageGroup({ group }) {
-  return (
-    <div className={`m-irc-msg-group ${group.self ? 'm-irc-self' : ''}`}>
-      <img className="m-irc-avatar" src={dicebearAvatar(group.sender, 24)} alt={group.sender} title={group.sender} />
-      <div className="m-irc-msg-body">
-        <div className="m-irc-msg-header">
-          <span className="m-irc-nick">{group.sender}</span>
-          <span className="m-irc-ts">{ircTimestamp(group.timestamp)}</span>
-        </div>
-        {group.messages.map((msg) => (
-          <div key={msg.id} className="m-irc-text markdown-body">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
-          </div>
-        ))}
-        {group.messages.length > 1 && group.messages[group.messages.length - 1].timestamp !== group.timestamp && (
-          <span className="m-irc-ts m-irc-ts-end">{ircTimestamp(group.messages[group.messages.length - 1].timestamp)}</span>
-        )}
-      </div>
-    </div>
-  )
-}
 
 // ── Shared mobile category picker ─────────────────────
 
@@ -1515,8 +1458,7 @@ function MobileCategories({ categories, universeId, onRefresh }) {
 // ── Main mobile app ───────────────────────────────────
 
 function MobileHelpView({ onClose }) {
-  const [section, setSection] = useState('irc')
-  const hostname = window.location.hostname
+  const [section, setSection] = useState('discord')
   const origin = window.location.origin
 
   return (
@@ -1528,27 +1470,27 @@ function MobileHelpView({ onClose }) {
         <h2>Help &amp; Setup</h2>
       </div>
       <div className="m-help-tabs">
-        <button className={`m-help-tab ${section === 'irc' ? 'active' : ''}`} onClick={() => setSection('irc')}>IRC</button>
+        <button className={`m-help-tab ${section === 'discord' ? 'active' : ''}`} onClick={() => setSection('discord')}>Discord</button>
         <button className={`m-help-tab ${section === 'mcp' ? 'active' : ''}`} onClick={() => setSection('mcp')}>MCP</button>
       </div>
       <div className="m-help-body">
-        {section === 'irc' && (
+        {section === 'discord' && (
           <div className="m-help-section">
-            <h3>Connecting to the IRC Server</h3>
-            <p>Astro runs an IRC server (ngircd) for agent communication. Any standard IRC client can connect.</p>
+            <h3>Discord Bot Setup</h3>
+            <p>Astro uses a Discord bot for agent communication. Set these environment variables before starting the server.</p>
             <div className="m-help-details">
-              <div className="m-help-row"><span>Host</span><code>{hostname}</code></div>
-              <div className="m-help-row"><span>Port</span><code>6667</code></div>
-              <div className="m-help-row"><span>Channel</span><code>#astro</code></div>
+              <div className="m-help-row"><span>DISCORD_BOT_TOKEN</span><code>Bot token from Discord Developer Portal</code></div>
+              <div className="m-help-row"><span>DISCORD_GUILD_ID</span><code>Your Discord server (guild) ID</code></div>
+              <div className="m-help-row"><span>DISCORD_DEFAULT_CHANNEL_ID</span><code>Default text channel ID for agent messages</code></div>
             </div>
-            <h4>Client Examples</h4>
+            <h4>Getting IDs</h4>
+            <p>Enable Developer Mode in Discord (Settings → Advanced), then right-click your server or channel and choose &quot;Copy ID&quot;.</p>
+            <h4>Example (.env)</h4>
             <div className="m-help-code">
-              <div className="m-help-code-title">irssi</div>
-              <pre>/server add -auto astro {hostname} 6667{'\n'}/join #astro</pre>
-            </div>
-            <div className="m-help-code">
-              <div className="m-help-code-title">weechat</div>
-              <pre>/server add astro {hostname}/6667{'\n'}/connect astro{'\n'}/join #astro</pre>
+              <div className="m-help-code-title">.env</div>
+              <pre>{`DISCORD_BOT_TOKEN=your-bot-token
+DISCORD_GUILD_ID=123456789012345678
+DISCORD_DEFAULT_CHANNEL_ID=123456789012345678`}</pre>
             </div>
           </div>
         )}
@@ -1573,35 +1515,12 @@ function MobileHelpView({ onClose }) {
 }
 
 function MobileApp() {
-  const [input, setInput] = useState('')
-  const [ircNick, setIrcNick] = useState('')
-  const [ircMessages, setIrcMessages] = useState([])
-  const [ircStatus, setIrcStatus] = useState({ connected: false, nick: '', channel: '', host: '', port: 0 })
-  const ircWsRef = useRef(null)
-  const ircHistoryTsRef = useRef(0)
-  const [ircHasMore, setIrcHasMore] = useState(false)
-  const [ircLoadingHistory, setIrcLoadingHistory] = useState(false)
-  const [ircChannelLoading, setIrcChannelLoading] = useState(false)
-  const ircChatAreaRef = useRef(null)
-  const [ircChannels, setIrcChannels] = useState([])
-  const [showAddChannel, setShowAddChannel] = useState(false)
-  const [newChannelName, setNewChannelName] = useState('')
-  const [unreadCounts, setUnreadCounts] = useState({})
-  const lastSeenTsRef = useRef({})
   const [menuOpen, setMenuOpen] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
-  const [view, setView] = useState('chat')
+  const [view, setView] = useState('markdowns')
   const [categories, setCategories] = useState([])
   const [universes, setUniverses] = useState([])
   const [currentUniverseId, setCurrentUniverseId] = useState(null)
-  const [chatListening, setChatListening] = useState(false)
-  const [voiceChat, setVoiceChat] = useState(false)
-  const chatRecognitionRef = useRef(null)
-  const chatWantListeningRef = useRef(false)
-  const chatWakeLockRef = useRef(null)
-  const chatBaseInputRef = useRef('')
-  const messagesEndRef = useRef(null)
-  const inputRef = useRef(null)
 
   useEffect(() => {
     document.documentElement.classList.add('m-mobile-shell')
@@ -1613,8 +1532,6 @@ function MobileApp() {
   }, [])
 
   useEffect(() => {
-    fetch('/api/settings/irc_channel').then(r => r.json()).then(d => { if (d.value) setIrcNick(d.value) }).catch(() => {})
-    fetchIrcChannels()
     fetch('/api/universes').then(r => r.json()).then(data => {
       setUniverses(data)
       fetch('/api/settings/selected_universe').then(r => r.json()).then(d => {
@@ -1623,221 +1540,6 @@ function MobileApp() {
         else if (data.length > 0) setCurrentUniverseId(data[0].id)
       }).catch(() => { if (data.length > 0) setCurrentUniverseId(data[0].id) })
     }).catch(() => {})
-  }, [])
-
-  const [ircUsers, setIrcUsers] = useState([])
-
-  const fetchIrcChannels = () => {
-    fetch('/api/irc/channels').then(r => r.json()).then(data => {
-      const filtered = data.filter(c => !c.name.startsWith('&'))
-      setIrcChannels(filtered)
-      const now = Date.now() / 1000
-      for (const ch of filtered) {
-        if (!(ch.name in lastSeenTsRef.current)) lastSeenTsRef.current[ch.name] = now
-      }
-    }).catch(() => {})
-  }
-
-  const fetchIrcUsers = () => {
-    fetch('/api/irc/users').then(r => r.json()).then(setIrcUsers).catch(() => {})
-  }
-
-
-  const fetchIrcHistory = (channel, beforeId = null) => {
-    const params = new URLSearchParams({ channel, limit: '100' })
-    if (beforeId) params.set('before_id', beforeId)
-    setIrcLoadingHistory(true)
-    return fetch(`/api/irc/history?${params}`)
-      .then(r => r.json())
-      .then(data => {
-        setIrcHasMore(data.has_more || false)
-        return data.messages || []
-      })
-      .catch(() => [])
-      .finally(() => setIrcLoadingHistory(false))
-  }
-
-  const loadOlderHistory = () => {
-    if (ircLoadingHistory || !ircHasMore) return
-    const channel = ircStatus.channel || '#astro'
-    const oldestId = ircMessages.length > 0 ? ircMessages[0].id : null
-    if (!oldestId) return
-    const area = ircChatAreaRef.current
-    fetchIrcHistory(channel, oldestId).then(older => {
-      if (older.length > 0) {
-        const prevScrollHeight = area ? area.scrollHeight : 0
-        const prevScrollTop = area ? area.scrollTop : 0
-        setIrcMessages(prev => [...older, ...prev])
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            if (area) {
-              area.scrollTop = area.scrollHeight - prevScrollHeight + prevScrollTop
-            }
-          })
-        })
-      }
-    })
-  }
-
-  const handleIrcScroll = (e) => {
-    if (e.target.scrollTop < 80) loadOlderHistory()
-  }
-
-  const handleSwitchChannel = (channel) => {
-    if (!channel) return
-    const name = channel.startsWith('#') ? channel : '#' + channel
-    lastSeenTsRef.current[name] = Date.now() / 1000
-    setUnreadCounts(prev => { const n = { ...prev }; delete n[name]; return n })
-    setIrcNick(name)
-    setIrcMessages([])
-    setIrcHasMore(false)
-    ircHistoryTsRef.current = 0
-    setIrcChannelLoading(true)
-    fetch('/api/irc/switch', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
-      .then(() => {
-        fetchIrcHistory(name).then(msgs => {
-          if (msgs.length > 0) ircHistoryTsRef.current = Math.max(...msgs.map(m => m.timestamp))
-          setIrcMessages(msgs)
-          setIrcChannelLoading(false)
-          setTimeout(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
-          }, 50)
-        })
-        setTimeout(fetchIrcUsers, 500)
-        setTimeout(fetchIrcChannels, 1000)
-      }).catch(() => { setIrcChannelLoading(false) })
-  }
-
-  const handleJoinChannel = () => {
-    const name = newChannelName.trim()
-    if (!name) return
-    setNewChannelName('')
-    setShowAddChannel(false)
-    handleSwitchChannel(name)
-  }
-
-  // IRC WebSocket
-  useEffect(() => {
-    let cancelled = false
-    let ws = null
-    let reconnectTimer = null
-
-    fetch('/api/irc/status').then(r => r.json()).then(status => {
-      if (cancelled) return
-      const channel = status.channel || '#astro'
-      setIrcNick(channel)
-      return fetch(`/api/irc/history?${new URLSearchParams({ channel, limit: '100' })}`)
-        .then(r => r.json())
-        .then(data => {
-          if (cancelled) return
-          const msgs = data.messages || []
-          setIrcHasMore(data.has_more || false)
-          if (msgs.length > 0) {
-            ircHistoryTsRef.current = Math.max(...msgs.map(m => m.timestamp))
-            setIrcMessages(msgs)
-          }
-          lastSeenTsRef.current[channel] = Date.now() / 1000
-        })
-    }).catch(() => {})
-
-    const connect = () => {
-      if (cancelled) return
-      const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-      ws = new WebSocket(`${proto}://${location.host}/ws/irc`)
-      ircWsRef.current = ws
-
-      ws.onmessage = (e) => {
-        try {
-          const data = JSON.parse(e.data)
-          if (data.type === 'msg') {
-            if (data.timestamp && data.timestamp <= ircHistoryTsRef.current) return
-            setIrcMessages(prev => {
-              if (data.id && prev.some(m => m.id === data.id)) return prev
-              return [...prev, data]
-            })
-          } else if (data.type === 'status') {
-            setIrcStatus({ connected: data.connected, nick: data.nick, channel: data.channel, host: data.host || '', port: data.port || 0 })
-          }
-        } catch {}
-      }
-      ws.onclose = () => {
-        if (!cancelled) {
-          setIrcStatus(prev => ({ ...prev, connected: false }))
-          reconnectTimer = setTimeout(connect, 2000)
-        }
-      }
-      ws.onerror = () => {}
-    }
-    connect()
-    fetchIrcUsers()
-    fetchIrcChannels()
-    const usersPoll = setInterval(fetchIrcUsers, 15000)
-    const channelsPoll = setInterval(fetchIrcChannels, 10000)
-
-    return () => {
-      cancelled = true
-      clearTimeout(reconnectTimer)
-      clearInterval(usersPoll)
-      clearInterval(channelsPoll)
-      if (ws) { ws.close(); ircWsRef.current = null }
-    }
-  }, [])
-
-  useEffect(() => {
-    const poll = () => {
-      const since = lastSeenTsRef.current
-      if (Object.keys(since).length === 0) return
-      fetch('/api/irc/unread', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(since),
-      })
-        .then(r => r.json())
-        .then(counts => {
-          const active = ircNick || '#astro'
-          const filtered = {}
-          for (const [ch, cnt] of Object.entries(counts)) {
-            if (ch !== active && cnt > 0) filtered[ch] = cnt
-          }
-          setUnreadCounts(filtered)
-        })
-        .catch(() => {})
-    }
-    poll()
-    const iv = setInterval(poll, 5000)
-    return () => clearInterval(iv)
-  }, [ircNick])
-
-  const [chatBg, setChatBg] = useState({ current: null, next: null, fading: false, author: null, authorUrl: null })
-
-  useEffect(() => {
-    let cancelled = false
-    let lastIndex = -1
-    const pick = () => {
-      let idx
-      do { idx = Math.floor(Math.random() * BACKGROUNDS.length) } while (idx === lastIndex && BACKGROUNDS.length > 1)
-      lastIndex = idx
-      return BACKGROUNDS[idx]
-    }
-    const preload = (bg) => new Promise((resolve) => {
-      const img = new Image()
-      img.onload = () => resolve(bg)
-      img.onerror = () => resolve(bg)
-      img.src = bg.url
-    })
-    preload(pick()).then((bg) => {
-      if (!cancelled) setChatBg({ current: bg.url, next: null, fading: false, author: bg.author, authorUrl: bg.authorUrl })
-    })
-    const interval = setInterval(async () => {
-      if (cancelled) return
-      const bg = await preload(pick())
-      if (cancelled) return
-      setChatBg(prev => ({ ...prev, next: bg.url, fading: true }))
-      setTimeout(() => {
-        if (!cancelled) setChatBg({ current: bg.url, next: null, fading: false, author: bg.author, authorUrl: bg.authorUrl })
-      }, 1500)
-    }, 600_000)
-    return () => { cancelled = true; clearInterval(interval) }
   }, [])
 
   useEffect(() => {
@@ -1853,133 +1555,6 @@ function MobileApp() {
       .then(setCategories)
       .catch(() => {})
   }, [currentUniverseId])
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
-  }, [ircMessages])
-
-  useEffect(() => {
-    if (view !== 'chat') return
-    inputRef.current?.focus()
-    const scrollToBottom = () => {
-      const area = ircChatAreaRef.current
-      if (area) {
-        area.scrollTop = area.scrollHeight
-      } else {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
-      }
-    }
-    const id = requestAnimationFrame(() => {
-      requestAnimationFrame(scrollToBottom)
-    })
-    return () => cancelAnimationFrame(id)
-  }, [view])
-
-  // ── Chat dictation ─────────────────────
-  const startChatRecSession = () => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SR) return
-    const recognition = new SR()
-    recognition.lang = 'en-US'
-    recognition.interimResults = true
-    recognition.continuous = false
-    chatRecognitionRef.current = recognition
-
-    recognition.onstart = () => setChatListening(true)
-    recognition.onresult = (e) => {
-      const transcript = e.results[0][0].transcript
-      const base = chatBaseInputRef.current
-      const sep = base && !base.endsWith(' ') ? ' ' : ''
-      setInput(base + sep + transcript)
-    }
-    recognition.onerror = (e) => {
-      if (e.error === 'not-allowed') {
-        chatWantListeningRef.current = false
-        setChatListening(false)
-        alert('Microphone access denied.')
-      } else if (e.error !== 'aborted' && e.error !== 'no-speech') {
-        chatWantListeningRef.current = false
-        setChatListening(false)
-      }
-    }
-    recognition.onend = () => {
-      chatRecognitionRef.current = null
-      setInput(prev => { chatBaseInputRef.current = prev; return prev })
-      if (chatWantListeningRef.current) {
-        setTimeout(() => { if (chatWantListeningRef.current) startChatRecSession() }, 100)
-      } else {
-        setChatListening(false)
-      }
-    }
-    try { recognition.start() } catch { chatWantListeningRef.current = false; setChatListening(false) }
-  }
-
-  const toggleChatDictation = () => {
-    if (chatListening || chatWantListeningRef.current) {
-      chatWantListeningRef.current = false
-      if (chatWakeLockRef.current) { chatWakeLockRef.current.release().catch(() => {}); chatWakeLockRef.current = null }
-      if (chatRecognitionRef.current) chatRecognitionRef.current.stop()
-      return
-    }
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SR) { alert('Speech recognition not supported. Try Chrome.'); return }
-    chatBaseInputRef.current = input
-    chatWantListeningRef.current = true
-    if ('wakeLock' in navigator) navigator.wakeLock.request('screen').then(l => { chatWakeLockRef.current = l }).catch(() => {})
-    startChatRecSession()
-  }
-
-  // Stop chat dictation when leaving chat view
-  useEffect(() => {
-    return () => { chatWantListeningRef.current = false; if (chatRecognitionRef.current) chatRecognitionRef.current.stop(); if (chatWakeLockRef.current) { chatWakeLockRef.current.release().catch(() => {}); chatWakeLockRef.current = null } }
-  }, [view])
-
-  // ── Voice chat (TTS) ──────────────────
-  const speakText = useCallback((text) => {
-    if (!voiceChat || !('speechSynthesis' in window)) return
-    window.speechSynthesis.cancel()
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.lang = 'en-US'
-    utterance.rate = 1.0
-    utterance.pitch = 1.0
-    window.speechSynthesis.speak(utterance)
-  }, [voiceChat])
-
-  const toggleVoiceChat = () => {
-    if (voiceChat) { window.speechSynthesis?.cancel() }
-    setVoiceChat(v => !v)
-  }
-
-  const IRC_MSG_LIMIT = 400
-  const ircByteCount = input
-    ? new TextEncoder().encode(input.trim()).length
-    : 0
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    const question = input.trim()
-    if (!question) return
-    if (chatWantListeningRef.current) {
-      chatWantListeningRef.current = false
-      if (chatRecognitionRef.current) chatRecognitionRef.current.stop()
-      if (chatWakeLockRef.current) { chatWakeLockRef.current.release().catch(() => {}); chatWakeLockRef.current = null }
-    }
-
-    setInput('')
-    chatBaseInputRef.current = ''
-    if (inputRef.current) inputRef.current.style.height = 'auto'
-    const ws = ircWsRef.current
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'send', message: question }))
-    } else {
-      setIrcMessages(prev => [...prev, { id: Date.now(), sender: 'system', text: 'Not connected to IRC', kind: 'error', timestamp: Date.now() / 1000, self: false }])
-    }
-  }
-
-  const clearChat = () => {
-    setIrcMessages([])
-    setMenuOpen(false)
-  }
 
   return (
     <div className="m-app">
@@ -2017,36 +1592,13 @@ function MobileApp() {
           </div>
         )}
         <span style={{ flex: 1 }} />
-        {view === 'chat' && (
-          <button className={`m-voice-toggle ${voiceChat ? 'active' : ''}`} onClick={toggleVoiceChat} title={voiceChat ? 'Voice chat on' : 'Voice chat off'}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill={voiceChat ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-              {voiceChat && <><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /></>}
-            </svg>
-          </button>
-        )}
       </header>
 
       {/* Slide-out menu */}
       {menuOpen && <div className="m-menu-overlay" onClick={() => setMenuOpen(false)} />}
       <nav className={`m-menu ${menuOpen ? 'open' : ''}`}>
         <div className="m-menu-section">
-          <div className="m-menu-section-title">Agent Network Channel</div>
-          <select
-            className="m-menu-input"
-            value={ircNick}
-            onChange={(e) => { handleSwitchChannel(e.target.value); setMenuOpen(false) }}
-          >
-            {ircChannels.length === 0 && ircNick && <option value={ircNick}>{ircNick}</option>}
-            {ircChannels.length === 0 && !ircNick && <option value="">No channels</option>}
-            {ircChannels.map((ch) => (
-              <option key={ch.name} value={ch.name}>{ch.name}{unreadCounts[ch.name] ? ` (${unreadCounts[ch.name]})` : ''}</option>
-            ))}
-          </select>
-        </div>
-        <div className="m-menu-section">
           <div className="m-menu-section-title">Actions</div>
-          <button className="m-menu-item m-menu-danger" onClick={clearChat}>Clear Chat</button>
           <a className="m-menu-item m-menu-link" href="/">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>
             Desktop Version
@@ -2065,106 +1617,6 @@ function MobileApp() {
 
       {/* Content area */}
       <div className="m-content">
-        {view === 'chat' && (
-          <div className="m-chat-bg-wrap">
-            {chatBg.current && (
-              <div className="m-chat-bg-layer" style={{ backgroundImage: `url(${chatBg.current})` }} />
-            )}
-            {chatBg.next && (
-              <div className={`m-chat-bg-layer m-chat-bg-next ${chatBg.fading ? 'fade-in' : ''}`} style={{ backgroundImage: `url(${chatBg.next})` }} />
-            )}
-            <div className="m-chat-bg-overlay" />
-            {chatBg.author && (
-              <div className="m-bg-attribution">
-                Photo by <a href={chatBg.authorUrl} target="_blank" rel="noopener noreferrer">{chatBg.author}</a> on <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer">Unsplash</a>
-              </div>
-            )}
-            <div className="m-irc-status-bar">
-                <div className={`m-irc-dot ${ircStatus.connected ? 'connected' : ''}`} />
-                <span>{ircStatus.connected ? `${ircStatus.nick} on ${ircStatus.channel}` : 'Connecting...'}</span>
-                {ircStatus.connected && ircStatus.host && (
-                  <span className="irc-connection-info">{ircStatus.host}:{ircStatus.port}</span>
-                )}
-                <button className="m-irc-toolbar-btn" onClick={() => {
-                  const ch = ircNick || ircStatus.channel || '#astro'
-                  if (!confirm(`Purge all message history for ${ch}?`)) return
-                  fetch(`/api/irc/channels/${encodeURIComponent(ch)}/history`, { method: 'DELETE' })
-                    .then(r => r.json())
-                    .then(() => { setIrcMessages([]); setIrcHasMore(false) })
-                    .catch(() => {})
-                }} title="Purge channel history">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                    <path d="M10 11v6" /><path d="M14 11v6" />
-                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                  </svg>
-                </button>
-            </div>
-            {ircUsers.length > 0 && (
-              <div className="irc-users-bar">
-                {ircUsers.map((nick) => (
-                  <span key={nick} className={`irc-user-chip ${nick.toLowerCase() === ircStatus.nick?.toLowerCase() ? 'irc-user-self' : ''}`}>
-                    <img className="irc-user-avatar" src={dicebearAvatar(nick, 18)} alt={nick} />
-                    {nick}
-                  </span>
-                ))}
-              </div>
-            )}
-            <main className="m-messages" ref={ircChatAreaRef} onScroll={handleIrcScroll}>
-              {ircMessages.length === 0 && !ircLoadingHistory ? (
-                ircChannelLoading ? (
-                  <div className="m-channel-loading">
-                    <div className="m-channel-spinner" />
-                  </div>
-                ) : (
-                <div className="m-empty">
-                  <img className="m-empty-logo" src={LOGO_URL} alt="Astro" />
-                  <h2>Agent Network</h2>
-                  <p style={{ color: 'var(--text-secondary, #999)', fontSize: 14 }}>Messages from {ircStatus.channel || '#astro'} will appear here</p>
-                </div>
-                )
-              ) : (
-                <>
-                  {ircLoadingHistory && (
-                    <div style={{ textAlign: 'center', padding: '8px 0', color: 'var(--text-secondary, #999)', fontSize: 12, opacity: 0.7 }}>Loading history...</div>
-                  )}
-                  {groupIrcMessages(ircMessages.filter(msg => msg.kind !== 'join' && msg.kind !== 'part' && msg.kind !== 'quit')).map((group, i) =>
-                    group.type === 'event' ? (
-                      <div key={group.msg.id} className="m-irc-event">
-                        <span className="m-irc-event-nick">{group.msg.sender}</span> {group.msg.text}
-                      </div>
-                    ) : (
-                      <MobileIrcMessageGroup key={group.messages[0].id} group={group} />
-                    )
-                  )}
-                  <div ref={messagesEndRef} />
-                </>
-              )}
-            </main>
-            {chatListening && <div className="mn-listening-bar">Listening...</div>}
-            <footer className="m-input-area">
-              <form className="m-input-form" onSubmit={handleSubmit}>
-                <button type="button" className={`m-chat-mic-btn ${chatListening ? 'active' : ''}`} onClick={toggleChatDictation}>
-                  {chatListening ? (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>
-                  ) : (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" /></svg>
-                  )}
-                </button>
-                <textarea ref={inputRef} className="m-input-field" rows="1" placeholder={`Message ${ircStatus.channel || '#astro'}...`} value={input} onChange={(e) => { setInput(e.target.value); const ta = e.target; ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 150) + 'px' }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(e) } }} />
-                {input.trim() && (
-                  <span className={`irc-byte-count ${ircByteCount > IRC_MSG_LIMIT ? 'over' : ircByteCount > IRC_MSG_LIMIT * 0.8 ? 'warn' : ''}`}>
-                    {ircByteCount}/{IRC_MSG_LIMIT}
-                  </span>
-                )}
-                <button type="submit" className="m-send-btn" disabled={!input.trim() || ircByteCount > IRC_MSG_LIMIT}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
-                </button>
-              </form>
-            </footer>
-          </div>
-        )}
         {view === 'markdowns' && <MobileMarkdowns categories={categories} universeId={currentUniverseId} />}
         {view === 'feeds' && <MobileFeeds categories={categories} universeId={currentUniverseId} />}
         {view === 'tables' && <MobileTables categories={categories} universeId={currentUniverseId} />}
@@ -2183,10 +1635,6 @@ function MobileApp() {
 
       {/* Bottom tab bar */}
       <nav className="m-tab-bar m-tab-bar-scroll">
-        <button className={`m-tab ${view === 'chat' ? 'active' : ''}`} onClick={() => setView('chat')}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
-          <span>Chat</span>
-        </button>
         <button className={`m-tab ${view === 'markdowns' ? 'active' : ''}`} onClick={() => setView('markdowns')}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
           <span>Markdowns</span>

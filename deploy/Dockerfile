@@ -11,7 +11,6 @@ RUN apt-get update \
         curl \
         iptables \
         ca-certificates \
-        ngircd \
     && curl -fsSL https://tailscale.com/install.sh | sh \
     && rm -rf /var/lib/apt/lists/*
 
@@ -32,7 +31,6 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Copy application code
 COPY src/ src/
 COPY web/dist/ web/dist/
-COPY config/ config/
 COPY VERSION .
 
 ARG ASTRO_BUILD_ID=""
@@ -47,7 +45,7 @@ RUN chmod +x /app/entrypoint.sh
 RUN mkdir -p /app/data /app/documents /var/lib/tailscale \
     && chown -R $USERNAME:$USERNAME /app
 
-EXPOSE 8000 6667
+EXPOSE 8000
 
 # Entrypoint starts tailscaled, then the app (runs as root for tailscale)
 ENTRYPOINT ["/app/entrypoint.sh"]

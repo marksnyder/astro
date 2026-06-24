@@ -3,7 +3,6 @@ services:
     image: marksnyder/astro:latest
     ports:
       - "8000:8000"
-      - "6667:6667"
     volumes:
       - astro-data:/app/data
       - astro-docs:/app/documents
@@ -13,6 +12,9 @@ services:
       - TS_HOSTNAME=${TS_HOSTNAME:-astro}
       - TS_SERVE_HTTPS=${TS_SERVE_HTTPS:-true}
       - TS_EXTRA_ARGS=${TS_EXTRA_ARGS:-}
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
+      - DISCORD_GUILD_ID=${DISCORD_GUILD_ID:-}
+      - DISCORD_DEFAULT_CHANNEL_ID=${DISCORD_DEFAULT_CHANNEL_ID:-}
     cap_add:
       - NET_ADMIN
       - NET_RAW

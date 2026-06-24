@@ -11,7 +11,6 @@ RUN apt-get update \
         git \
         nano \
         tmux \
-        ngircd \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user matching the default VS Code devcontainer convention

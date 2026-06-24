@@ -7,7 +7,7 @@ from typing import Optional
 from datetime import datetime, timezone
 
 import fastapi
-from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -141,32 +141,6 @@ from src.universe_pack import build_universe_export_zip, import_universe_bundle_
 
 DOCUMENTS_DIR = Path(__file__).resolve().parent.parent / "documents"
 
-_ngircd_proc = None
-
-
-def _start_ngircd():
-    """Launch ngircd as a background process if not already running."""
-    global _ngircd_proc
-    import subprocess, shutil, time
-    if shutil.which("ngircd") is None:
-        print("[IRC] ngircd not found — install it with: apt install ngircd")
-        return
-    conf = Path(__file__).resolve().parent.parent / "config" / "ngircd.conf"
-    if not conf.exists():
-        print(f"[IRC] Config not found: {conf}")
-        return
-    try:
-        _ngircd_proc = subprocess.Popen(
-            ["ngircd", "-n", "-f", str(conf)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        print(f"[IRC] ngircd started (config: {conf})")
-        time.sleep(0.5)
-    except Exception as e:
-        print(f"[IRC] Failed to start ngircd: {e}")
-
-
 # MCP server for AI agent integration
 from contextlib import asynccontextmanager
 from src.mcp_server import mcp as _mcp
@@ -176,32 +150,15 @@ _mcp_app = _mcp.http_app(path="/", stateless_http=True)
 
 @asynccontextmanager
 async def _lifespan(application):
-    _start_ngircd()
-    from src.irc_client import IRCClient
-    IRCClient.get()
-    from src.irc_monitor import IRCMonitor
-    IRCMonitor.get()
     from src.agent_task_runner import AgentTaskRunner
     AgentTaskRunner.get()
 
     async with _mcp_app.lifespan(application):
         yield
 
-    from src.irc_client import IRCClient as _IC
-    if _IC._instance:
-        _IC._instance.stop()
-    from src.irc_monitor import IRCMonitor as _IM
-    if _IM._instance:
-        _IM._instance.stop()
     from src.agent_task_runner import AgentTaskRunner as _ATR
     if _ATR._instance is not None:
         _ATR._instance.stop()
-    if _ngircd_proc:
-        _ngircd_proc.terminate()
-        try:
-            _ngircd_proc.wait(timeout=3)
-        except Exception:
-            _ngircd_proc.kill()
 
 
 app = FastAPI(title="Astro", version="1.0.0", lifespan=_lifespan)
@@ -1543,220 +1500,32 @@ def api_serve_feed_file(filename: str):
     return FileResponse(safe)
 
 
-class IrcSendRequest(BaseModel):
-    message: str
+@app.get("/api/discord/status")
+def api_discord_status():
+    from src.discord_client import get_status
+
+    return get_status()
 
 
-@app.post("/api/irc/send")
-def api_irc_send(req: IrcSendRequest):
-    from src.irc_client import IRCClient
-    client = IRCClient.get()
-    client.send_message(req.message)
-    return {"ok": True}
+@app.get("/api/discord/channels")
+def api_discord_channels():
+    from src.discord_client import get_status, list_channels
 
-
-@app.get("/api/irc/messages")
-def api_irc_messages(after: int = 0):
-    from src.irc_client import IRCClient
-    client = IRCClient.get()
-    return {"messages": client.get_messages(after)}
-
-
-@app.get("/api/irc/history")
-def api_irc_history(channel: str = "#astro", before_id: Optional[int] = None, limit: int = 100):
-    """Return persisted IRC history for a channel, paginated by message id."""
-    from src.irc_monitor import get_history
-    limit = min(limit, 200)
-    messages = get_history(channel, before_id=before_id, limit=limit)
-    has_more = len(messages) == limit
-    return {"messages": messages, "has_more": has_more}
-
-
-@app.post("/api/irc/unread")
-def api_irc_unread(since: dict[str, float]):
-    """Return unread message counts per channel since given timestamps."""
-    from src.irc_monitor import get_unread_counts
-    return get_unread_counts(since)
-
-
-@app.get("/api/irc/status")
-def api_irc_status():
-    from src.irc_client import IRCClient
-    client = IRCClient.get()
-    return client.get_status()
-
-
-@app.get("/api/irc/users")
-def api_irc_users():
-    from src.irc_client import IRCClient
-    client = IRCClient.get()
-    return client.get_channel_users()
-
-
-@app.get("/api/irc/channels")
-def api_irc_channels():
-    from src.irc_monitor import IRCMonitor
-    return IRCMonitor.get().get_channels()
-
-
-class IrcChannelRequest(BaseModel):
-    name: str
-
-
-@app.post("/api/irc/channels", status_code=201)
-def api_create_irc_channel(req: IrcChannelRequest):
-    """Create a channel by having the Astro client join it (IRC creates on join)."""
-    from src.irc_client import IRCClient
-    name = req.name.strip()
-    if not name.startswith("#"):
-        name = "#" + name
-    client = IRCClient.get()
-    if not client.connected or not client._sock:
-        raise HTTPException(status_code=503, detail="IRC not connected")
-    old_channel = client.channel
-    client._raw_send(f"JOIN {name}")
-    import time
-    time.sleep(0.5)
-    client._raw_send(f"PART {name}")
-    time.sleep(0.3)
-    if old_channel != name:
-        client._raw_send(f"JOIN {old_channel}")
-    return {"ok": True, "name": name}
-
-
-@app.post("/api/irc/channels/{name:path}/hide")
-def api_hide_irc_channel(name: str):
-    """Have both bots leave a channel immediately when it's hidden."""
-    from src.irc_client import IRCClient
-    from src.irc_monitor import IRCMonitor
-    name = name.strip()
-    if not name.startswith("#"):
-        name = "#" + name
+    status = get_status()
+    if not status.get("connected"):
+        raise HTTPException(
+            status_code=503,
+            detail=status.get("error") or "Discord not connected",
+        )
+    if not status.get("guild_id"):
+        raise HTTPException(
+            status_code=400,
+            detail="discord_guild_id not configured",
+        )
     try:
-        client = IRCClient.get()
-        if client.connected and client._sock:
-            client._raw_send(f"PART {name}")
-    except Exception:
-        pass
-    try:
-        IRCMonitor.get().part_channel(name)
-    except Exception:
-        pass
-    return {"ok": True}
-
-
-@app.delete("/api/irc/channels/{name:path}/history")
-def api_purge_irc_channel_history(name: str):
-    """Delete all persisted message history for a channel."""
-    from src.irc_monitor import purge_history
-    name = name.strip()
-    if not name.startswith("#"):
-        name = "#" + name
-    count = purge_history(name)
-    return {"ok": True, "deleted": count}
-
-
-@app.delete("/api/irc/channels/{name:path}")
-def api_delete_irc_channel(name: str):
-    """Fully delete a channel: have bots leave, remove from ngircd config, purge DB history."""
-    import subprocess, re, time
-    from src.irc_client import IRCClient
-    from src.irc_monitor import IRCMonitor, delete_channel
-    name = name.strip()
-    if not name.startswith("#"):
-        name = "#" + name
-
-    # Have both IRC bots leave the channel first so ngircd can destroy it
-    try:
-        client = IRCClient.get()
-        if client.connected and client._sock:
-            client._raw_send(f"PART {name}")
-    except Exception:
-        pass
-    try:
-        IRCMonitor.get().part_channel(name)
-    except Exception:
-        pass
-    time.sleep(0.5)
-
-    delete_channel(name)
-    conf_path = Path(__file__).resolve().parent.parent / "config" / "ngircd.conf"
-    if conf_path.exists():
-        text = conf_path.read_text()
-        pattern = r'\[Channel\]\s*\n\s*Name\s*=\s*' + re.escape(name) + r'[^\[]*'
-        new_text = re.sub(pattern, '', text, flags=re.IGNORECASE)
-        if new_text != text:
-            conf_path.write_text(new_text.strip() + "\n")
-            subprocess.run(["pkill", "-HUP", "ngircd"], capture_output=True)
-    return {"ok": True}
-
-
-@app.put("/api/irc/switch")
-def api_irc_switch_channel(req: IrcChannelRequest):
-    from src.irc_client import IRCClient
-    name = req.name.strip()
-    if not name.startswith("#"):
-        name = "#" + name
-    client = IRCClient.get()
-    client.switch_channel(name)
-    set_setting("irc_channel", name)
-    return {"ok": True, "channel": name}
-
-
-@app.websocket("/ws/irc")
-async def ws_irc(ws: WebSocket):
-    import asyncio, json
-    from src.irc_client import IRCClient
-
-    await ws.accept()
-    client = IRCClient.get()
-    queue = client.subscribe()
-
-    # Send current status (history is loaded from DB via /api/irc/history)
-    await ws.send_json({"type": "status", **client.get_status()})
-
-    async def _reader():
-        """Read send commands from browser."""
-        try:
-            while True:
-                data = await ws.receive_json()
-                if data.get("type") == "send" and data.get("message"):
-                    client.send_message(data["message"])
-        except (WebSocketDisconnect, Exception):
-            pass
-
-    async def _writer():
-        """Push IRC messages to browser as they arrive."""
-        try:
-            while True:
-                msg = await queue.get()
-                await ws.send_json({"type": "msg", **msg})
-        except (WebSocketDisconnect, Exception):
-            pass
-
-    async def _status():
-        """Push status updates periodically."""
-        try:
-            last = None
-            while True:
-                await asyncio.sleep(3)
-                s = client.get_status()
-                if s != last:
-                    await ws.send_json({"type": "status", **s})
-                    last = s
-        except (WebSocketDisconnect, Exception):
-            pass
-
-    try:
-        await asyncio.gather(_reader(), _writer(), _status())
-    except Exception:
-        pass
-    finally:
-        client.unsubscribe(queue)
-        try:
-            await ws.close()
-        except Exception:
-            pass
+        return list_channels()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
 
 
 # ── Diagrams ──────────────────────────────────────────────────────────────

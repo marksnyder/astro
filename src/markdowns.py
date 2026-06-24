@@ -1790,7 +1790,7 @@ def table_row_to_dict(r: TableRow) -> dict:
     return asdict(r)
 
 
-# ── Agent Tasks (IRC delivery of markdown instructions) ────────────────────
+# ── Agent Tasks (Discord delivery of markdown instructions) ─────────────────
 
 
 @dataclass

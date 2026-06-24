@@ -2,7 +2,7 @@
 
 **Build apps on top of AI.**
 
-Astro is a self hosted platform for composing agent workflows, tools, and data around your models. It gives you an Agent Network (IRC), scheduled **Agent Tasks**, markdown and document memory, diagrams, tables, bookmarks, feeds, and a full **MCP** surface so you can ship AI backed experiences instead of only filing notes.
+Astro is a self hosted platform for composing agent workflows, tools, and data around your models. It gives you **Discord** integration for agent coordination, scheduled **Agent Tasks**, markdown and document memory, diagrams, tables, bookmarks, feeds, and a full **MCP** surface so you can ship AI backed experiences instead of only filing notes.
 
 Everything lives inside **Universes**: separate workspaces so each app or project keeps its own data and agents clean.
 
@@ -12,11 +12,11 @@ Everything lives inside **Universes**: separate workspaces so each app or projec
 
 ## Features
 
-### AI Agent Network
-A built in IRC server connects AI agents and tools. Coordinate runs, bridge systems, and plug in external AI services from one hub.
+### Discord Integration
+Connect a Discord bot so Agent Tasks and agents can coordinate in your server channels.
 
 ### Agent Tasks
-Define recurring or single jobs that send instructions to the Agent Network on behalf of a markdown note. Each task picks a note (instructions live in the note), an IRC channel, and a schedule: manual run only, cron, or one future time. A dedicated IRC client delivers the message lines. The text is driven by a template in Settings (default includes how to fetch the markdown over HTTP and the note ID). The Agent Tasks tab lists tasks with search, last run and next run hints, and run, edit, and delete actions.
+Define recurring or single jobs that send instructions to Discord on behalf of a markdown note. Each task picks a note (instructions live in the note), a Discord channel, and a schedule: manual run only, cron, or one future time. The bot delivers the message using a template in Settings (default includes how to fetch the markdown over HTTP and the note ID). The Agent Tasks tab lists tasks with search, last run and next run hints, and run, edit, and delete actions.
 
 ### Markdowns
 Author structured markdown with rich formatting, images, categories, and full text search. Notes are vectorized for semantic retrieval and MCP access.
@@ -52,7 +52,7 @@ HTTP endpoints with per feed API keys: post markdown or files into timelines. Pi
 A [Model Context Protocol](https://modelcontextprotocol.io) server at `/mcp/` exposes tools so clients such as Claude Desktop, Cursor, or custom agents can read and write Astro data as part of an application.
 
 ### Mobile Interface
-`/mobile` offers a phone friendly UI for chat, notes, feeds, tables, library, categories, and agent tasks.
+`/mobile` offers a phone friendly UI for notes, feeds, tables, library, categories, and agent tasks.
 
 ---
 
@@ -108,10 +108,18 @@ curl -fsSL https://runastro.sh/install.sh | bash -s -- [OPTIONS]
 | Tailscale hostname | `astro` | Tailscale hostname |
 | Tailscale HTTPS | `true` | Enable Tailscale HTTPS proxy |
 
+Discord (optional, for Agent Tasks):
+
+| Variable | Purpose |
+|---|---|
+| `DISCORD_BOT_TOKEN` | Bot token from the Discord Developer Portal |
+| `DISCORD_GUILD_ID` | Discord server ID |
+| `DISCORD_DEFAULT_CHANNEL_ID` | Default channel for new agent tasks |
+
 Or use environment variables:
 
 ```bash
-PORT=9000 TS_AUTHKEY=tskey-auth-... curl -fsSL https://runastro.sh/install.sh | bash
+PORT=9000 TS_AUTHKEY=tskey-auth-... DISCORD_BOT_TOKEN=... curl -fsSL https://runastro.sh/install.sh | bash
 ```
 
 ---
@@ -133,10 +141,25 @@ Create an auth key at [login.tailscale.com/admin/settings/keys](https://login.ta
 
 ---
 
+## Discord (Agent Tasks)
+
+Agent Tasks post instructions to Discord channels via a bot you configure:
+
+| Variable | Purpose |
+|---|---|
+| `DISCORD_BOT_TOKEN` | Bot token from the [Discord Developer Portal](https://discord.com/developers/applications) |
+| `DISCORD_GUILD_ID` | Server ID (Developer Mode → right-click server → Copy Server ID) |
+| `DISCORD_DEFAULT_CHANNEL_ID` | Default channel for new tasks |
+
+Pass them when installing or in `deploy/docker-compose.yml`. Guild and default channel can also be set in **Settings → Agent tasks (Discord)** in the web UI.
+
+---
+
 ## First Run
 
 1. Open **http://localhost:8000**
-2. Connect MCP clients, create markdown instructions, or run Agent Tasks
+2. Configure Discord in **Settings → Agent tasks (Discord)** (or set `DISCORD_BOT_TOKEN` before install)
+3. Connect MCP clients, create markdown instructions, or run Agent Tasks
 
 Embeddings run locally; no external API keys are required for search.
 
@@ -206,6 +229,10 @@ The MCP server is available at `http://localhost:8000/mcp/` and exposes 43 tools
 | **Universes** | |
 | `list_all_universes` | List all universes |
 | `set_default_universe` | Set the active universe |
+| **Agent Tasks** | |
+| `list_agent_tasks` | List agent tasks |
+| `write_agent_task` | Create a task (delivers to Discord) |
+| `run_agent_task_now` | Send a task to Discord immediately |
 | **Stats** | |
 | `get_stats` | Vector store statistics |
 

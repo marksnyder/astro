@@ -68,6 +68,7 @@ Alternatively, set environment variables before piping to bash:
 
 ```
 PORT=9000 TS_AUTHKEY=tskey-auth-... \
+  DISCORD_BOT_TOKEN=your-bot-token DISCORD_GUILD_ID=your-guild-id \
   curl -fsSL https://runastro.sh/install.sh | bash
 ```
 
@@ -89,12 +90,32 @@ Once connected, Astro is available at:
 
 You can create a Tailscale auth key at [login.tailscale.com/admin/settings/keys](https://login.tailscale.com/admin/settings/keys).
 
+## Discord (Agent Tasks)
+
+Agent Tasks deliver markdown instructions to Discord channels via a bot you configure:
+
+| Variable | Purpose |
+|---|---|
+| `DISCORD_BOT_TOKEN` | Bot token from the [Discord Developer Portal](https://discord.com/developers/applications) |
+| `DISCORD_GUILD_ID` | Server ID (Developer Mode → right-click server → Copy Server ID) |
+| `DISCORD_DEFAULT_CHANNEL_ID` | Default channel for new tasks |
+
+Pass them when starting the container, for example:
+
+```
+DISCORD_BOT_TOKEN=your-token DISCORD_GUILD_ID=your-guild-id \
+  curl -fsSL https://runastro.sh/install.sh | bash
+```
+
+Guild and default channel can also be set in **Settings → Agent tasks (Discord)** in the web UI. See [Discord Integration](/docs/agent-network/) for setup details.
+
 ## First Run
 
 After installation:
 
 1. Open **http://localhost:8000** in your browser
-2. Start uploading documents, creating markdowns, or coordinating agents
+2. Configure Discord in Settings (or set `DISCORD_BOT_TOKEN` before install) for Agent Tasks
+3. Connect MCP clients, create markdown instructions, or run Agent Tasks
 
 Embeddings are handled locally and no external API keys are required.
 

@@ -167,7 +167,6 @@ DOCKER_ARGS=(
     --name "${CONTAINER_NAME}"
     --restart unless-stopped
     -p "${PORT}:8000"
-    -p 6667:6667
     -v "${ASTRO_DATA_DIR}/data:/app/data"
     -v "${ASTRO_DATA_DIR}/documents:/app/documents"
 )
@@ -186,6 +185,16 @@ if [ "$USE_TAILSCALE" = "yes" ]; then
     )
 fi
 
+if [ -n "${DISCORD_BOT_TOKEN:-}" ]; then
+    DOCKER_ARGS+=(-e "DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}")
+fi
+if [ -n "${DISCORD_GUILD_ID:-}" ]; then
+    DOCKER_ARGS+=(-e "DISCORD_GUILD_ID=${DISCORD_GUILD_ID}")
+fi
+if [ -n "${DISCORD_DEFAULT_CHANNEL_ID:-}" ]; then
+    DOCKER_ARGS+=(-e "DISCORD_DEFAULT_CHANNEL_ID=${DISCORD_DEFAULT_CHANNEL_ID}")
+fi
+
 echo "==> Starting Astro..."
 docker run "${DOCKER_ARGS[@]}" "${IMAGE_NAME}:latest"
 
@@ -195,7 +204,7 @@ echo "  Astro is running!"
 echo "============================================"
 echo ""
 echo "  URL:        http://localhost:${PORT}"
-echo "  IRC:        localhost:6667 (any IRC client)"
+echo "  Discord:    set DISCORD_BOT_TOKEN (and optional DISCORD_GUILD_ID)"
 echo "  Data dir:   ${ASTRO_DATA_DIR}"
 echo "  Container:  ${CONTAINER_NAME}"
 echo ""
