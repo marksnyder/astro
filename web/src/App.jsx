@@ -9,6 +9,7 @@ import TablesPanel, { TableEditorView } from './TablesPanel'
 import AgentTasksPanel from './AgentTasksPanel'
 import CategoryTree, { EmojiPopover } from './CategoryTree'
 import ChatBackground from './ChatBackground'
+import SlackManifestGenerator from './SlackManifestGenerator'
 import { DEFAULT_AGENT_TASK_MESSAGE_TEMPLATE } from './agentTaskDefaults'
 
 const _originalFetch = window.fetch
@@ -794,6 +795,7 @@ function ApiKeyManager() {
 }
 
 function SettingsDialog({ onClose }) {
+  const [tab, setTab] = useState('general')
   const [status, setStatus] = useState(null) // { type: 'success'|'error'|'info', text: string }
   const [reindexing, setReindexing] = useState(false)
   const [agentTaskTemplate, setAgentTaskTemplate] = useState(DEFAULT_AGENT_TASK_MESSAGE_TEMPLATE)
@@ -949,131 +951,177 @@ function SettingsDialog({ onClose }) {
 
   return (
     <div className="br-modal" onClick={onClose}>
-      <div className="br-modal-content" onClick={e => e.stopPropagation()}>
-        <h2>Settings</h2>
-
-        <div className="br-section">
-          <h3>Rebuild Index</h3>
-          <p>Re-create the search index from existing data.</p>
-          <button className="br-action-btn" onClick={handleReindex} disabled={reindexing}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="23 4 23 10 17 10" />
-              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-            </svg>
-            {reindexing ? 'Reindexing...' : 'Rebuild Index'}
-          </button>
+      <div className="br-modal-content settings-modal-content" onClick={e => e.stopPropagation()}>
+        <div className="settings-modal-header">
+          <h2>Settings</h2>
+          <div className="settings-tabs">
+            <button type="button" className={`settings-tab ${tab === 'general' ? 'active' : ''}`} onClick={() => setTab('general')}>
+              General
+            </button>
+            <button type="button" className={`settings-tab ${tab === 'security' ? 'active' : ''}`} onClick={() => setTab('security')}>
+              Security
+            </button>
+            <button type="button" className={`settings-tab ${tab === 'slack' ? 'active' : ''}`} onClick={() => setTab('slack')}>
+              Slack
+            </button>
+            <button type="button" className={`settings-tab ${tab === 'tasks' ? 'active' : ''}`} onClick={() => setTab('tasks')}>
+              Task messages
+            </button>
+          </div>
         </div>
 
-        <div className="br-divider" />
+        <div className="settings-modal-body">
+          {tab === 'general' && (
+            <div className="br-section settings-tab-panel">
+              <h3>Rebuild index</h3>
+              <p>Re-create the search index from existing data.</p>
+              <button className="br-action-btn" onClick={handleReindex} disabled={reindexing}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="23 4 23 10 17 10" />
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                </svg>
+                {reindexing ? 'Reindexing...' : 'Rebuild Index'}
+              </button>
+            </div>
+          )}
 
-        <div className="br-section">
-          <h3>API Key</h3>
-          <p>Generate an API key to secure access to the web app, API, and MCP endpoints. Leave empty for open access.</p>
-          <ApiKeyManager />
-        </div>
+          {tab === 'security' && (
+            <div className="br-section settings-tab-panel">
+              <h3>API key</h3>
+              <p>Generate an API key to secure access to the web app, API, and MCP endpoints. Leave empty for open access.</p>
+              <ApiKeyManager />
+            </div>
+          )}
 
-        <div className="br-divider" />
-
-        <div className="br-section">
-          <h3>Agent tasks (Slack)</h3>
-          <p>
-            Message template for tasks posted to Slack channels.
-            Placeholders: <code>{'{markdown_id}'}</code>, <code>{'{markdown_title}'}</code>, <code>{'{markdown_body}'}</code>, <code>{'{read_url}'}</code> (same as <code>{'{markdown_read_url}'}</code>).
-          </p>
-          {agentTaskSettingsLoading ? (
-            <p className="br-subtitle">Loading…</p>
-          ) : (
-            <>
-              <div className="agent-task-template-header">
-                <label className="agent-task-settings-label">Template</label>
-                <button
-                  type="button"
-                  className="br-action-btn agent-task-template-reset-btn"
-                  onClick={resetAgentTaskTemplate}
-                  disabled={agentTaskSaving || agentTaskSettingsLoading}
-                >
-                  Reset to default
-                </button>
-              </div>
-              <textarea
-                className="agent-task-settings-textarea"
-                rows={10}
-                value={agentTaskTemplate}
-                onChange={(e) => setAgentTaskTemplate(e.target.value)}
-              />
-              <label className="agent-task-settings-label">Base URL for read links</label>
-              <input
-                className="prompt-form-input"
-                style={{ width: '100%', marginBottom: 12 }}
-                value={agentTaskBaseUrl}
-                onChange={(e) => setAgentTaskBaseUrl(e.target.value)}
-                placeholder="http://127.0.0.1:8000"
-              />
-              <p style={{ marginBottom: 12, fontSize: '0.88rem', color: 'var(--text-muted, #888)' }}>
-                Configure Slack here or with <code>SLACK_BOT_TOKEN</code> / <code>SLACK_DEFAULT_CHANNEL_ID</code> environment variables (env vars take precedence).
+          {tab === 'slack' && (
+            <div className="br-section settings-tab-panel">
+              <h3>Slack integration</h3>
+              <p>
+                Connect a bot for agent task delivery. Environment variables{' '}
+                <code>SLACK_BOT_TOKEN</code> and <code>SLACK_DEFAULT_CHANNEL_ID</code> override UI values when set.
               </p>
-              <label className="agent-task-settings-label">Slack bot token</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <input
-                  className="prompt-form-input"
-                  style={{ flex: 1, marginBottom: 0 }}
-                  type={showSlackBotToken ? 'text' : 'password'}
-                  value={slackBotToken}
-                  onChange={(e) => setSlackBotToken(e.target.value)}
-                  placeholder={slackBotTokenConfigured ? 'Token saved — enter a new token to replace' : 'xoxb-…'}
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                <button
-                  type="button"
-                  className="irc-channel-btn"
-                  onClick={() => setShowSlackBotToken((v) => !v)}
-                  title={showSlackBotToken ? 'Hide token' : 'Show token'}
-                >
-                  {showSlackBotToken ? '🙈' : '👁️'}
-                </button>
-              </div>
-              {slackBotTokenConfigured && (
-                <button
-                  type="button"
-                  className="br-action-btn"
-                  style={{ marginBottom: 12, background: '#e53e3e22', color: '#e53e3e' }}
-                  onClick={clearSlackBotToken}
-                  disabled={agentTaskSaving}
-                >
-                  Remove saved token
-                </button>
-              )}
-              <label className="agent-task-settings-label">Default Slack channel ID</label>
-              <input
-                className="prompt-form-input"
-                style={{ width: '100%', marginBottom: 12 }}
-                value={slackDefaultChannelId}
-                onChange={(e) => setSlackDefaultChannelId(e.target.value)}
-                placeholder="Channel ID (e.g. C0123456789)"
-              />
-              {slackStatus && (
-                <div className={`br-status ${slackStatus.connected ? 'success' : slackStatus.configured ? 'error' : 'info'}`} style={{ marginBottom: 12 }}>
-                  {slackStatus.connected
-                    ? `Slack connected as ${slackStatus.username || 'bot'}${slackStatus.team ? ` (${slackStatus.team})` : ''}`
-                    : slackStatus.error || 'Slack not configured — add a bot token above or set SLACK_BOT_TOKEN'}
+              {agentTaskSettingsLoading ? (
+                <p className="br-subtitle">Loading…</p>
+              ) : (
+                <div className="settings-slack-grid">
+                  <div className="settings-slack-col">
+                    <SlackManifestGenerator />
+                  </div>
+                  <div className="settings-slack-col">
+                    <label className="agent-task-settings-label">Slack bot token</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <input
+                        className="prompt-form-input"
+                        style={{ flex: 1, marginBottom: 0 }}
+                        type={showSlackBotToken ? 'text' : 'password'}
+                        value={slackBotToken}
+                        onChange={(e) => setSlackBotToken(e.target.value)}
+                        placeholder={slackBotTokenConfigured ? 'Token saved — enter a new token to replace' : 'xoxb-…'}
+                        autoComplete="off"
+                        spellCheck={false}
+                      />
+                      <button
+                        type="button"
+                        className="irc-channel-btn"
+                        onClick={() => setShowSlackBotToken((v) => !v)}
+                        title={showSlackBotToken ? 'Hide token' : 'Show token'}
+                      >
+                        {showSlackBotToken ? '🙈' : '👁️'}
+                      </button>
+                    </div>
+                    {slackBotTokenConfigured && (
+                      <button
+                        type="button"
+                        className="br-action-btn"
+                        style={{ marginBottom: 12, background: '#e53e3e22', color: '#e53e3e' }}
+                        onClick={clearSlackBotToken}
+                        disabled={agentTaskSaving}
+                      >
+                        Remove saved token
+                      </button>
+                    )}
+                    <label className="agent-task-settings-label">Default Slack channel ID</label>
+                    <input
+                      className="prompt-form-input"
+                      style={{ width: '100%', marginBottom: 12 }}
+                      value={slackDefaultChannelId}
+                      onChange={(e) => setSlackDefaultChannelId(e.target.value)}
+                      placeholder="Channel ID (e.g. C0123456789)"
+                    />
+                    {slackStatus && (
+                      <div className={`br-status ${slackStatus.connected ? 'success' : slackStatus.configured ? 'error' : 'info'}`}>
+                        {slackStatus.connected
+                          ? `Slack connected as ${slackStatus.username || 'bot'}${slackStatus.team ? ` (${slackStatus.team})` : ''}`
+                          : slackStatus.error || 'Slack not configured — add a bot token above or set SLACK_BOT_TOKEN'}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
-              <button className="br-action-btn" type="button" onClick={saveAgentTaskSettings} disabled={agentTaskSaving}>
-                {agentTaskSaving ? 'Saving…' : 'Save agent task settings'}
-              </button>
-            </>
+            </div>
+          )}
+
+          {tab === 'tasks' && (
+            <div className="br-section settings-tab-panel">
+              <h3>Agent task messages</h3>
+              <p>
+                Template for instructions posted to Slack.
+                Placeholders: <code>{'{markdown_id}'}</code>, <code>{'{markdown_title}'}</code>, <code>{'{markdown_body}'}</code>, <code>{'{read_url}'}</code> (same as <code>{'{markdown_read_url}'}</code>).
+              </p>
+              {agentTaskSettingsLoading ? (
+                <p className="br-subtitle">Loading…</p>
+              ) : (
+                <>
+                  <div className="agent-task-template-header">
+                    <label className="agent-task-settings-label">Template</label>
+                    <button
+                      type="button"
+                      className="br-action-btn agent-task-template-reset-btn"
+                      onClick={resetAgentTaskTemplate}
+                      disabled={agentTaskSaving || agentTaskSettingsLoading}
+                    >
+                      Reset to default
+                    </button>
+                  </div>
+                  <textarea
+                    className="agent-task-settings-textarea settings-task-template"
+                    rows={8}
+                    value={agentTaskTemplate}
+                    onChange={(e) => setAgentTaskTemplate(e.target.value)}
+                  />
+                  <label className="agent-task-settings-label">Base URL for read links</label>
+                  <input
+                    className="prompt-form-input"
+                    style={{ width: '100%' }}
+                    value={agentTaskBaseUrl}
+                    onChange={(e) => setAgentTaskBaseUrl(e.target.value)}
+                    placeholder="http://127.0.0.1:8000"
+                  />
+                </>
+              )}
+            </div>
           )}
         </div>
 
-        {status && (
-          <div className={`br-status ${status.type}`}>
-            {status.text}
+        <div className="settings-modal-footer">
+          {status && (
+            <div className={`br-status ${status.type} settings-modal-status`}>
+              {status.text}
+            </div>
+          )}
+          <div className="settings-modal-footer-actions">
+            {(tab === 'slack' || tab === 'tasks') && (
+              <button
+                className="br-action-btn"
+                type="button"
+                onClick={saveAgentTaskSettings}
+                disabled={agentTaskSaving || agentTaskSettingsLoading}
+              >
+                {agentTaskSaving ? 'Saving…' : 'Save agent task settings'}
+              </button>
+            )}
+            <button className="br-close-btn" type="button" onClick={onClose}>Close</button>
           </div>
-        )}
-
-        <div className="br-close-row">
-          <button className="br-close-btn" onClick={onClose}>Close</button>
         </div>
       </div>
     </div>

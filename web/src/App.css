@@ -3907,6 +3907,12 @@
   backdrop-filter: blur(4px);
 }
 
+.br-modal:has(.settings-modal-content) {
+  align-items: flex-start;
+  padding: 24px 0;
+  overflow-y: auto;
+}
+
 .br-modal-content {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
@@ -6984,6 +6990,154 @@
 
 .agent-task-settings-textarea:focus {
   border-color: var(--accent);
+}
+
+.slack-manifest-generator {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.slack-manifest-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px 12px;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 720px) {
+  .slack-manifest-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+.slack-manifest-output {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  margin-bottom: 10px;
+}
+
+.slack-manifest-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.slack-manifest-generator a {
+  color: var(--accent);
+}
+
+/* ── Settings modal (tabbed) ─────────────────────── */
+
+.settings-modal-content {
+  width: min(820px, 94vw);
+  max-height: min(88vh, 920px);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.settings-modal-header {
+  flex-shrink: 0;
+  padding: 24px 28px 0;
+}
+
+.settings-modal-header h2 {
+  margin-bottom: 12px;
+}
+
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin: 0 -4px;
+  padding-bottom: 0;
+}
+
+.settings-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.settings-tab:hover {
+  color: var(--text-primary);
+}
+
+.settings-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.settings-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 28px 20px;
+}
+
+.settings-tab-panel {
+  margin-bottom: 0;
+}
+
+.settings-tab-panel .br-subtitle {
+  margin: 0;
+}
+
+.settings-slack-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 760px) {
+  .settings-slack-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.settings-slack-col .slack-manifest-generator {
+  margin-bottom: 0;
+}
+
+.settings-task-template {
+  min-height: 160px;
+}
+
+.settings-modal-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 28px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.settings-modal-status {
+  flex: 1;
+  min-width: 180px;
+  margin: 0;
+}
+
+.settings-modal-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
 }
 
 .agent-task-md-picker-wrap {
