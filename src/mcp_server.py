@@ -88,10 +88,18 @@ def _default_universe() -> int:
         return 1
 
 
-def _normalize_discord_channel(ch: str) -> str:
-    from src.discord_client import normalize_channel_id
+def _normalize_agent_task_channel(ch: str) -> str:
+    from src.slack_client import normalize_channel_id
 
     return normalize_channel_id(ch)
+
+
+def _normalize_agent_task_user(user_id: str) -> str:
+    from src.slack_client import normalize_user_id
+
+    if not (user_id or "").strip():
+        raise ValueError("slack_user_id is required")
+    return normalize_user_id(user_id)
 
 
 def _agent_task_markdown_error(markdown_id: int, universe_id: int) -> str | None:
@@ -115,7 +123,7 @@ mcp = FastMCP(
         "Call list_universes to see available universes and "
         "set_default_universe to change the default. Diagrams use the "
         "Excalidraw format (https://excalidraw.com) — see write_diagram "
-        "for schema details. Agent tasks send markdown instructions to Discord; "
+        "for schema details. Agent tasks send markdown instructions to Slack; "
         "use list_agent_tasks, write_agent_task, and run_agent_task_now to manage them."
     ),
 )
@@ -627,13 +635,13 @@ def delete_table_row(row_id: int) -> str:
     return "Deleted"
 
 
-# ── Agent tasks (Discord) ─────────────────────────────────────────────────
+# ── Agent tasks (Slack) ───────────────────────────────────────────────────
 
 
 @mcp.tool
 def list_agent_tasks(universe_id: int | None = None) -> list[dict]:
     """List agent tasks: scheduled or manual jobs that send a markdown's
-    content to a Discord channel. When
+    content to a Slack channel. When
     universe_id is set, only tasks whose markdown belongs to that universe
     are returned; when omitted, all tasks are listed."""
     tasks = _db_list_agent_tasks(universe_id)
@@ -659,6 +667,7 @@ def write_agent_task(
     title: str,
     markdown_id: int,
     channel: str,
+    slack_user_id: str,
     universe_id: int | None = None,
     schedule_mode: str = "manual",
     cron_expr: str = "",
@@ -666,7 +675,7 @@ def write_agent_task(
     enabled: bool = True,
 ) -> dict | str:
     """Create an agent task. The task delivers instructions from the given
-    markdown to a Discord channel (channel ID). schedule_mode: manual (only when run with
+    markdown to a Slack channel (channel ID) and mentions slack_user_id. schedule_mode: manual (only when run with
     run_agent_task_now), cron (cron_expr required, five fields, UTC), or once
     (run_at ISO time required). The markdown must belong to universe_id."""
     uid = universe_id if universe_id is not None else _default_universe()
@@ -682,7 +691,11 @@ def write_agent_task(
     run_at_val = ((run_at or "").strip() or None) if schedule_mode == "once" else None
     cron_val = ((cron_expr or "").strip() or None) if schedule_mode == "cron" else None
     try:
-        ch = _normalize_discord_channel(channel)
+        ch = _normalize_agent_task_channel(channel)
+    except ValueError as e:
+        return str(e)
+    try:
+        suid = _normalize_agent_task_user(slack_user_id)
     except ValueError as e:
         return str(e)
     t = _db_create_agent_task(
@@ -691,6 +704,7 @@ def write_agent_task(
         ch,
         uid,
         schedule_mode,
+        suid,
         cron_val,
         run_at_val,
         enabled,
@@ -705,6 +719,7 @@ def update_agent_task(
     title: str,
     markdown_id: int,
     channel: str,
+    slack_user_id: str,
     universe_id: int | None = None,
     schedule_mode: str = "manual",
     cron_expr: str = "",
@@ -725,7 +740,11 @@ def update_agent_task(
     run_at_val = ((run_at or "").strip() or None) if schedule_mode == "once" else None
     cron_val = ((cron_expr or "").strip() or None) if schedule_mode == "cron" else None
     try:
-        ch = _normalize_discord_channel(channel)
+        ch = _normalize_agent_task_channel(channel)
+    except ValueError as e:
+        return str(e)
+    try:
+        suid = _normalize_agent_task_user(slack_user_id)
     except ValueError as e:
         return str(e)
     t = _db_update_agent_task(
@@ -735,6 +754,7 @@ def update_agent_task(
         ch,
         uid,
         schedule_mode,
+        suid,
         cron_val,
         run_at_val,
         enabled,
@@ -755,7 +775,7 @@ def delete_agent_task(task_id: int) -> str:
 
 @mcp.tool
 def run_agent_task_now(task_id: int) -> dict | str:
-    """Send an agent task to Discord immediately (same as the Run button in the UI).
+    """Send an agent task immediately (same as the Run button in the UI).
     Fails if the task is disabled, markdown is missing, or the channel is on cooldown."""
     try:
         send_agent_task_message_now(task_id)

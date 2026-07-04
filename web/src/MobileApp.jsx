@@ -8,6 +8,7 @@ import './App.css'
 import { parseDiagramData, EMPTY_DIAGRAM_JSON } from './diagramParse'
 import CategoryTree from './CategoryTree'
 import AgentTasksPanel from './AgentTasksPanel'
+import ChatBackground from './ChatBackground'
 import { sortCategoriesForTree } from './categorySidebarOrder'
 import { formatCategoryHierarchyLabel } from './categoryHierarchy'
 import { MobileCategoryTree } from './SidebarCategoryTree'
@@ -1458,7 +1459,7 @@ function MobileCategories({ categories, universeId, onRefresh }) {
 // ── Main mobile app ───────────────────────────────────
 
 function MobileHelpView({ onClose }) {
-  const [section, setSection] = useState('discord')
+  const [section, setSection] = useState('slack')
   const origin = window.location.origin
 
   return (
@@ -1470,27 +1471,25 @@ function MobileHelpView({ onClose }) {
         <h2>Help &amp; Setup</h2>
       </div>
       <div className="m-help-tabs">
-        <button className={`m-help-tab ${section === 'discord' ? 'active' : ''}`} onClick={() => setSection('discord')}>Discord</button>
+        <button className={`m-help-tab ${section === 'slack' ? 'active' : ''}`} onClick={() => setSection('slack')}>Slack</button>
         <button className={`m-help-tab ${section === 'mcp' ? 'active' : ''}`} onClick={() => setSection('mcp')}>MCP</button>
       </div>
       <div className="m-help-body">
-        {section === 'discord' && (
+        {section === 'slack' && (
           <div className="m-help-section">
-            <h3>Discord Bot Setup</h3>
-            <p>Astro uses a Discord bot for agent communication. Set these environment variables before starting the server.</p>
+            <h3>Slack Bot Setup</h3>
+            <p>Astro uses a Slack bot for agent task delivery. Set these environment variables before starting the server.</p>
             <div className="m-help-details">
-              <div className="m-help-row"><span>DISCORD_BOT_TOKEN</span><code>Bot token from Discord Developer Portal</code></div>
-              <div className="m-help-row"><span>DISCORD_GUILD_ID</span><code>Your Discord server (guild) ID</code></div>
-              <div className="m-help-row"><span>DISCORD_DEFAULT_CHANNEL_ID</span><code>Default text channel ID for agent messages</code></div>
+              <div className="m-help-row"><span>SLACK_BOT_TOKEN</span><code>Bot token (xoxb-…) from your Slack app</code></div>
+              <div className="m-help-row"><span>SLACK_DEFAULT_CHANNEL_ID</span><code>Default channel ID for agent messages</code></div>
             </div>
-            <h4>Getting IDs</h4>
-            <p>Enable Developer Mode in Discord (Settings → Advanced), then right-click your server or channel and choose &quot;Copy ID&quot;.</p>
+            <h4>Getting started</h4>
+            <p>Create a Slack app with bot scopes <code>chat:write</code>, <code>channels:read</code>, and <code>groups:read</code>. Install it to your workspace and invite the bot to target channels.</p>
             <h4>Example (.env)</h4>
             <div className="m-help-code">
               <div className="m-help-code-title">.env</div>
-              <pre>{`DISCORD_BOT_TOKEN=your-bot-token
-DISCORD_GUILD_ID=123456789012345678
-DISCORD_DEFAULT_CHANNEL_ID=123456789012345678`}</pre>
+              <pre>{`SLACK_BOT_TOKEN=xoxb-your-bot-token
+SLACK_DEFAULT_CHANNEL_ID=C0123456789`}</pre>
             </div>
           </div>
         )}
@@ -1617,6 +1616,7 @@ function MobileApp() {
 
       {/* Content area */}
       <div className="m-content">
+        <ChatBackground variant="mobile">
         {view === 'markdowns' && <MobileMarkdowns categories={categories} universeId={currentUniverseId} />}
         {view === 'feeds' && <MobileFeeds categories={categories} universeId={currentUniverseId} />}
         {view === 'tables' && <MobileTables categories={categories} universeId={currentUniverseId} />}
@@ -1631,6 +1631,7 @@ function MobileApp() {
             <AgentTasksPanel universeId={currentUniverseId} mobileReadOnly />
           </div>
         )}
+        </ChatBackground>
       </div>
 
       {/* Bottom tab bar */}

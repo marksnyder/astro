@@ -4877,7 +4877,7 @@
   backdrop-filter: blur(6px);
   padding: 4px 10px;
   border-radius: 6px;
-  z-index: 1;
+  z-index: 5;
   pointer-events: auto;
   transition: background 0.2s, color 0.2s;
 }

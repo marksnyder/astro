@@ -873,6 +873,7 @@ class AgentTaskRequest(BaseModel):
     title: str
     markdown_id: int
     channel: str
+    slack_user_id: str
     universe_id: int = 1
     schedule_mode: str = "manual"  # manual | cron | once
     cron_expr: str = ""
@@ -889,10 +890,20 @@ def _validate_agent_task_markdown(markdown_id: int, universe_id: int) -> None:
 
 
 def _normalize_channel(ch: str) -> str:
-    ch = ch.strip()
-    if not ch.startswith("#"):
-        ch = "#" + ch
-    return ch
+    from src.slack_client import normalize_channel_id
+
+    return normalize_channel_id(ch)
+
+
+def _normalize_slack_user(user_id: str) -> str:
+    from src.slack_client import normalize_user_id
+
+    if not (user_id or "").strip():
+        raise HTTPException(status_code=400, detail="slack_user_id is required")
+    try:
+        return normalize_user_id(user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @app.get("/api/agent-tasks")
@@ -914,13 +925,18 @@ def api_create_agent_task(req: AgentTaskRequest):
     if req.schedule_mode == "once" and not (req.run_at or "").strip():
         raise HTTPException(status_code=400, detail="run_at required for one-time schedule")
     _validate_agent_task_markdown(req.markdown_id, req.universe_id)
-    ch = _normalize_channel(req.channel)
+    try:
+        ch = _normalize_channel(req.channel)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    uid = _normalize_slack_user(req.slack_user_id)
     t = create_agent_task(
         title=req.title,
         markdown_id=req.markdown_id,
         channel=ch,
         universe_id=req.universe_id,
         schedule_mode=req.schedule_mode,
+        slack_user_id=uid,
         cron_expr=(req.cron_expr or "").strip() or None,
         run_at=(req.run_at or "").strip() or None,
         enabled=req.enabled,
@@ -938,7 +954,11 @@ def api_update_agent_task(task_id: int, req: AgentTaskRequest):
     if req.schedule_mode == "once" and not (req.run_at or "").strip():
         raise HTTPException(status_code=400, detail="run_at required for one-time schedule")
     _validate_agent_task_markdown(req.markdown_id, req.universe_id)
-    ch = _normalize_channel(req.channel)
+    try:
+        ch = _normalize_channel(req.channel)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    uid = _normalize_slack_user(req.slack_user_id)
     t = update_agent_task(
         task_id,
         title=req.title,
@@ -946,6 +966,7 @@ def api_update_agent_task(task_id: int, req: AgentTaskRequest):
         channel=ch,
         universe_id=req.universe_id,
         schedule_mode=req.schedule_mode,
+        slack_user_id=uid,
         cron_expr=(req.cron_expr or "").strip() or None,
         run_at=(req.run_at or "").strip() or None,
         enabled=req.enabled,
@@ -995,11 +1016,22 @@ def api_get_setting(key: str):
         from src.agent_task_runner import DEFAULT_AGENT_TASK_TEMPLATE
 
         out["default_value"] = DEFAULT_AGENT_TASK_TEMPLATE
+    if key == "slack_bot_token":
+        stored = out["value"]
+        out["configured"] = bool(stored.strip())
+        out["value"] = ""
     return out
 
 
 @app.put("/api/settings/{key}")
 def api_set_setting(key: str, req: SettingRequest):
+    if key == "slack_bot_token":
+        val = (req.value or "").strip()
+        if val and not val.startswith("xox"):
+            raise HTTPException(
+                status_code=400,
+                detail="Slack bot token should start with xoxb- or xoxp-",
+            )
     set_setting(key, req.value)
     return {"ok": True}
 
@@ -1500,30 +1532,52 @@ def api_serve_feed_file(filename: str):
     return FileResponse(safe)
 
 
-@app.get("/api/discord/status")
-def api_discord_status():
-    from src.discord_client import get_status
+@app.get("/api/agent-tasks/delivery")
+def api_agent_task_delivery():
+    from src.slack_client import get_status
+
+    return {
+        "delivery": "slack",
+        "label": "Slack",
+        "status": get_status(),
+    }
+
+
+@app.get("/api/slack/status")
+def api_slack_status():
+    from src.slack_client import get_status
 
     return get_status()
 
 
-@app.get("/api/discord/channels")
-def api_discord_channels():
-    from src.discord_client import get_status, list_channels
+@app.get("/api/slack/channels")
+def api_slack_channels():
+    from src.slack_client import get_status, list_channels
 
     status = get_status()
     if not status.get("connected"):
         raise HTTPException(
             status_code=503,
-            detail=status.get("error") or "Discord not connected",
-        )
-    if not status.get("guild_id"):
-        raise HTTPException(
-            status_code=400,
-            detail="discord_guild_id not configured",
+            detail=status.get("error") or "Slack not connected",
         )
     try:
         return list_channels()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+
+@app.get("/api/slack/users")
+def api_slack_users():
+    from src.slack_client import get_status, list_users
+
+    status = get_status()
+    if not status.get("connected"):
+        raise HTTPException(
+            status_code=503,
+            detail=status.get("error") or "Slack not connected",
+        )
+    try:
+        return list_users()
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
 

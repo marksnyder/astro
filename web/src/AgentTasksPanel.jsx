@@ -53,6 +53,7 @@ const emptyForm = () => ({
   markdown_universe_id: '',
   selected_md_title: '',
   channel: '',
+  slack_user_id: '',
   schedule_mode: 'manual',
   cron_expr: '',
   run_at_local: '',
@@ -66,6 +67,7 @@ function buildAgentTaskPutBody(t, enabled) {
     title: (t.title || '').trim() || 'Untitled task',
     markdown_id: Number(t.markdown_id),
     channel: t.channel || '',
+    slack_user_id: t.slack_user_id || '',
     universe_id: Number(t.universe_id),
     schedule_mode: mode,
     cron_expr: mode === 'cron' ? (t.cron_expr || '').trim() : '',
@@ -90,24 +92,35 @@ export default function AgentTasksPanel({ universeId, mobileReadOnly = false }) 
   const [mdPickerResults, setMdPickerResults] = useState([])
   const [mdPickerLoading, setMdPickerLoading] = useState(false)
   const [loadError, setLoadError] = useState(null)
-  const [discordChannels, setDiscordChannels] = useState([])
+  const [slackChannels, setSlackChannels] = useState([])
+  const [slackUsers, setSlackUsers] = useState([])
   const [defaultChannelId, setDefaultChannelId] = useState('')
 
   const channelLabel = useCallback((id) => {
     if (!id) return '—'
-    const ch = discordChannels.find((c) => c.id === id)
+    const ch = slackChannels.find((c) => c.id === id)
     return ch ? ch.label : id
-  }, [discordChannels])
+  }, [slackChannels])
+
+  const userLabel = useCallback((id) => {
+    if (!id) return '—'
+    const u = slackUsers.find((x) => x.id === id)
+    return u ? u.label : id
+  }, [slackUsers])
 
   useEffect(() => {
-    fetch('/api/settings/discord_default_channel_id')
+    fetch('/api/settings/slack_default_channel_id')
       .then((r) => r.json())
-      .then((d) => { if (d.value) setDefaultChannelId(d.value) })
+      .then((cfg) => { if (cfg.value) setDefaultChannelId(cfg.value) })
       .catch(() => {})
-    fetch('/api/discord/channels')
+    fetch('/api/slack/channels')
       .then(async (r) => (r.ok ? r.json() : []))
-      .then((list) => setDiscordChannels(Array.isArray(list) ? list : []))
-      .catch(() => setDiscordChannels([]))
+      .then((list) => setSlackChannels(Array.isArray(list) ? list : []))
+      .catch(() => setSlackChannels([]))
+    fetch('/api/slack/users')
+      .then(async (r) => (r.ok ? r.json() : []))
+      .then((list) => setSlackUsers(Array.isArray(list) ? list : []))
+      .catch(() => setSlackUsers([]))
   }, [])
   const loadTasks = useCallback((silent = false) => {
     if (!silent) {
@@ -190,6 +203,7 @@ export default function AgentTasksPanel({ universeId, mobileReadOnly = false }) 
         t.title,
         t.markdown_title,
         t.channel,
+        t.slack_user_id,
         t.cron_expr,
         t.schedule_mode,
         uName,
@@ -220,6 +234,7 @@ export default function AgentTasksPanel({ universeId, mobileReadOnly = false }) 
       markdown_universe_id: String(t.universe_id ?? ''),
       selected_md_title: t.markdown_title || '',
       channel: t.channel || '',
+      slack_user_id: t.slack_user_id || '',
       schedule_mode: t.schedule_mode || 'manual',
       cron_expr: t.cron_expr || '',
       run_at_local: isoToLocalInput(t.run_at),
@@ -262,10 +277,19 @@ export default function AgentTasksPanel({ universeId, mobileReadOnly = false }) 
       setFormError('Search and select a markdown (from any universe).')
       return
     }
+    if (!form.channel?.trim()) {
+      setFormError('Select a Slack channel.')
+      return
+    }
+    if (!form.slack_user_id?.trim()) {
+      setFormError('Select a Slack user to mention.')
+      return
+    }
     const body = {
       title: (form.title || '').trim() || 'Untitled task',
       markdown_id: mid,
       channel: form.channel || '',
+      slack_user_id: form.slack_user_id || '',
       universe_id: taskUniverseId,
       schedule_mode: form.schedule_mode,
       cron_expr: form.schedule_mode === 'cron' ? (form.cron_expr || '').trim() : '',
@@ -395,7 +419,7 @@ export default function AgentTasksPanel({ universeId, mobileReadOnly = false }) 
           placeholder={
             mobileReadOnly
               ? 'Search tasks…'
-              : 'Search by title, markdown, universe, channel, schedule…'
+              : 'Search by title, markdown, universe, channel, mention, schedule…'
           }
         />
       </div>
@@ -417,7 +441,7 @@ export default function AgentTasksPanel({ universeId, mobileReadOnly = false }) 
               : tasks.length === 0
                 ? mobileReadOnly
                   ? 'No tasks yet. Create and edit tasks on the desktop app.'
-                  : 'No tasks yet. Add one to send markdown instructions to Discord.'
+                  : 'No tasks yet. Add one to send markdown instructions to Slack.'
                 : 'No tasks match your search.'}
           </div>
         ) : mobileReadOnly ? (
@@ -460,6 +484,10 @@ export default function AgentTasksPanel({ universeId, mobileReadOnly = false }) 
                       </dd>
                     </div>
                     <div>
+                      <dt>Mention</dt>
+                      <dd>{userLabel(t.slack_user_id)}</dd>
+                    </div>
+                    <div>
                       <dt>Schedule</dt>
                       <dd>{scheduleSummary(t)}</dd>
                     </div>
@@ -492,6 +520,7 @@ export default function AgentTasksPanel({ universeId, mobileReadOnly = false }) 
                 <th>Universe</th>
                 <th>Markdown</th>
                 <th>Channel</th>
+                <th>Mention</th>
                 <th>Schedule</th>
                 <th>Last run</th>
                 <th>Next run</th>
@@ -517,6 +546,7 @@ export default function AgentTasksPanel({ universeId, mobileReadOnly = false }) 
                     {t.markdown_title || `#${t.markdown_id}`}
                   </td>
                   <td><code className="agent-tasks-channel">{channelLabel(t.channel)}</code></td>
+                  <td>{userLabel(t.slack_user_id)}</td>
                   <td className="agent-tasks-col-sched">{scheduleSummary(t)}</td>
                   <td>{fmtTs(t.last_run_at)}</td>
                   <td>{fmtTs(t.next_run_at)}</td>
@@ -527,7 +557,7 @@ export default function AgentTasksPanel({ universeId, mobileReadOnly = false }) 
                       className="agent-tasks-run-btn"
                       disabled={runningId === t.id || !t.enabled}
                       onClick={() => runTask(t.id)}
-                      title="Send to Discord now"
+                      title="Send to Slack now"
                     >
                       {runningId === t.id ? '…' : 'Run'}
                     </button>
@@ -621,15 +651,15 @@ export default function AgentTasksPanel({ universeId, mobileReadOnly = false }) 
                 </div>
               </div>
               <label className="agent-task-label">
-                Discord channel
-                {discordChannels.length > 0 ? (
+                Slack channel
+                {slackChannels.length > 0 ? (
                   <select
                     className="prompt-form-input"
                     value={form.channel}
                     onChange={(e) => setForm((f) => ({ ...f, channel: e.target.value }))}
                   >
                     <option value="">Select a channel…</option>
-                    {discordChannels.map((ch) => (
+                    {slackChannels.map((ch) => (
                       <option key={ch.id} value={ch.id}>{ch.label}</option>
                     ))}
                   </select>
@@ -638,12 +668,39 @@ export default function AgentTasksPanel({ universeId, mobileReadOnly = false }) 
                     className="prompt-form-input"
                     value={form.channel}
                     onChange={(e) => setForm((f) => ({ ...f, channel: e.target.value }))}
-                    placeholder="Discord channel ID"
+                    placeholder="Slack channel ID"
                   />
                 )}
-                {discordChannels.length === 0 && (
+                {slackChannels.length === 0 && (
                   <span className="agent-task-cron-hint">
-                    Configure Discord in Settings, or paste a channel ID (Developer Mode → Copy Channel ID).
+                    Configure Slack in Settings, or paste a channel ID (open channel → copy channel ID).
+                  </span>
+                )}
+              </label>
+              <label className="agent-task-label">
+                Mention user
+                {slackUsers.length > 0 ? (
+                  <select
+                    className="prompt-form-input"
+                    value={form.slack_user_id}
+                    onChange={(e) => setForm((f) => ({ ...f, slack_user_id: e.target.value }))}
+                  >
+                    <option value="">Select a user…</option>
+                    {slackUsers.map((u) => (
+                      <option key={u.id} value={u.id}>{u.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    className="prompt-form-input"
+                    value={form.slack_user_id}
+                    onChange={(e) => setForm((f) => ({ ...f, slack_user_id: e.target.value }))}
+                    placeholder="Slack user ID (U…)"
+                  />
+                )}
+                {slackUsers.length === 0 && (
+                  <span className="agent-task-cron-hint">
+                    Configure Slack in Settings so users can be listed, or paste a user ID (profile → copy member ID).
                   </span>
                 )}
               </label>

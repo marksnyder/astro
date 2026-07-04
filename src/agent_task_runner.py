@@ -1,4 +1,4 @@
-"""Background runner for Agent Tasks: sends markdown instructions to Discord."""
+"""Background runner for Agent Tasks: sends markdown instructions to Slack."""
 
 import threading
 import time
@@ -55,8 +55,8 @@ def build_agent_task_message(markdown_id: int, markdown_title: str, markdown_bod
         raise ValueError(f"Invalid placeholder in agent task template: {e}") from e
 
 
-def _lines_for_discord(text: str) -> list[str]:
-    """Split body into message lines (Discord handles long lines via chunking)."""
+def _lines_for_delivery(text: str) -> list[str]:
+    """Split body into message lines (delivery clients handle long lines via chunking)."""
     raw = text.replace("\r\n", "\n").replace("\r", "\n")
     out: list[str] = []
     for line in raw.split("\n"):
@@ -190,8 +190,8 @@ class AgentTaskRunner:
 
 
 def run_agent_task(task_id: int) -> None:
-    """Load task + markdown, build message, send via Discord, record run."""
-    from src.discord_client import send_messages
+    """Load task + markdown, build message, send via configured delivery provider, record run."""
+    from src.slack_client import send_messages
 
     task = get_agent_task(task_id)
     if not task:
@@ -201,13 +201,15 @@ def run_agent_task(task_id: int) -> None:
     md = get_markdown(task.markdown_id)
     if not md:
         raise ValueError("Markdown not found")
+    if not (task.slack_user_id or "").strip():
+        raise ValueError("Task has no Slack user to mention")
     text = build_agent_task_message(md.id or 0, md.title, md.body)
-    parts = _lines_for_discord(text)
+    parts = _lines_for_delivery(text)
     runner = AgentTaskRunner.get()
     rem = runner._channel_cooldown_remaining(task.channel)
     if rem > 0:
         raise ChannelCooldownError(task.channel, rem)
-    send_messages(task.channel, parts)
+    send_messages(task.channel, parts, mention_user_id=task.slack_user_id)
     runner._record_channel_send(task.channel)
     mark_agent_task_run(task_id)
 

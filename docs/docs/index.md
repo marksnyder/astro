@@ -12,8 +12,8 @@ Astro is a **self hosted platform for building applications on top of AI**: agen
 
 ## Browse by topic
 
-- [Discord Integration](/docs/agent-network/) — Discord bot for agent coordination
-- [Agent Tasks](/docs/agent-tasks/) — scheduled Discord delivery from markdown
+- [Slack Integration](/docs/agent-network/) — Slack bot for agent coordination
+- [Agent Tasks](/docs/agent-tasks/) — scheduled Slack delivery from markdown
 - [Vector search & stats](/docs/vector-search/) — semantic search and index maintenance
 - [Markdowns](/docs/markdowns/)
 - [Document archive](/docs/documents/)

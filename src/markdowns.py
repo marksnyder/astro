@@ -1790,7 +1790,7 @@ def table_row_to_dict(r: TableRow) -> dict:
     return asdict(r)
 
 
-# ── Agent Tasks (Discord delivery of markdown instructions) ─────────────────
+# ── Agent Tasks (Slack delivery of markdown instructions) ─────────────────
 
 
 @dataclass
@@ -1799,6 +1799,7 @@ class AgentTask:
     title: str
     markdown_id: int
     channel: str
+    slack_user_id: str
     universe_id: int
     schedule_mode: str  # manual | cron | once
     cron_expr: str | None
@@ -1810,11 +1811,14 @@ class AgentTask:
 
 
 def _row_to_agent_task(row: sqlite3.Row) -> AgentTask:
+    keys = row.keys()
+    slack_user_id = row["slack_user_id"] if "slack_user_id" in keys else ""
     return AgentTask(
         id=row["id"],
         title=row["title"],
         markdown_id=row["markdown_id"],
         channel=row["channel"],
+        slack_user_id=slack_user_id or "",
         universe_id=row["universe_id"],
         schedule_mode=row["schedule_mode"],
         cron_expr=row["cron_expr"],
@@ -1892,6 +1896,7 @@ def create_agent_task(
     channel: str,
     universe_id: int,
     schedule_mode: str,
+    slack_user_id: str = "",
     cron_expr: str | None = None,
     run_at: str | None = None,
     enabled: bool = True,
@@ -1901,14 +1906,15 @@ def create_agent_task(
     cur = conn.execute(
         """
         INSERT INTO agent_tasks (
-            title, markdown_id, channel, universe_id, schedule_mode, cron_expr, run_at,
+            title, markdown_id, channel, slack_user_id, universe_id, schedule_mode, cron_expr, run_at,
             enabled, last_run_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
         """,
         (
             title.strip(),
             markdown_id,
             channel.strip(),
+            slack_user_id.strip(),
             universe_id,
             schedule_mode,
             (cron_expr or "").strip() or None,
@@ -1931,6 +1937,7 @@ def update_agent_task(
     channel: str,
     universe_id: int,
     schedule_mode: str,
+    slack_user_id: str = "",
     cron_expr: str | None = None,
     run_at: str | None = None,
     enabled: bool = True,
@@ -1940,7 +1947,7 @@ def update_agent_task(
     cur = conn.execute(
         """
         UPDATE agent_tasks SET
-            title = ?, markdown_id = ?, channel = ?, universe_id = ?,
+            title = ?, markdown_id = ?, channel = ?, slack_user_id = ?, universe_id = ?,
             schedule_mode = ?, cron_expr = ?, run_at = ?, enabled = ?, updated_at = ?
         WHERE id = ?
         """,
@@ -1948,6 +1955,7 @@ def update_agent_task(
             title.strip(),
             markdown_id,
             channel.strip(),
+            slack_user_id.strip(),
             universe_id,
             schedule_mode,
             (cron_expr or "").strip() or None,

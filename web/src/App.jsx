@@ -8,6 +8,7 @@ import DiagramsPanel, { DiagramEditorView } from './DiagramsPanel'
 import TablesPanel, { TableEditorView } from './TablesPanel'
 import AgentTasksPanel from './AgentTasksPanel'
 import CategoryTree, { EmojiPopover } from './CategoryTree'
+import ChatBackground from './ChatBackground'
 import { DEFAULT_AGENT_TASK_MESSAGE_TEMPLATE } from './agentTaskDefaults'
 
 const _originalFetch = window.fetch
@@ -636,37 +637,45 @@ function UniverseManager({ universes, currentId, onSwitch, onClose, onRefresh })
 }
 
 function HelpDialog({ onClose }) {
-  const [section, setSection] = useState('discord')
+  const [section, setSection] = useState('slack')
   const origin = window.location.origin
 
   return (
     <div className="br-modal" onClick={onClose}>
       <div className="help-modal-content" onClick={e => e.stopPropagation()}>
         <h2>Help &amp; Integration Guide</h2>
-        <p className="br-subtitle">Connect AI agents to Astro via Discord and MCP.</p>
+        <p className="br-subtitle">Connect AI agents to Astro via Slack and MCP.</p>
 
         <div className="help-tabs">
-          <button className={`help-tab ${section === 'discord' ? 'active' : ''}`} onClick={() => setSection('discord')}>Discord</button>
+          <button className={`help-tab ${section === 'slack' ? 'active' : ''}`} onClick={() => setSection('slack')}>Slack</button>
           <button className={`help-tab ${section === 'mcp' ? 'active' : ''}`} onClick={() => setSection('mcp')}>MCP Integration</button>
         </div>
 
         <div className="help-body">
-          {section === 'discord' && (
+          {section === 'slack' && (
             <div className="help-section">
-              <h3>Agent tasks via Discord</h3>
+              <h3>Agent tasks via Slack</h3>
               <p>
-                Astro sends agent task instructions to Discord channels. Configure a Discord bot and guild in Settings
+                Astro sends agent task instructions to Slack channels. Configure a Slack bot in Settings
                 or with environment variables on the server.
+              </p>
+              <h4>Settings UI</h4>
+              <p>
+                Open <strong>Settings → Agent tasks (Slack)</strong> to set the bot token and default channel ID.
+                Environment variables override UI values when both are set.
               </p>
               <h4>Environment variables</h4>
               <div className="help-details">
-                <div className="help-detail-row"><span className="help-label">DISCORD_BOT_TOKEN</span><code>Bot token from the Discord Developer Portal</code></div>
-                <div className="help-detail-row"><span className="help-label">DISCORD_GUILD_ID</span><code>Numeric ID of your Discord server (Developer Mode → Copy Server ID)</code></div>
-                <div className="help-detail-row"><span className="help-label">DISCORD_DEFAULT_CHANNEL_ID</span><code>Default channel for tasks (Developer Mode → Copy Channel ID)</code></div>
+                <div className="help-detail-row"><span className="help-label">SLACK_BOT_TOKEN</span><code>Bot token (xoxb-…) from your Slack app</code></div>
+                <div className="help-detail-row"><span className="help-label">SLACK_DEFAULT_CHANNEL_ID</span><code>Default channel for tasks (open channel → copy channel ID)</code></div>
               </div>
               <p>
+                Required bot scopes: <code>chat:write</code>, <code>channels:read</code>, <code>groups:read</code>, and <code>users:read</code>.
+                Invite the bot to channels you want to use for agent tasks.
+              </p>
+              <p>
                 Create tasks in the Agent Tasks tab; when you run or schedule them, Astro posts formatted markdown
-                instructions to the selected Discord channel. Agents can read those messages and use MCP tools to
+                instructions to the selected Slack channel. Agents can read those messages and use MCP tools to
                 work with your knowledge base.
               </p>
             </div>
@@ -790,9 +799,11 @@ function SettingsDialog({ onClose }) {
   const [agentTaskTemplate, setAgentTaskTemplate] = useState(DEFAULT_AGENT_TASK_MESSAGE_TEMPLATE)
   const [defaultAgentTaskTemplate, setDefaultAgentTaskTemplate] = useState(DEFAULT_AGENT_TASK_MESSAGE_TEMPLATE)
   const [agentTaskBaseUrl, setAgentTaskBaseUrl] = useState('')
-  const [discordGuildId, setDiscordGuildId] = useState('')
-  const [discordDefaultChannelId, setDiscordDefaultChannelId] = useState('')
-  const [discordStatus, setDiscordStatus] = useState(null)
+  const [slackBotToken, setSlackBotToken] = useState('')
+  const [slackBotTokenConfigured, setSlackBotTokenConfigured] = useState(false)
+  const [showSlackBotToken, setShowSlackBotToken] = useState(false)
+  const [slackDefaultChannelId, setSlackDefaultChannelId] = useState('')
+  const [slackStatus, setSlackStatus] = useState(null)
   const [agentTaskSettingsLoading, setAgentTaskSettingsLoading] = useState(true)
   const [agentTaskSaving, setAgentTaskSaving] = useState(false)
 
@@ -802,20 +813,21 @@ function SettingsDialog({ onClose }) {
     Promise.all([
       fetch('/api/settings/agent_task_message_template').then((r) => r.json()),
       fetch('/api/settings/agent_task_base_url').then((r) => r.json()),
-      fetch('/api/settings/discord_guild_id').then((r) => r.json()),
-      fetch('/api/settings/discord_default_channel_id').then((r) => r.json()),
-      fetch('/api/discord/status').then((r) => r.json()),
+      fetch('/api/settings/slack_bot_token').then((r) => r.json()),
+      fetch('/api/settings/slack_default_channel_id').then((r) => r.json()),
+      fetch('/api/slack/status').then((r) => r.json()),
     ])
-      .then(([t, b, g, c, ds]) => {
+      .then(([t, b, tok, sc, ss]) => {
         if (cancelled) return
         const def = (t && t.default_value) || DEFAULT_AGENT_TASK_MESSAGE_TEMPLATE
         setDefaultAgentTaskTemplate(def)
         const stored = (t && t.value) || ''
         setAgentTaskTemplate(stored.trim() ? stored : def)
         setAgentTaskBaseUrl((b && b.value) || '')
-        setDiscordGuildId((g && g.value) || '')
-        setDiscordDefaultChannelId((c && c.value) || '')
-        setDiscordStatus(ds || null)
+        setSlackBotToken('')
+        setSlackBotTokenConfigured(Boolean(tok && tok.configured))
+        setSlackDefaultChannelId((sc && sc.value) || '')
+        setSlackStatus(ss || null)
       })
       .catch(() => {})
       .finally(() => {
@@ -843,13 +855,37 @@ function SettingsDialog({ onClose }) {
     }
   }
 
+  const clearSlackBotToken = async () => {
+    if (!confirm('Remove the saved Slack bot token? Agent tasks will stop sending until you set a token again.')) return
+    setAgentTaskSaving(true)
+    setStatus(null)
+    try {
+      const r = await fetch('/api/settings/slack_bot_token', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: '' }),
+      })
+      if (!r.ok) throw new Error('Failed to remove Slack token')
+      setSlackBotToken('')
+      setSlackBotTokenConfigured(false)
+      setShowSlackBotToken(false)
+      const ss = await fetch('/api/slack/status').then((res) => res.json()).catch(() => null)
+      if (ss) setSlackStatus(ss)
+      setStatus({ type: 'success', text: 'Slack bot token removed.' })
+    } catch (e) {
+      setStatus({ type: 'error', text: e.message || 'Failed to remove Slack token' })
+    } finally {
+      setAgentTaskSaving(false)
+    }
+  }
+
   const saveAgentTaskSettings = async () => {
     setAgentTaskSaving(true)
     setStatus(null)
     try {
       const templateToStore =
         agentTaskTemplate === defaultAgentTaskTemplate ? '' : agentTaskTemplate
-      const [r1, r2, r3, r4] = await Promise.all([
+      const saves = [
         fetch('/api/settings/agent_task_message_template', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -860,21 +896,32 @@ function SettingsDialog({ onClose }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ value: agentTaskBaseUrl }),
         }),
-        fetch('/api/settings/discord_guild_id', {
+        fetch('/api/settings/slack_default_channel_id', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ value: discordGuildId }),
+          body: JSON.stringify({ value: slackDefaultChannelId }),
         }),
-        fetch('/api/settings/discord_default_channel_id', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ value: discordDefaultChannelId }),
-        }),
-      ])
-      if (!r1.ok || !r2.ok || !r3.ok || !r4.ok) throw new Error('Failed to save')
-      const ds = await fetch('/api/discord/status').then((r) => r.json()).catch(() => null)
-      if (ds) setDiscordStatus(ds)
-      setStatus({ type: 'success', text: 'Agent task Discord settings saved.' })
+      ]
+      const tokenTrimmed = slackBotToken.trim()
+      if (tokenTrimmed) {
+        saves.push(
+          fetch('/api/settings/slack_bot_token', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value: tokenTrimmed }),
+          }),
+        )
+      }
+      const results = await Promise.all(saves)
+      if (results.some((r) => !r.ok)) throw new Error('Failed to save')
+      if (tokenTrimmed) {
+        setSlackBotToken('')
+        setSlackBotTokenConfigured(true)
+        setShowSlackBotToken(false)
+      }
+      const ss = await fetch('/api/slack/status').then((r) => r.json()).catch(() => null)
+      if (ss) setSlackStatus(ss)
+      setStatus({ type: 'success', text: 'Agent task settings saved.' })
     } catch (e) {
       setStatus({ type: 'error', text: e.message || 'Failed to save agent task settings' })
     } finally {
@@ -928,9 +975,9 @@ function SettingsDialog({ onClose }) {
         <div className="br-divider" />
 
         <div className="br-section">
-          <h3>Agent tasks (Discord)</h3>
+          <h3>Agent tasks (Slack)</h3>
           <p>
-            Message template for tasks posted to Discord channels.
+            Message template for tasks posted to Slack channels.
             Placeholders: <code>{'{markdown_id}'}</code>, <code>{'{markdown_title}'}</code>, <code>{'{markdown_body}'}</code>, <code>{'{read_url}'}</code> (same as <code>{'{markdown_read_url}'}</code>).
           </p>
           {agentTaskSettingsLoading ? (
@@ -962,27 +1009,54 @@ function SettingsDialog({ onClose }) {
                 onChange={(e) => setAgentTaskBaseUrl(e.target.value)}
                 placeholder="http://127.0.0.1:8000"
               />
-              <label className="agent-task-settings-label">Discord guild ID</label>
+              <p style={{ marginBottom: 12, fontSize: '0.88rem', color: 'var(--text-muted, #888)' }}>
+                Configure Slack here or with <code>SLACK_BOT_TOKEN</code> / <code>SLACK_DEFAULT_CHANNEL_ID</code> environment variables (env vars take precedence).
+              </p>
+              <label className="agent-task-settings-label">Slack bot token</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <input
+                  className="prompt-form-input"
+                  style={{ flex: 1, marginBottom: 0 }}
+                  type={showSlackBotToken ? 'text' : 'password'}
+                  value={slackBotToken}
+                  onChange={(e) => setSlackBotToken(e.target.value)}
+                  placeholder={slackBotTokenConfigured ? 'Token saved — enter a new token to replace' : 'xoxb-…'}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <button
+                  type="button"
+                  className="irc-channel-btn"
+                  onClick={() => setShowSlackBotToken((v) => !v)}
+                  title={showSlackBotToken ? 'Hide token' : 'Show token'}
+                >
+                  {showSlackBotToken ? '🙈' : '👁️'}
+                </button>
+              </div>
+              {slackBotTokenConfigured && (
+                <button
+                  type="button"
+                  className="br-action-btn"
+                  style={{ marginBottom: 12, background: '#e53e3e22', color: '#e53e3e' }}
+                  onClick={clearSlackBotToken}
+                  disabled={agentTaskSaving}
+                >
+                  Remove saved token
+                </button>
+              )}
+              <label className="agent-task-settings-label">Default Slack channel ID</label>
               <input
                 className="prompt-form-input"
                 style={{ width: '100%', marginBottom: 12 }}
-                value={discordGuildId}
-                onChange={(e) => setDiscordGuildId(e.target.value)}
-                placeholder="Server ID (or set DISCORD_GUILD_ID)"
+                value={slackDefaultChannelId}
+                onChange={(e) => setSlackDefaultChannelId(e.target.value)}
+                placeholder="Channel ID (e.g. C0123456789)"
               />
-              <label className="agent-task-settings-label">Default Discord channel ID</label>
-              <input
-                className="prompt-form-input"
-                style={{ width: '100%', marginBottom: 12 }}
-                value={discordDefaultChannelId}
-                onChange={(e) => setDiscordDefaultChannelId(e.target.value)}
-                placeholder="Channel ID (or set DISCORD_DEFAULT_CHANNEL_ID)"
-              />
-              {discordStatus && (
-                <div className={`br-status ${discordStatus.connected ? 'success' : discordStatus.configured ? 'error' : 'info'}`} style={{ marginBottom: 12 }}>
-                  {discordStatus.connected
-                    ? `Discord connected as ${discordStatus.username || 'bot'}`
-                    : discordStatus.error || 'Discord not configured'}
+              {slackStatus && (
+                <div className={`br-status ${slackStatus.connected ? 'success' : slackStatus.configured ? 'error' : 'info'}`} style={{ marginBottom: 12 }}>
+                  {slackStatus.connected
+                    ? `Slack connected as ${slackStatus.username || 'bot'}${slackStatus.team ? ` (${slackStatus.team})` : ''}`
+                    : slackStatus.error || 'Slack not configured — add a bot token above or set SLACK_BOT_TOKEN'}
                 </div>
               )}
               <button className="br-action-btn" type="button" onClick={saveAgentTaskSettings} disabled={agentTaskSaving}>
@@ -1646,6 +1720,7 @@ function App() {
       </header>
 
       <div className="app-body">
+        <ChatBackground />
         <div className="sidebar" style={{ width: sidebarWidth, minWidth: sidebarWidth }}>
           <div className="sidebar-rail">
             <button className={`rail-tab ${sidebarTab === 'markdowns' ? 'active' : ''}`} onClick={() => setSidebarTab('markdowns')} title="Markdowns">

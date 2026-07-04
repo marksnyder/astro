@@ -185,14 +185,11 @@ if [ "$USE_TAILSCALE" = "yes" ]; then
     )
 fi
 
-if [ -n "${DISCORD_BOT_TOKEN:-}" ]; then
-    DOCKER_ARGS+=(-e "DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}")
+if [ -n "${SLACK_BOT_TOKEN:-}" ]; then
+    DOCKER_ARGS+=(-e "SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}")
 fi
-if [ -n "${DISCORD_GUILD_ID:-}" ]; then
-    DOCKER_ARGS+=(-e "DISCORD_GUILD_ID=${DISCORD_GUILD_ID}")
-fi
-if [ -n "${DISCORD_DEFAULT_CHANNEL_ID:-}" ]; then
-    DOCKER_ARGS+=(-e "DISCORD_DEFAULT_CHANNEL_ID=${DISCORD_DEFAULT_CHANNEL_ID}")
+if [ -n "${SLACK_DEFAULT_CHANNEL_ID:-}" ]; then
+    DOCKER_ARGS+=(-e "SLACK_DEFAULT_CHANNEL_ID=${SLACK_DEFAULT_CHANNEL_ID}")
 fi
 
 echo "==> Starting Astro..."
@@ -204,7 +201,7 @@ echo "  Astro is running!"
 echo "============================================"
 echo ""
 echo "  URL:        http://localhost:${PORT}"
-echo "  Discord:    set DISCORD_BOT_TOKEN (and optional DISCORD_GUILD_ID)"
+echo "  Slack:      set SLACK_BOT_TOKEN (and optional SLACK_DEFAULT_CHANNEL_ID)"
 echo "  Data dir:   ${ASTRO_DATA_DIR}"
 echo "  Container:  ${CONTAINER_NAME}"
 echo ""

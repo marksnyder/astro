@@ -1,4 +1,4 @@
-"""Remove IRC history tables (replaced by Discord integration)."""
+"""Remove IRC history tables (replaced by Slack integration)."""
 
 import sqlite3
 

@@ -1,24 +1,25 @@
 ---
 layout: docs
 title: Agent Tasks
-subtitle: Send markdown instructions to Discord on a schedule or on demand
+subtitle: Send markdown instructions to Slack on a schedule or on demand
 nav_id: agent-tasks
 permalink: /docs/agent-tasks/
 ---
 
-Agent Tasks turn markdown notes into **instructions you can push to Discord on a schedule or on demand**. Use them when an external agent (or a human in Discord) should receive a consistent prompt that references content stored in Astro.
+Agent Tasks turn markdown notes into **instructions you can push to Slack on a schedule or on demand**. Use them when an external agent (or a human in Slack) should receive a consistent prompt that references content stored in Astro.
 
 ### What you configure
 
 - **Markdown**: Pick any note in any universe (search by title or body). The task is stored under that note’s universe.
-- **Channel**: Discord channel ID where the message is sent.
+- **Channel**: Slack channel ID where the message is sent.
+- **Mention**: Slack user ID (`U…`) who is @mentioned at the start of the task message.
 - **Schedule**: Run only when you click **Run**, on a **cron** expression, or **once** at a future date and time. Tasks can be disabled without deleting them.
 
 ### How delivery works
 
-A background runner sends the rendered message to the target Discord channel via the configured bot. The **message body** comes from a **template** in Settings (`agent_task_message_template`). The default template tells the recipient how to retrieve the full markdown via your Astro HTTP API (including `markdown_id` and a read URL). Optional **`agent_task_base_url`** adjusts links for reverse proxies or Tailscale.
+A background runner sends the rendered message to the target Slack channel via the configured bot. The **message body** comes from a **template** in Settings (`agent_task_message_template`). The default template tells the recipient how to retrieve the full markdown via your Astro HTTP API (including `markdown_id` and a read URL). Optional **`agent_task_base_url`** adjusts links for reverse proxies or Tailscale.
 
-Configure Discord first — see [Discord Integration](/docs/agent-network/).
+Configure Slack first — see [Slack Integration](/docs/agent-network/).
 
 ### In the app
 
@@ -51,6 +52,6 @@ These tools manage tasks from any MCP client. They mirror the HTTP API: the mark
 | `write_agent_task` | Create a task (title, markdown, channel, schedule, and so on) |
 | `update_agent_task` | Replace an existing task |
 | `delete_agent_task` | Delete a task |
-| `run_agent_task_now` | Send a task to Discord immediately (respects enable flag and channel cooldown) |
+| `run_agent_task_now` | Send a task to Slack immediately (respects enable flag and channel cooldown) |
 
-Recipients in Discord follow the message template; they often call **`read_markdown`** (see [Markdowns](/docs/markdowns/)) using the `markdown_id` from the rendered message. Configure the template so agents know how to fetch the full note.
+Recipients in Slack follow the message template; they often call **`read_markdown`** (see [Markdowns](/docs/markdowns/)) using the `markdown_id` from the rendered message. Configure the template so agents know how to fetch the full note.
