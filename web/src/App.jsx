@@ -23,6 +23,59 @@ window.fetch = function(url, opts = {}) {
 
 const LOGO_URL = '/logo.png'
 
+const LARGE_BACKUP_BYTES = 200 * 1024 * 1024
+
+function formatSize(bytes) {
+  if (bytes == null || Number.isNaN(bytes)) return '—'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
+function apiAuthHeaders() {
+  const key = localStorage.getItem('astro_api_key')
+  return key ? { 'x-api-key': key } : {}
+}
+
+function backupDownloadUrl() {
+  const key = localStorage.getItem('astro_api_key')
+  return key ? `/api/backup?api_key=${encodeURIComponent(key)}` : '/api/backup'
+}
+
+function BackupOperationProgress({ op }) {
+  if (!op) return null
+  const pct = op.progress
+  const showBar = pct != null
+  const detail = op.total
+    ? `${formatSize(op.loaded || 0)} / ${formatSize(op.total)}`
+    : op.loaded
+      ? formatSize(op.loaded)
+      : null
+  return (
+    <div className="br-operation-progress">
+      <div className="br-operation-message">{op.message}</div>
+      {showBar && (
+        <div className="br-progress-track" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+          <div className="br-progress-fill" style={{ width: `${pct}%` }} />
+        </div>
+      )}
+      {!showBar && (
+        <div className="br-progress-track br-progress-indeterminate" aria-busy="true">
+          <div className="br-progress-fill" />
+        </div>
+      )}
+      {(detail || pct != null) && (
+        <div className="br-operation-detail">
+          {pct != null ? `${pct}%` : null}
+          {pct != null && detail ? ' · ' : null}
+          {detail}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function AstroLogo({ className }) {
   return <img src={LOGO_URL} alt="Astro" className={`astro-logo ${className || ''}`} />
 }
@@ -794,10 +847,16 @@ function ApiKeyManager() {
   )
 }
 
-function SettingsDialog({ onClose }) {
+function SettingsDialog({ onClose, onRestored }) {
   const [tab, setTab] = useState('general')
   const [status, setStatus] = useState(null) // { type: 'success'|'error'|'info', text: string }
+  const [busy, setBusy] = useState(false)
+  const [operation, setOperation] = useState(null)
+  const [selectedFile, setSelectedFile] = useState(null)
   const [reindexing, setReindexing] = useState(false)
+  const [backupInfo, setBackupInfo] = useState(null)
+  const [backupInfoLoading, setBackupInfoLoading] = useState(false)
+  const restoreInputRef = useRef(null)
   const [agentTaskTemplate, setAgentTaskTemplate] = useState(DEFAULT_AGENT_TASK_MESSAGE_TEMPLATE)
   const [defaultAgentTaskTemplate, setDefaultAgentTaskTemplate] = useState(DEFAULT_AGENT_TASK_MESSAGE_TEMPLATE)
   const [agentTaskBaseUrl, setAgentTaskBaseUrl] = useState('')
@@ -837,6 +896,277 @@ function SettingsDialog({ onClose }) {
       })
     return () => { cancelled = true }
   }, [])
+
+  useEffect(() => {
+    if (tab !== 'general') return
+    let cancelled = false
+    setBackupInfoLoading(true)
+    fetch('/api/backup/info')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (!cancelled) setBackupInfo(data) })
+      .catch(() => { if (!cancelled) setBackupInfo(null) })
+      .finally(() => { if (!cancelled) setBackupInfoLoading(false) })
+    return () => { cancelled = true }
+  }, [tab])
+
+  const operationActive = busy || reindexing
+
+  const handleClose = () => {
+    if (operationActive) {
+      if (!confirm('A backup or restore operation is still running. Close settings anyway?')) return
+    }
+    onClose()
+  }
+
+  const handleBackupNativeDownload = () => {
+    setBusy(true)
+    setStatus(null)
+    setOperation({
+      phase: 'preparing',
+      progress: null,
+      message: 'Building backup on the server. Your browser will download the file when it is ready — this may take several minutes for large libraries.',
+    })
+    const iframe = document.createElement('iframe')
+    iframe.style.display = 'none'
+    iframe.src = backupDownloadUrl()
+    document.body.appendChild(iframe)
+    window.setTimeout(() => iframe.remove(), 120000)
+    setStatus({
+      type: 'info',
+      text: 'Backup download started. Check your downloads folder — large backups can take a while to build and transfer.',
+    })
+    setOperation(null)
+    setBusy(false)
+  }
+
+  const handleBackup = async () => {
+    const est = backupInfo?.total_bytes ?? 0
+    const useNative = est >= LARGE_BACKUP_BYTES && !('showSaveFilePicker' in window)
+    if (useNative) {
+      if (!confirm(`Estimated backup size is about ${formatSize(est)}. Your browser will download the file directly, which works best for large backups. Continue?`)) return
+      handleBackupNativeDownload()
+      return
+    }
+
+    setBusy(true)
+    setStatus(null)
+    setOperation({
+      phase: 'preparing',
+      progress: null,
+      message: est > 0
+        ? `Building backup archive (about ${formatSize(est)} of data). This may take several minutes…`
+        : 'Building backup archive…',
+    })
+
+    const filename = `astro-backup-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.zip`
+    let writable = null
+
+    if ('showSaveFilePicker' in window) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: filename,
+          types: [{ accept: { 'application/zip': ['.zip'] } }],
+        })
+        writable = await handle.createWritable()
+      } catch (e) {
+        if (e?.name === 'AbortError') {
+          setBusy(false)
+          setOperation(null)
+          return
+        }
+      }
+    }
+
+    try {
+      const res = await fetch('/api/backup', { headers: apiAuthHeaders() })
+      if (!res.ok) throw new Error('Backup failed')
+
+      const total = Number(res.headers.get('Content-Length')) || null
+      if (!res.body) throw new Error('Backup download unavailable in this browser')
+
+      const reader = res.body.getReader()
+      let loaded = 0
+      let started = false
+      const chunks = []
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        if (!started) {
+          started = true
+          setOperation({
+            phase: 'downloading',
+            progress: total ? 0 : null,
+            loaded: 0,
+            total,
+            message: 'Downloading backup…',
+          })
+        }
+        loaded += value.length
+        if (writable) {
+          await writable.write(value)
+        } else {
+          chunks.push(value)
+        }
+        setOperation((op) => ({
+          ...op,
+          phase: 'downloading',
+          loaded,
+          total: total || op?.total,
+          progress: total ? Math.min(100, Math.round((loaded / total) * 100)) : null,
+          message: total ? 'Downloading backup…' : `Downloaded ${formatSize(loaded)}…`,
+        }))
+      }
+
+      if (writable) {
+        await writable.close()
+      } else {
+        const blob = new Blob(chunks, { type: 'application/zip' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        URL.revokeObjectURL(url)
+      }
+
+      setStatus({ type: 'success', text: `Backup saved (${formatSize(loaded)}).` })
+    } catch (e) {
+      if (writable) {
+        try { await writable.abort() } catch { /* ignore */ }
+      }
+      setStatus({ type: 'error', text: `Backup failed: ${e.message}` })
+    } finally {
+      setBusy(false)
+      setOperation(null)
+    }
+  }
+
+  const restoreBackupFile = (file, onProgress) => new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', '/api/restore')
+    const key = localStorage.getItem('astro_api_key')
+    if (key) xhr.setRequestHeader('x-api-key', key)
+
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable) {
+        onProgress({
+          phase: 'upload',
+          progress: Math.min(100, Math.round((e.loaded / e.total) * 100)),
+          loaded: e.loaded,
+          total: e.total,
+          message: `Uploading backup (${formatSize(e.loaded)} / ${formatSize(e.total)})…`,
+        })
+      } else {
+        onProgress({
+          phase: 'upload',
+          progress: null,
+          loaded: e.loaded,
+          total: null,
+          message: `Uploading backup (${formatSize(e.loaded)} sent)…`,
+        })
+      }
+    })
+
+    xhr.upload.addEventListener('load', () => {
+      onProgress({
+        phase: 'processing',
+        progress: null,
+        message: 'Extracting and restoring data on the server. This may take several minutes for large backups…',
+      })
+    })
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText))
+        } catch {
+          reject(new Error('Restore failed: invalid server response'))
+        }
+        return
+      }
+      try {
+        const err = JSON.parse(xhr.responseText)
+        reject(new Error(err.detail || 'Restore failed'))
+      } catch {
+        reject(new Error(`Restore failed (${xhr.status})`))
+      }
+    })
+
+    xhr.addEventListener('error', () => reject(new Error('Network error during restore upload')))
+    xhr.addEventListener('timeout', () => reject(new Error('Restore timed out — try again or use a smaller backup')))
+    xhr.timeout = 0
+
+    const form = new FormData()
+    form.append('file', file)
+    xhr.send(form)
+  })
+
+  const handleRestore = async () => {
+    if (!selectedFile) return
+    const sizeLabel = formatSize(selectedFile.size)
+    if (!confirm(`This will replace ALL current data (markdowns, documents, links, settings, etc.) with the ${sizeLabel} backup. This cannot be undone. Continue?`)) return
+
+    setBusy(true)
+    setStatus(null)
+    setOperation({
+      phase: 'upload',
+      progress: selectedFile.size ? 0 : null,
+      loaded: 0,
+      total: selectedFile.size || null,
+      message: `Uploading backup (${sizeLabel})…`,
+    })
+
+    try {
+      const data = await restoreBackupFile(selectedFile, setOperation)
+      const r = data.restored
+      setStatus({
+        type: 'success',
+        text: `Restore complete! DB: ${r.db ? 'yes' : 'no'}, Images: ${r.images}, Documents: ${r.documents}, Feed files: ${r.feed_files ?? 0}, Vector store: ${r.chroma ? 'yes' : 'no (use Rebuild Index)'}.`,
+      })
+      setSelectedFile(null)
+      if (restoreInputRef.current) restoreInputRef.current.value = ''
+      onRestored?.()
+      fetch('/api/backup/info')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((info) => { if (info) setBackupInfo(info) })
+        .catch(() => {})
+    } catch (e) {
+      setStatus({ type: 'error', text: `Restore failed: ${e.message}` })
+    } finally {
+      setBusy(false)
+      setOperation(null)
+    }
+  }
+
+  const handleReindex = async () => {
+    if (backupInfo?.breakdown?.documents?.bytes > 50 * 1024 * 1024) {
+      if (!confirm('You have a large document library. Rebuilding the search index may take several minutes. Continue?')) return
+    }
+    setReindexing(true)
+    setStatus(null)
+    setOperation({
+      phase: 'processing',
+      progress: null,
+      message: 'Rebuilding search index… this may take several minutes for large libraries.',
+    })
+    try {
+      const res = await fetch('/api/reindex', { method: 'POST' })
+      if (!res.ok) throw new Error('Reindex failed')
+      const data = await res.json()
+      setStatus({
+        type: 'success',
+        text: `Reindex complete! Markdowns: ${data.reindexed.markdowns}, Document chunks: ${data.reindexed.document_chunks}.`,
+      })
+    } catch (e) {
+      setStatus({ type: 'error', text: `Reindex failed: ${e.message}` })
+    } finally {
+      setReindexing(false)
+      setOperation(null)
+    }
+  }
 
   const resetAgentTaskTemplate = async () => {
     setAgentTaskSaving(true)
@@ -931,26 +1261,8 @@ function SettingsDialog({ onClose }) {
     }
   }
 
-  const handleReindex = async () => {
-    setReindexing(true)
-    setStatus({ type: 'info', text: 'Rebuilding search index...' })
-    try {
-      const res = await fetch('/api/reindex', { method: 'POST' })
-      if (!res.ok) throw new Error('Reindex failed')
-      const data = await res.json()
-      setStatus({
-        type: 'success',
-        text: `Reindex complete! Markdowns: ${data.reindexed.markdowns}, Document chunks: ${data.reindexed.document_chunks}.`,
-      })
-    } catch (e) {
-      setStatus({ type: 'error', text: `Reindex failed: ${e.message}` })
-    } finally {
-      setReindexing(false)
-    }
-  }
-
   return (
-    <div className="br-modal" onClick={onClose}>
+    <div className="br-modal" onClick={handleClose}>
       <div className="br-modal-content settings-modal-content" onClick={e => e.stopPropagation()}>
         <div className="settings-modal-header">
           <h2>Settings</h2>
@@ -972,16 +1284,83 @@ function SettingsDialog({ onClose }) {
 
         <div className="settings-modal-body">
           {tab === 'general' && (
-            <div className="br-section settings-tab-panel">
-              <h3>Rebuild index</h3>
-              <p>Re-create the search index from existing data.</p>
-              <button className="br-action-btn" onClick={handleReindex} disabled={reindexing}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="23 4 23 10 17 10" />
-                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-                </svg>
-                {reindexing ? 'Reindexing...' : 'Rebuild Index'}
-              </button>
+            <div className="settings-tab-panel">
+              <div className="br-section">
+                <h3>Backup</h3>
+                <p>Download a complete snapshot of your Astro data — database, documents, images, settings, and search index.</p>
+                {backupInfoLoading ? (
+                  <p className="br-subtitle">Calculating backup size…</p>
+                ) : backupInfo ? (
+                  <p className="br-backup-size-note">
+                    Current data: about <strong>{formatSize(backupInfo.total_bytes)}</strong>
+                    {backupInfo.file_count ? ` (${backupInfo.file_count.toLocaleString()} files)` : ''}.
+                    {backupInfo.breakdown?.documents?.bytes > 0 && (
+                      <> Documents alone are {formatSize(backupInfo.breakdown.documents.bytes)}.</>
+                    )}
+                    {' '}Large backups may take several minutes to build and download.
+                  </p>
+                ) : null}
+                <button className="br-action-btn" onClick={handleBackup} disabled={operationActive}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  {busy ? 'Working…' : 'Download Backup'}
+                </button>
+              </div>
+
+              <div className="br-divider" />
+
+              <div className="br-section">
+                <h3>Restore</h3>
+                <p>Upload a backup ZIP to replace all current data, including the search index.</p>
+                <div className="br-restore-row">
+                  <label className={`br-file-label ${operationActive ? 'disabled' : ''}`}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="17 8 12 3 7 8" />
+                      <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    {selectedFile ? `${selectedFile.name} (${formatSize(selectedFile.size)})` : 'Choose ZIP file'}
+                    <input
+                      ref={restoreInputRef}
+                      type="file"
+                      accept=".zip"
+                      onChange={e => setSelectedFile(e.target.files?.[0] || null)}
+                      disabled={operationActive}
+                    />
+                  </label>
+                  <button
+                    className="br-action-btn danger"
+                    onClick={handleRestore}
+                    disabled={!selectedFile || operationActive}
+                  >
+                    {busy ? 'Restoring…' : 'Restore'}
+                  </button>
+                </div>
+                {selectedFile && selectedFile.size >= LARGE_BACKUP_BYTES && (
+                  <p className="br-backup-size-note">
+                    This is a large backup ({formatSize(selectedFile.size)}). Upload and restore may take several minutes — keep this window open.
+                  </p>
+                )}
+              </div>
+
+              <div className="br-divider" />
+
+              <div className="br-section">
+                <h3>Rebuild index</h3>
+                <p>Re-create the search index from existing data without restoring a backup.</p>
+                <button className="br-action-btn" onClick={handleReindex} disabled={operationActive}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="23 4 23 10 17 10" />
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                  </svg>
+                  {reindexing ? 'Reindexing…' : 'Rebuild Index'}
+                </button>
+              </div>
+
+              {operation && <BackupOperationProgress op={operation} />}
             </div>
           )}
 
@@ -1120,7 +1499,7 @@ function SettingsDialog({ onClose }) {
                 {agentTaskSaving ? 'Saving…' : 'Save agent task settings'}
               </button>
             )}
-            <button className="br-close-btn" type="button" onClick={onClose}>Close</button>
+            <button className="br-close-btn" type="button" onClick={handleClose}>Close</button>
           </div>
         </div>
       </div>
@@ -2072,6 +2451,13 @@ function App() {
       {showSettings && (
         <SettingsDialog
           onClose={() => setShowSettings(false)}
+          onRestored={() => {
+            fetchUniverses()
+            fetchCategories()
+            fetchPinned()
+            fetchUnreadCounts()
+            fetch('/api/stats').then(r => r.json()).then(d => setStats(d)).catch(() => {})
+          }}
         />
       )}
       {showUniverseManager && (

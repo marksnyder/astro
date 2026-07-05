@@ -10,6 +10,7 @@ import fastapi
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
+from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from pydantic import BaseModel
@@ -18,6 +19,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from src.backup import create_backup, estimate_backup_size, restore_backup
 from src.ingest import SUPPORTED_EXTENSIONS, chunk_documents, load_document
 from src.markdowns import (
     FEED_FILES_DIR,
@@ -1149,6 +1151,57 @@ def api_get_latest_version():
     except Exception as e:
         print(f"[Astro] WARNING: Version check failed: {e}")
         return {"current": current, "latest": current, "update_available": False, "build_id": build_id}
+
+
+@app.get("/api/backup/info")
+def api_backup_info():
+    """Return estimated backup size before creating the archive."""
+    return estimate_backup_size()
+
+
+@app.get("/api/backup")
+def api_backup():
+    """Download a ZIP archive of all Astro data (DB, images, documents, vector store)."""
+    zip_path = create_backup()
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+
+    def _cleanup() -> None:
+        zip_path.unlink(missing_ok=True)
+
+    return FileResponse(
+        zip_path,
+        filename=f"astro-backup-{ts}.zip",
+        media_type="application/zip",
+        background=BackgroundTask(_cleanup),
+    )
+
+
+@app.post("/api/restore")
+async def api_restore(file: UploadFile):
+    """Restore Astro data from a backup ZIP archive.
+
+    This replaces the current database, images, documents, and vector store.
+    """
+    if not file.filename or not file.filename.endswith(".zip"):
+        raise HTTPException(status_code=400, detail="Please upload a .zip file")
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
+        shutil.copyfileobj(file.file, tmp)
+        tmp_path = Path(tmp.name)
+
+    try:
+        summary = restore_backup(tmp_path)
+    except Exception as e:
+        tmp_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=400, detail=f"Invalid backup file: {e}")
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+    return {
+        "ok": True,
+        "restored": summary,
+        "message": "Restore complete (including vector store).",
+    }
 
 
 @app.post("/api/reindex")
