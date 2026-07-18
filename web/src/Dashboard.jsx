@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 const COLUMNS = [0, 1, 2, 3]
+const REFRESH_MS = 30_000
 
 const markdownComponents = {
   a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
@@ -54,11 +55,10 @@ function WidgetEditorModal({ mode, initial, onSave, onClose }) {
   }
 
   return (
-    <div className="dashboard-modal-overlay" onClick={onClose}>
-      <div className="dashboard-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="dashboard-modal-overlay">
+      <div className="dashboard-modal">
         <div className="dashboard-modal-header">
           <h3>{mode === 'create' ? 'Add widget' : 'Edit widget'}</h3>
-          <button type="button" className="dashboard-icon-btn" onClick={onClose} aria-label="Close">×</button>
         </div>
         <form className="dashboard-modal-body" onSubmit={submit}>
           {mode === 'create' ? (
@@ -102,7 +102,15 @@ function WidgetEditorModal({ mode, initial, onSave, onClose }) {
   )
 }
 
-function DashboardWidgetCard({ widget, onEdit, onDelete, onDragStart, onDragOver, onDrop }) {
+function DashboardWidgetCard({ widget, universeId, onRefreshWidget, onEdit, onDelete, onDragStart, onDragOver, onDrop }) {
+  useEffect(() => {
+    if (!universeId || !onRefreshWidget) return undefined
+    const timer = setInterval(() => {
+      onRefreshWidget(widget.tag)
+    }, REFRESH_MS)
+    return () => clearInterval(timer)
+  }, [universeId, widget.tag, onRefreshWidget])
+
   return (
     <article
       className="dashboard-widget"
@@ -148,19 +156,72 @@ export default function Dashboard({ universeId, variant = 'desktop' }) {
 
   const uid = universeId || 1
 
-  const load = useCallback(() => {
+  const fetchWidgets = useCallback(async () => {
+    if (!universeId) return []
+    const res = await fetch(`/api/dashboard/widgets?universe_id=${uid}`)
+    if (!res.ok) return []
+    const data = await res.json()
+    return Array.isArray(data) ? data : []
+  }, [universeId, uid])
+
+  const load = useCallback(async ({ silent = false } = {}) => {
     if (!universeId) {
       setWidgets([])
       setLoading(false)
       return
     }
-    setLoading(true)
-    fetch(`/api/dashboard/widgets?universe_id=${uid}`)
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data) => setWidgets(Array.isArray(data) ? data : []))
-      .catch(() => setWidgets([]))
-      .finally(() => setLoading(false))
-  }, [universeId, uid])
+    if (!silent) setLoading(true)
+    try {
+      const data = await fetchWidgets()
+      setWidgets(data)
+    } catch {
+      if (!silent) setWidgets([])
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }, [universeId, fetchWidgets])
+
+  const refreshWidgets = useCallback(async () => {
+    if (!universeId) return
+    try {
+      const data = await fetchWidgets()
+      setWidgets((prev) => {
+        const prevByTag = Object.fromEntries(prev.map((w) => [w.tag, w]))
+        let changed = data.length !== prev.length
+        const next = data.map((fresh) => {
+          const old = prevByTag[fresh.tag]
+          if (!old) {
+            changed = true
+            return fresh
+          }
+          if (
+            old.updated_at !== fresh.updated_at
+            || old.body !== fresh.body
+            || old.column_index !== fresh.column_index
+            || old.sort_order !== fresh.sort_order
+          ) {
+            changed = true
+            return fresh
+          }
+          return old
+        })
+        return changed ? next : prev
+      })
+    } catch {
+      /* keep current widgets on refresh failure */
+    }
+  }, [universeId, fetchWidgets])
+
+  const refreshInFlight = useRef(false)
+  const refreshWidgetByTag = useCallback(async (_tag) => {
+    if (refreshInFlight.current) return
+    refreshInFlight.current = true
+    try {
+      await refreshWidgets()
+    } finally {
+      refreshInFlight.current = false
+    }
+  }, [refreshWidgets])
 
   useEffect(() => {
     load()
@@ -206,7 +267,7 @@ export default function Dashboard({ universeId, variant = 'desktop' }) {
     try {
       await persistPlacements(updated)
     } catch {
-      load()
+      await load({ silent: true })
     } finally {
       setDraggingTag(null)
       setDropTargetTag(null)
@@ -223,7 +284,7 @@ export default function Dashboard({ universeId, variant = 'desktop' }) {
       const err = await res.json().catch(() => ({}))
       throw new Error(err.detail || 'Failed to create widget')
     }
-    load()
+    await load({ silent: true })
   }
 
   const handleUpdate = async ({ tag, title, body, column_index }) => {
@@ -236,7 +297,7 @@ export default function Dashboard({ universeId, variant = 'desktop' }) {
       const err = await res.json().catch(() => ({}))
       throw new Error(err.detail || 'Failed to update widget')
     }
-    load()
+    await load({ silent: true })
   }
 
   const handleDelete = async (widget) => {
@@ -244,7 +305,7 @@ export default function Dashboard({ universeId, variant = 'desktop' }) {
     await fetch(`/api/dashboard/widgets/${encodeURIComponent(widget.tag)}?universe_id=${uid}`, {
       method: 'DELETE',
     })
-    load()
+    await load({ silent: true })
   }
 
   return (
@@ -278,6 +339,8 @@ export default function Dashboard({ universeId, variant = 'desktop' }) {
                 <DashboardWidgetCard
                   key={widget.tag}
                   widget={widget}
+                  universeId={universeId}
+                  onRefreshWidget={refreshWidgetByTag}
                   onEdit={(w) => setEditor({ mode: 'edit', widget: w })}
                   onDelete={handleDelete}
                   onDragStart={setDraggingTag}

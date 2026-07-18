@@ -553,11 +553,21 @@
 
 .dashboard-widget-body img,
 .dashboard-widget-image {
-  max-width: 100%;
+  width: calc(100% + 24px);
+  max-width: calc(100% + 24px);
   height: auto;
   border-radius: 0;
-  margin: 8px 0;
+  margin: 8px -12px;
   display: block;
+}
+
+.dashboard-widget-body p:has(> img:only-child) {
+  margin: 0 -12px 0.35em;
+}
+
+.dashboard-widget-body p:has(> img:only-child) img {
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 .dashboard-icon-btn {
