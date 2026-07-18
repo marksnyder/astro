@@ -5,11 +5,42 @@ import remarkGfm from 'remark-gfm'
 const COLUMNS = [0, 1, 2, 3]
 const REFRESH_MS = 30_000
 
+const IMAGE_LAYOUT_RE = /^(half-left|half-right|50-left|50-right)(?::(.*))?$/i
+
+function parseDashboardImageAlt(alt = '') {
+  const match = IMAGE_LAYOUT_RE.exec(alt.trim())
+  if (!match) {
+    return { layout: 'full', altText: alt }
+  }
+  const side = match[1].toLowerCase().startsWith('half-right') || match[1].toLowerCase() === '50-right'
+    ? 'right'
+    : 'left'
+  const altText = (match[2] || '').trim()
+  return { layout: 'half', float: side, altText }
+}
+
+function DashboardMarkdownImage({ alt, ...props }) {
+  const { layout, float, altText } = parseDashboardImageAlt(alt || '')
+  const className = [
+    'dashboard-widget-image',
+    layout === 'half' ? 'dashboard-widget-image-half' : 'dashboard-widget-image-full',
+    layout === 'half' && float === 'left' ? 'dashboard-widget-image-float-left' : '',
+    layout === 'half' && float === 'right' ? 'dashboard-widget-image-float-right' : '',
+  ].filter(Boolean).join(' ')
+
+  return (
+    <img
+      {...props}
+      alt={altText}
+      loading="lazy"
+      className={className}
+    />
+  )
+}
+
 const markdownComponents = {
   a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
-  img: ({ node, ...props }) => (
-    <img {...props} alt={props.alt || ''} loading="lazy" className="dashboard-widget-image" />
-  ),
+  img: ({ node, ...props }) => <DashboardMarkdownImage {...props} />,
 }
 
 function groupByColumn(widgets) {
@@ -85,7 +116,7 @@ function WidgetEditorModal({ mode, initial, onSave, onClose }) {
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              placeholder="Markdown supported — images, emojis, lists…"
+              placeholder={'Markdown supported — images, emojis, lists…\n\nFull width:\n![](https://example.com/photo.jpg)\n\nHalf width, text wraps beside it:\n![half-left:Caption](https://example.com/photo.jpg)\n![half-right](https://example.com/other.jpg)'}
               rows={10}
             />
           </label>
