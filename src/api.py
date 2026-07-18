@@ -30,6 +30,25 @@ from src.dashboard import (
     upsert_dashboard_widget,
     widget_to_dict,
 )
+from src.python_tasks import (
+    create_python_task,
+    delete_python_task,
+    get_python_task,
+    list_python_tasks,
+    python_task_to_dict,
+    update_python_task,
+)
+from src.scripts import (
+    create_script,
+    delete_script,
+    get_script,
+    list_pinned_scripts,
+    list_scripts,
+    move_script_to_universe,
+    script_to_dict,
+    set_script_pinned,
+    update_script,
+)
 from src.ingest import SUPPORTED_EXTENSIONS, chunk_documents, load_document
 from src.markdowns import (
     FEED_FILES_DIR,
@@ -163,14 +182,21 @@ _mcp_app = _mcp.http_app(path="/", stateless_http=True)
 @asynccontextmanager
 async def _lifespan(application):
     from src.agent_task_runner import AgentTaskRunner
+    from src.python_task_runner import PythonTaskRunner
+
     AgentTaskRunner.get()
+    PythonTaskRunner.get()
 
     async with _mcp_app.lifespan(application):
         yield
 
     from src.agent_task_runner import AgentTaskRunner as _ATR
+    from src.python_task_runner import PythonTaskRunner as _PTR
+
     if _ATR._instance is not None:
         _ATR._instance.stop()
+    if _PTR._instance is not None:
+        _PTR._instance.stop()
 
 
 app = FastAPI(title="Astro", version="1.0.0", lifespan=_lifespan)
@@ -563,7 +589,17 @@ def api_list_pinned(universe_id: Optional[int] = None):
     pinned_cats = [category_to_dict(c) for c in list_pinned_categories(universe_id=universe_id)]
     diagrams = [diagram_summary_to_dict(d) for d in list_pinned_diagram_summaries(universe_id=universe_id)]
     tables = [table_to_dict(t) for t in list_pinned_tables(universe_id=universe_id)]
-    return {"markdowns": markdowns, "documents": docs, "links": links, "feeds": feeds, "feed_categories": pinned_cats, "diagrams": diagrams, "tables": tables}
+    scripts = [script_to_dict(s) for s in list_pinned_scripts(universe_id=universe_id)]
+    return {
+        "markdowns": markdowns,
+        "documents": docs,
+        "links": links,
+        "feeds": feeds,
+        "feed_categories": pinned_cats,
+        "diagrams": diagrams,
+        "tables": tables,
+        "scripts": scripts,
+    }
 
 
 # ── Links (bookmarks) ───────────────────────────────────────────────────
@@ -1012,6 +1048,235 @@ def api_run_agent_task_now(task_id: int):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to send: {e}")
+
+
+# ── Python Tasks ───────────────────────────────────────────────────────────
+
+
+class PythonTaskRequest(BaseModel):
+    title: str
+    script_id: int
+    universe_id: int = 1
+    schedule_mode: str = "manual"  # manual | cron | once
+    cron_expr: str = ""
+    run_at: str | None = None
+    enabled: bool = True
+    timeout_seconds: int = 120
+
+
+def _validate_python_task_schedule(req: PythonTaskRequest) -> None:
+    if req.schedule_mode not in ("manual", "cron", "once"):
+        raise HTTPException(status_code=400, detail="Invalid schedule_mode")
+    if req.schedule_mode == "cron" and not (req.cron_expr or "").strip():
+        raise HTTPException(status_code=400, detail="cron_expr required for cron schedule")
+    if req.schedule_mode == "once" and not (req.run_at or "").strip():
+        raise HTTPException(status_code=400, detail="run_at required for one-time schedule")
+
+
+def _validate_python_task_script(script_id: int, universe_id: int) -> None:
+    s = get_script(script_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="Script not found")
+    if s.universe_id != universe_id:
+        raise HTTPException(status_code=400, detail="Script must belong to the selected universe")
+
+
+def _python_task_response(t):
+    script = get_script(t.script_id)
+    return python_task_to_dict(t, script.title if script else None)
+
+
+@app.get("/api/python-tasks")
+def api_list_python_tasks(universe_id: Optional[int] = None):
+    out = []
+    for t in list_python_tasks(universe_id=universe_id):
+        script = get_script(t.script_id)
+        out.append(python_task_to_dict(t, script.title if script else None))
+    return out
+
+
+@app.get("/api/python-tasks/{task_id}")
+def api_get_python_task(task_id: int):
+    t = get_python_task(task_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return _python_task_response(t)
+
+
+@app.post("/api/python-tasks", status_code=201)
+def api_create_python_task(req: PythonTaskRequest):
+    _validate_python_task_schedule(req)
+    _validate_python_task_script(req.script_id, req.universe_id)
+    try:
+        t = create_python_task(
+            title=req.title,
+            script_id=req.script_id,
+            universe_id=req.universe_id,
+            schedule_mode=req.schedule_mode,
+            cron_expr=(req.cron_expr or "").strip() or None,
+            run_at=(req.run_at or "").strip() or None,
+            enabled=req.enabled,
+            timeout_seconds=req.timeout_seconds,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return _python_task_response(t)
+
+
+@app.put("/api/python-tasks/{task_id}")
+def api_update_python_task(task_id: int, req: PythonTaskRequest):
+    _validate_python_task_schedule(req)
+    _validate_python_task_script(req.script_id, req.universe_id)
+    try:
+        t = update_python_task(
+            task_id,
+            title=req.title,
+            script_id=req.script_id,
+            universe_id=req.universe_id,
+            schedule_mode=req.schedule_mode,
+            cron_expr=(req.cron_expr or "").strip() or None,
+            run_at=(req.run_at or "").strip() or None,
+            enabled=req.enabled,
+            timeout_seconds=req.timeout_seconds,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if not t:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return _python_task_response(t)
+
+
+@app.delete("/api/python-tasks/{task_id}")
+def api_delete_python_task(task_id: int):
+    if not delete_python_task(task_id):
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"ok": True}
+
+
+@app.post("/api/python-tasks/{task_id}/run")
+def api_run_python_task_now(task_id: int):
+    from src.python_task_runner import PythonTaskAlreadyRunningError, run_python_task_now
+
+    try:
+        result = run_python_task_now(task_id)
+        return {"ok": True, **result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except PythonTaskAlreadyRunningError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to run: {e}")
+
+
+# ── Scripts ───────────────────────────────────────────────────────────────
+
+
+class ScriptRequest(BaseModel):
+    title: str
+    source: str = ""
+    category_id: Optional[int] = None
+
+
+class ScriptResponse(BaseModel):
+    id: int
+    title: str
+    source: str
+    category_id: Optional[int]
+    pinned: bool
+    created_at: str
+    updated_at: str
+    universe_id: int = 1
+
+
+class ScriptRunRequest(BaseModel):
+    source: str = ""
+    universe_id: int = 1
+    timeout_seconds: int = 120
+
+
+@app.get("/api/scripts", response_model=list[ScriptResponse])
+def api_list_scripts(q: str = "", category_id: Optional[int] = None, universe_id: Optional[int] = None):
+    return [script_to_dict(s) for s in list_scripts(q, category_id, universe_id=universe_id)]
+
+
+@app.get("/api/scripts/{script_id}", response_model=ScriptResponse)
+def api_get_script(script_id: int):
+    s = get_script(script_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="Script not found")
+    return script_to_dict(s)
+
+
+@app.post("/api/scripts", response_model=ScriptResponse, status_code=201)
+def api_create_script(req: ScriptRequest, universe_id: int = 1):
+    try:
+        s = create_script(req.title, req.source, req.category_id, universe_id=universe_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return script_to_dict(s)
+
+
+@app.put("/api/scripts/{script_id}", response_model=ScriptResponse)
+def api_update_script(script_id: int, req: ScriptRequest):
+    try:
+        s = update_script(script_id, req.title, req.source, req.category_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if not s:
+        raise HTTPException(status_code=404, detail="Script not found")
+    return script_to_dict(s)
+
+
+@app.post("/api/scripts/{script_id}/move-universe", response_model=ScriptResponse)
+def api_move_script_universe(script_id: int, req: MoveToUniverseRequest):
+    if not get_universe(req.universe_id):
+        raise HTTPException(status_code=400, detail="Universe not found")
+    _validate_move_category(req)
+    s = move_script_to_universe(script_id, req.universe_id, req.category_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="Script not found")
+    return script_to_dict(s)
+
+
+@app.delete("/api/scripts/{script_id}")
+def api_delete_script(script_id: int):
+    if not delete_script(script_id):
+        raise HTTPException(status_code=404, detail="Script not found")
+    return {"ok": True}
+
+
+@app.put("/api/scripts/{script_id}/pin")
+def api_toggle_script_pin(script_id: int, pinned: bool = True):
+    if not set_script_pinned(script_id, pinned):
+        raise HTTPException(status_code=404, detail="Script not found")
+    return {"ok": True}
+
+
+@app.post("/api/scripts/{script_id}/run")
+def api_run_script(script_id: int, timeout_seconds: int = 120):
+    from src.python_task_executor import execute_python_source
+
+    s = get_script(script_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="Script not found")
+    try:
+        result = execute_python_source(s.source, timeout_seconds, s.universe_id)
+        return {"ok": True, **result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to run: {e}")
+
+
+@app.post("/api/scripts/run-preview")
+def api_run_script_preview(req: ScriptRunRequest):
+    from src.python_task_executor import execute_python_source
+
+    if not get_universe(req.universe_id):
+        raise HTTPException(status_code=400, detail="Universe not found")
+    try:
+        result = execute_python_source(req.source, req.timeout_seconds, req.universe_id)
+        return {"ok": True, **result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to run: {e}")
 
 
 # ── App settings ──────────────────────────────────────────────────────────

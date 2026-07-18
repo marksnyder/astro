@@ -71,6 +71,26 @@ from src.dashboard import (
     upsert_dashboard_widget as _db_upsert_dashboard_widget,
     widget_to_dict,
 )
+from src.python_task_runner import (
+    PythonTaskAlreadyRunningError,
+    run_python_task_now as _run_python_task_now,
+)
+from src.python_tasks import (
+    create_python_task as _db_create_python_task,
+    delete_python_task as _db_delete_python_task,
+    get_python_task as _db_get_python_task,
+    list_python_tasks as _db_list_python_tasks,
+    python_task_to_dict,
+    update_python_task as _db_update_python_task,
+)
+from src.scripts import (
+    create_script as _db_create_script,
+    delete_script as _db_delete_script,
+    get_script as _db_get_script,
+    list_scripts as _db_list_scripts,
+    script_to_dict,
+    update_script as _db_update_script,
+)
 from src.ingest import load_document as _load_document, chunk_documents as _chunk_documents
 from src.store import (
     add_documents as _add_documents,
@@ -132,6 +152,11 @@ mcp = FastMCP(
         "Excalidraw format (https://excalidraw.com) — see write_diagram "
         "for schema details. Agent tasks send markdown instructions to Slack; "
         "use list_agent_tasks, write_agent_task, and run_agent_task_now to manage them. "
+        "Python tasks run saved scripts on a schedule or on demand; "
+        "use list_python_tasks, write_python_task, and run_python_task_now. "
+        "Scripts are Python source files stored in Astro; use list_scripts, read_script, "
+        "write_script, update_script, delete_script, and run_script. Scripts receive "
+        "ASTRO_BASE_URL, ASTRO_API_KEY (if configured), and ASTRO_UNIVERSE_ID. "
         "Universe dashboards (shown when no workspace tab is open) use list_dashboard_widgets, "
         "upsert_dashboard_widget, move_dashboard_widget, and remove_dashboard_widget."
     ),
@@ -795,6 +820,235 @@ def run_agent_task_now(task_id: int) -> dict | str:
             f"Channel {e.channel} on cooldown; wait about {e.wait_seconds:.0f}s"
         )
     return {"ok": True, "task_id": task_id}
+
+
+# ── Python tasks ──────────────────────────────────────────────────────────
+
+
+def _python_task_schedule_error(
+    schedule_mode: str,
+    cron_expr: str,
+    run_at: str | None,
+) -> str | None:
+    if schedule_mode not in ("manual", "cron", "once"):
+        return "schedule_mode must be manual, cron, or once"
+    if schedule_mode == "cron" and not (cron_expr or "").strip():
+        return "cron_expr is required for cron schedule"
+    if schedule_mode == "once" and not (run_at or "").strip():
+        return "run_at is required for one-time schedule"
+    return None
+
+
+def _python_task_script_error(script_id: int, universe_id: int) -> str | None:
+    s = _db_get_script(script_id)
+    if not s:
+        return "Script not found"
+    if s.universe_id != universe_id:
+        return "Script must belong to the given universe_id"
+    return None
+
+
+def _python_task_dict(t) -> dict:
+    script = _db_get_script(t.script_id)
+    return python_task_to_dict(t, script.title if script else None)
+
+
+@mcp.tool
+def list_python_tasks(universe_id: int | None = None) -> list[dict]:
+    """List Python tasks: scheduled or manual runs of saved scripts.
+    When universe_id is set, only tasks in that universe are returned."""
+    out: list[dict] = []
+    for t in _db_list_python_tasks(universe_id):
+        out.append(_python_task_dict(t))
+    return out
+
+
+@mcp.tool
+def read_python_task(task_id: int) -> dict | str:
+    """Read one Python task by ID (title, script, schedule, last run output, etc.)."""
+    t = _db_get_python_task(task_id)
+    if t is None:
+        return "Task not found"
+    return _python_task_dict(t)
+
+
+@mcp.tool
+def write_python_task(
+    title: str,
+    script_id: int,
+    universe_id: int | None = None,
+    schedule_mode: str = "manual",
+    cron_expr: str = "",
+    run_at: str | None = None,
+    enabled: bool = True,
+    timeout_seconds: int = 120,
+) -> dict | str:
+    """Create a Python task that runs a saved script on a schedule or manually.
+    schedule_mode: manual, cron (cron_expr required, UTC), or once (run_at ISO required)."""
+    uid = universe_id if universe_id is not None else _default_universe()
+    err = _python_task_schedule_error(schedule_mode, cron_expr, run_at)
+    if err:
+        return err
+    err = _python_task_script_error(script_id, uid)
+    if err:
+        return err
+    run_at_val = ((run_at or "").strip() or None) if schedule_mode == "once" else None
+    cron_val = ((cron_expr or "").strip() or None) if schedule_mode == "cron" else None
+    try:
+        t = _db_create_python_task(
+            (title or "").strip() or "Untitled task",
+            script_id,
+            uid,
+            schedule_mode,
+            cron_val,
+            run_at_val,
+            enabled,
+            timeout_seconds,
+        )
+    except ValueError as e:
+        return str(e)
+    return _python_task_dict(t)
+
+
+@mcp.tool
+def update_python_task(
+    task_id: int,
+    title: str,
+    script_id: int,
+    universe_id: int | None = None,
+    schedule_mode: str = "manual",
+    cron_expr: str = "",
+    run_at: str | None = None,
+    enabled: bool = True,
+    timeout_seconds: int = 120,
+) -> dict | str:
+    """Replace an existing Python task. Same rules as write_python_task."""
+    uid = universe_id if universe_id is not None else _default_universe()
+    err = _python_task_schedule_error(schedule_mode, cron_expr, run_at)
+    if err:
+        return err
+    err = _python_task_script_error(script_id, uid)
+    if err:
+        return err
+    run_at_val = ((run_at or "").strip() or None) if schedule_mode == "once" else None
+    cron_val = ((cron_expr or "").strip() or None) if schedule_mode == "cron" else None
+    try:
+        t = _db_update_python_task(
+            task_id,
+            (title or "").strip() or "Untitled task",
+            script_id,
+            uid,
+            schedule_mode,
+            cron_val,
+            run_at_val,
+            enabled,
+            timeout_seconds,
+        )
+    except ValueError as e:
+        return str(e)
+    if not t:
+        return "Task not found"
+    return _python_task_dict(t)
+
+
+@mcp.tool
+def delete_python_task(task_id: int) -> str:
+    """Permanently delete a Python task by ID."""
+    if not _db_delete_python_task(task_id):
+        return "Task not found"
+    return "Deleted"
+
+
+@mcp.tool
+def run_python_task_now(task_id: int) -> dict | str:
+    """Run a Python task immediately (same as the Run button in the UI).
+    Returns status, output, and exit_code. Fails if disabled or already running."""
+    try:
+        result = _run_python_task_now(task_id)
+    except ValueError as e:
+        return str(e)
+    except PythonTaskAlreadyRunningError as e:
+        return str(e)
+    return {"ok": True, "task_id": task_id, **result}
+
+
+# ── Scripts ───────────────────────────────────────────────────────────────
+
+
+@mcp.tool
+def list_scripts(
+    query: str = "",
+    category_id: int | None = None,
+    universe_id: int | None = None,
+) -> list[dict]:
+    """List Python scripts in Astro (editable source code, runnable on the server)."""
+    uid = universe_id if universe_id is not None else None
+    return [script_to_dict(s) for s in _db_list_scripts(query, category_id, uid)]
+
+
+@mcp.tool
+def read_script(script_id: int) -> dict | str:
+    """Read one script by ID (title, source code, category, etc.)."""
+    s = _db_get_script(script_id)
+    if s is None:
+        return "Script not found"
+    return script_to_dict(s)
+
+
+@mcp.tool
+def write_script(
+    title: str,
+    source: str = "",
+    category_id: int | None = None,
+    universe_id: int | None = None,
+) -> dict | str:
+    """Create a Python script. source is the Python code body."""
+    uid = universe_id if universe_id is not None else _default_universe()
+    try:
+        s = _db_create_script((title or "").strip() or "Untitled script", source, category_id, uid)
+    except ValueError as e:
+        return str(e)
+    return script_to_dict(s)
+
+
+@mcp.tool
+def update_script(
+    script_id: int,
+    title: str,
+    source: str = "",
+    category_id: int | None = None,
+) -> dict | str:
+    """Replace an existing script's title, source, and category."""
+    try:
+        s = _db_update_script(script_id, (title or "").strip() or "Untitled script", source, category_id)
+    except ValueError as e:
+        return str(e)
+    if not s:
+        return "Script not found"
+    return script_to_dict(s)
+
+
+@mcp.tool
+def delete_script(script_id: int) -> str:
+    """Permanently delete a script by ID (also removes tasks that reference it)."""
+    if not _db_delete_script(script_id):
+        return "Script not found"
+    return "Deleted"
+
+
+@mcp.tool
+def run_script(script_id: int, timeout_seconds: int = 120) -> dict | str:
+    """Run a saved script immediately and return status, output, and exit_code."""
+    from src.python_task_executor import execute_python_source
+
+    s = _db_get_script(script_id)
+    if s is None:
+        return "Script not found"
+    try:
+        result = execute_python_source(s.source, timeout_seconds, s.universe_id)
+    except Exception as e:
+        return str(e)
+    return {"ok": True, "script_id": script_id, **result}
 
 
 # ── Dashboard widgets ─────────────────────────────────────────────────────

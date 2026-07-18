@@ -7385,6 +7385,177 @@
   border-top: 1px solid var(--border);
 }
 
+.python-task-modal-box {
+  max-width: 720px;
+}
+
+.python-task-editor {
+  width: 100%;
+  min-height: 280px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: ui-monospace, 'Cascadia Code', 'SF Mono', Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  resize: vertical;
+  outline: none;
+  tab-size: 4;
+}
+
+.python-task-editor:focus {
+  border-color: var(--accent);
+}
+
+.python-task-output-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.python-task-output {
+  margin: 0;
+  max-height: 200px;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text-primary);
+  font-family: ui-monospace, 'Cascadia Code', 'SF Mono', Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.python-task-status--success {
+  color: #48bb78;
+}
+
+.python-task-status--error,
+.python-task-status--timeout {
+  color: #e53e3e;
+}
+
+.python-task-modal-run {
+  margin-right: auto;
+}
+
+.python-task-script-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.python-task-script-link:hover {
+  opacity: 0.85;
+}
+
+.script-card-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 0 12px 8px;
+}
+
+.script-editor-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: 16px 20px 20px;
+  gap: 12px;
+}
+
+.script-editor-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.script-editor-title {
+  max-width: 480px;
+}
+
+.script-editor-runbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.script-editor-timeout {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.script-editor-timeout input {
+  width: 72px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.script-editor-run-btn {
+  padding: 6px 16px;
+}
+
+.script-editor-codemirror-wrap {
+  flex: 1;
+  min-height: 240px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.script-editor-codemirror-wrap .script-codemirror {
+  height: 100%;
+  font-size: 13px;
+}
+
+.script-editor-codemirror-wrap .cm-editor {
+  height: 100%;
+}
+
+.script-editor-output-section {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+}
+
+.script-editor-output-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.script-editor-output {
+  max-height: 180px;
+}
+
+.chat-container:has(> .script-editor-view) {
+  padding: 0;
+}
+
 .agent-task-settings-label {
   display: block;
   font-size: 12px;

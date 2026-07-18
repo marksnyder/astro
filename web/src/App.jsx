@@ -7,6 +7,8 @@ import FeedsPanel, { PostTimeline } from './FeedsPanel'
 import DiagramsPanel, { DiagramEditorView } from './DiagramsPanel'
 import TablesPanel, { TableEditorView } from './TablesPanel'
 import AgentTasksPanel from './AgentTasksPanel'
+import PythonTasksPanel from './PythonTasksPanel'
+import ScriptsPanel, { ScriptEditorView } from './ScriptsPanel'
 import CategoryTree, { EmojiPopover } from './CategoryTree'
 import ChatBackground from './ChatBackground'
 import Dashboard from './Dashboard'
@@ -1661,6 +1663,7 @@ function App() {
   const [markdownRefreshKey, setMarkdownRefreshKey] = useState(0)
   const [diagramRefreshKey, setDiagramRefreshKey] = useState(0)
   const [tableRefreshKey, setTableRefreshKey] = useState(0)
+  const [scriptRefreshKey, setScriptRefreshKey] = useState(0)
   const [openFeedRequest, setOpenFeedRequest] = useState(null)
 
   const [tabs, setTabs] = useState([DASHBOARD_TAB])
@@ -1751,6 +1754,15 @@ function App() {
     setActiveTabId(tabId)
   }, [])
 
+  const openPythonTasksTab = useCallback(() => {
+    const tabId = 'python-tasks'
+    setTabs(prev => {
+      if (prev.find(t => t.id === tabId)) return prev
+      return [...prev, { id: tabId, type: 'python-tasks', title: 'Python Tasks', closable: true }]
+    })
+    setActiveTabId(tabId)
+  }, [])
+
   const openMarkdownTab = useCallback((markdown) => {
     const key = markdown._new ? 'new' : markdown.id
     const tabId = `markdown-${key}`
@@ -1805,6 +1817,19 @@ function App() {
         return prev.map(t => t.id === tabId ? { ...t, data: table, title: table.title || 'Untitled Table' } : t)
       }
       return [...prev, { id: tabId, type: 'table', title: table.title || 'Untitled Table', closable: true, data: table }]
+    })
+    setActiveTabId(tabId)
+  }, [])
+
+  const openScriptTab = useCallback((script) => {
+    const key = script._new ? `new-${script._key || 'default'}` : script.id
+    const tabId = `script-${key}`
+    setTabs(prev => {
+      const existing = prev.find(t => t.id === tabId)
+      if (existing) {
+        return prev.map(t => t.id === tabId ? { ...t, data: script, title: script.title || 'Untitled Script' } : t)
+      }
+      return [...prev, { id: tabId, type: 'script', title: script.title || 'Untitled Script', closable: true, data: script }]
     })
     setActiveTabId(tabId)
   }, [])
@@ -2078,7 +2103,7 @@ function App() {
             </button>
           )}
         </div>
-        {(pinnedItems.markdowns.length > 0 || pinnedItems.documents.length > 0 || pinnedItems.links?.length > 0 || pinnedItems.feed_categories?.length > 0 || pinnedItems.diagrams?.length > 0 || pinnedItems.tables?.length > 0) && (
+        {(pinnedItems.markdowns.length > 0 || pinnedItems.documents.length > 0 || pinnedItems.links?.length > 0 || pinnedItems.feed_categories?.length > 0 || pinnedItems.diagrams?.length > 0 || pinnedItems.tables?.length > 0 || pinnedItems.scripts?.length > 0) && (
           <div className="pinned-bar">
             {pinnedItems.markdowns.map((n) => (
               <button key={`n-${n.id}`} className="pinned-chip pinned-markdown" onClick={() => { setSidebarTab('markdowns'); setEditMarkdownRequest(n); }} title={n.title || 'Untitled'}>
@@ -2136,9 +2161,29 @@ function App() {
                 <span className="pinned-chip-label">{t.title || 'Untitled'}</span>
               </button>
             ))}
+            {(pinnedItems.scripts || []).map((s) => (
+              <button key={`sc-${s.id}`} className="pinned-chip pinned-diagram" onClick={() => { setSidebarTab('scripts'); openScriptTab(s) }} title={s.title || 'Untitled Script'}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
+                </svg>
+                <span className="pinned-chip-label">{s.title || 'Untitled'}</span>
+              </button>
+            ))}
           </div>
         )}
         <div className="header-controls">
+          <button
+            type="button"
+            className={`header-agent-tasks-btn ${activeTab?.type === 'python-tasks' ? 'active' : ''}`}
+            onClick={openPythonTasksTab}
+            title="Open Python Tasks"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="16 18 22 12 16 6" />
+              <polyline points="8 6 2 12 8 18" />
+            </svg>
+            <span>Python Tasks</span>
+          </button>
           <button
             type="button"
             className={`header-agent-tasks-btn ${activeTab?.type === 'agent-tasks' ? 'active' : ''}`}
@@ -2212,6 +2257,11 @@ function App() {
             <button className={`rail-tab ${sidebarTab === 'tables' ? 'active' : ''}`} onClick={() => setSidebarTab('tables')} title="Tables">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/>
+              </svg>
+            </button>
+            <button className={`rail-tab ${sidebarTab === 'scripts' ? 'active' : ''}`} onClick={() => setSidebarTab('scripts')} title="Scripts">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
               </svg>
             </button>
             <div className="rail-sep" />
@@ -2334,6 +2384,17 @@ function App() {
               onLoaded={() => setSidebarLoading(false)}
             />
           )}
+          {sidebarTab === 'scripts' && (
+            <ScriptsPanel
+              categories={categories}
+              universeId={currentUniverseId}
+              universes={universes}
+              onPinChange={fetchPinned}
+              onEditScript={(s) => openScriptTab(s._new ? { ...s, _key: s._key || 'new' } : s)}
+              refreshKey={scriptRefreshKey}
+              onLoaded={() => setSidebarLoading(false)}
+            />
+          )}
           </div>
         </div>
         <div className="sidebar-resize-handle">
@@ -2443,6 +2504,29 @@ function App() {
                 fetchPinned()
               }}
             />
+          ) : activeTab.type === 'script' && activeTab.data ? (
+            <ScriptEditorView
+              key={activeTab.id}
+              script={activeTab.data}
+              categories={categories}
+              onSaved={(created) => {
+                setScriptRefreshKey(k => k + 1)
+                fetchPinned()
+                if (created) {
+                  const tabId = `script-${created.id}`
+                  setTabs(prev => prev.map(t => t.id === activeTab.id
+                    ? {
+                        ...t,
+                        id: tabId,
+                        data: { ...created, universeId: activeTab.data.universeId },
+                        title: created.title || 'Untitled Script',
+                      }
+                    : t
+                  ))
+                  setActiveTabId(tabId)
+                }
+              }}
+            />
           ) : activeTab.type === 'feed' && activeTab.data ? (
             <PostTimeline
               key={activeTab.id}
@@ -2452,6 +2536,8 @@ function App() {
             />
           ) : activeTab.type === 'agent-tasks' ? (
             <AgentTasksPanel universeId={currentUniverseId} />
+          ) : activeTab.type === 'python-tasks' ? (
+            <PythonTasksPanel universeId={currentUniverseId} onEditScript={openScriptTab} />
           ) : null}
         </div>
         </div>

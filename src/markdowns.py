@@ -189,6 +189,8 @@ def delete_universe(uid: int) -> bool:
     conn.execute("DELETE FROM links WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM diagrams WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM tables_ WHERE universe_id = ?", (uid,))
+    conn.execute("DELETE FROM scripts WHERE universe_id = ?", (uid,))
+    conn.execute("DELETE FROM python_tasks WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM document_meta WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM categories WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM universes WHERE id = ?", (uid,))

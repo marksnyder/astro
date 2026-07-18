@@ -8,6 +8,7 @@ import './App.css'
 import { parseDiagramData, EMPTY_DIAGRAM_JSON } from './diagramParse'
 import CategoryTree from './CategoryTree'
 import AgentTasksPanel from './AgentTasksPanel'
+import PythonTasksPanel from './PythonTasksPanel'
 import ChatBackground from './ChatBackground'
 import Dashboard from './Dashboard'
 import { sortCategoriesForTree } from './categorySidebarOrder'
@@ -1613,6 +1614,7 @@ function MobileApp() {
           <div className="m-menu-section-title">Organize</div>
           <button className="m-menu-item" onClick={() => { setView('categories'); setMenuOpen(false) }}>Categories</button>
           <button className="m-menu-item" onClick={() => { setView('agent-tasks'); setMenuOpen(false) }}>Agent tasks</button>
+          <button className="m-menu-item" onClick={() => { setView('python-tasks'); setMenuOpen(false) }}>Python tasks</button>
         </div>
       </nav>
 
@@ -1636,6 +1638,11 @@ function MobileApp() {
         {view === 'agent-tasks' && (
           <div className="m-agent-tasks-shell">
             <AgentTasksPanel universeId={currentUniverseId} mobileReadOnly />
+          </div>
+        )}
+        {view === 'python-tasks' && (
+          <div className="m-agent-tasks-shell">
+            <PythonTasksPanel universeId={currentUniverseId} mobileReadOnly />
           </div>
         )}
         </ChatBackground>

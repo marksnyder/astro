@@ -83,6 +83,13 @@ function SidebarTreeItemIcon({ kind }) {
           <line x1="15" y1="3" x2="15" y2="21" />
         </svg>
       )
+    case 'scripts':
+      return (
+        <svg {...svgProps}>
+          <polyline points="16 18 22 12 16 6" />
+          <polyline points="8 6 2 12 8 18" />
+        </svg>
+      )
     default:
       return null
   }
