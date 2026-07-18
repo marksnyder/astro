@@ -20,6 +20,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from src.backup import create_backup, estimate_backup_size, restore_backup
+from src.dashboard import (
+    create_dashboard_widget,
+    delete_dashboard_widget,
+    list_dashboard_widgets,
+    move_dashboard_widget,
+    reorder_dashboard_widgets,
+    update_dashboard_widget,
+    upsert_dashboard_widget,
+    widget_to_dict,
+)
 from src.ingest import SUPPORTED_EXTENSIONS, chunk_documents, load_document
 from src.markdowns import (
     FEED_FILES_DIR,
@@ -2007,6 +2017,111 @@ def api_search(q: str, k: int = 4, universe_id: int = 1):
             for d in docs
         ],
     }
+
+
+# ── Dashboard widgets ────────────────────────────────────────────────────
+
+
+class DashboardWidgetRequest(BaseModel):
+    tag: str
+    title: str = ""
+    body: str = ""
+    column_index: int = 0
+    sort_order: int | None = None
+    universe_id: int = 1
+
+
+class DashboardWidgetUpdateRequest(BaseModel):
+    title: str = ""
+    body: str = ""
+
+
+class DashboardWidgetMoveRequest(BaseModel):
+    column_index: int
+    sort_order: int | None = None
+    universe_id: int = 1
+
+
+class DashboardWidgetReorderRequest(BaseModel):
+    universe_id: int = 1
+    widgets: list[dict]
+
+
+@app.get("/api/dashboard/widgets")
+def api_list_dashboard_widgets(universe_id: int = 1):
+    return [widget_to_dict(w) for w in list_dashboard_widgets(universe_id)]
+
+
+@app.post("/api/dashboard/widgets", status_code=201)
+def api_create_dashboard_widget(req: DashboardWidgetRequest):
+    try:
+        w = create_dashboard_widget(
+            universe_id=req.universe_id,
+            tag=req.tag,
+            title=req.title,
+            body=req.body,
+            column_index=req.column_index,
+            sort_order=req.sort_order,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return widget_to_dict(w)
+
+
+@app.put("/api/dashboard/widgets/{tag}")
+def api_upsert_dashboard_widget(tag: str, req: DashboardWidgetRequest):
+    try:
+        w = upsert_dashboard_widget(
+            universe_id=req.universe_id,
+            tag=tag,
+            title=req.title,
+            body=req.body,
+            column_index=req.column_index,
+            sort_order=req.sort_order,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return widget_to_dict(w)
+
+
+@app.patch("/api/dashboard/widgets/{tag}")
+def api_update_dashboard_widget(tag: str, req: DashboardWidgetUpdateRequest, universe_id: int = 1):
+    w = update_dashboard_widget(universe_id, tag, req.title, req.body)
+    if not w:
+        raise HTTPException(status_code=404, detail="Widget not found")
+    return widget_to_dict(w)
+
+
+@app.patch("/api/dashboard/widgets/{tag}/move")
+def api_move_dashboard_widget(tag: str, req: DashboardWidgetMoveRequest):
+    try:
+        w = move_dashboard_widget(
+            req.universe_id,
+            tag,
+            req.column_index,
+            req.sort_order,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if not w:
+        raise HTTPException(status_code=404, detail="Widget not found")
+    return widget_to_dict(w)
+
+
+@app.post("/api/dashboard/widgets/reorder")
+def api_reorder_dashboard_widgets(req: DashboardWidgetReorderRequest):
+    try:
+        widgets = reorder_dashboard_widgets(req.universe_id, req.widgets)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return [widget_to_dict(w) for w in widgets]
+
+
+@app.delete("/api/dashboard/widgets/{tag}")
+def api_delete_dashboard_widget(tag: str, universe_id: int = 1):
+    if not delete_dashboard_widget(universe_id, tag):
+        raise HTTPException(status_code=404, detail="Widget not found")
+    return {"ok": True, "tag": tag}
 
 
 # ── Stats ────────────────────────────────────────────────────────────────

@@ -64,6 +64,13 @@ from src.markdowns import (
     update_agent_task as _db_update_agent_task,
 )
 from src.agent_task_runner import ChannelCooldownError, send_agent_task_message_now
+from src.dashboard import (
+    delete_dashboard_widget as _db_delete_dashboard_widget,
+    list_dashboard_widgets as _db_list_dashboard_widgets,
+    move_dashboard_widget as _db_move_dashboard_widget,
+    upsert_dashboard_widget as _db_upsert_dashboard_widget,
+    widget_to_dict,
+)
 from src.ingest import load_document as _load_document, chunk_documents as _chunk_documents
 from src.store import (
     add_documents as _add_documents,
@@ -124,7 +131,9 @@ mcp = FastMCP(
         "set_default_universe to change the default. Diagrams use the "
         "Excalidraw format (https://excalidraw.com) — see write_diagram "
         "for schema details. Agent tasks send markdown instructions to Slack; "
-        "use list_agent_tasks, write_agent_task, and run_agent_task_now to manage them."
+        "use list_agent_tasks, write_agent_task, and run_agent_task_now to manage them. "
+        "Universe dashboards (shown when no workspace tab is open) use list_dashboard_widgets, "
+        "upsert_dashboard_widget, move_dashboard_widget, and remove_dashboard_widget."
     ),
 )
 
@@ -786,6 +795,75 @@ def run_agent_task_now(task_id: int) -> dict | str:
             f"Channel {e.channel} on cooldown; wait about {e.wait_seconds:.0f}s"
         )
     return {"ok": True, "task_id": task_id}
+
+
+# ── Dashboard widgets ─────────────────────────────────────────────────────
+
+
+@mcp.tool
+def list_dashboard_widgets(universe_id: int | None = None) -> list[dict]:
+    """List dashboard widgets for a universe (4-column markdown grid on the home screen)."""
+    uid = universe_id if universe_id is not None else _default_universe()
+    return [widget_to_dict(w) for w in _db_list_dashboard_widgets(uid)]
+
+
+@mcp.tool
+def upsert_dashboard_widget(
+    tag: str,
+    body: str = "",
+    title: str = "",
+    column_index: int | None = None,
+    sort_order: int | None = None,
+    universe_id: int | None = None,
+) -> dict | str:
+    """Create or update a dashboard widget by tag within a universe.
+    Body is markdown (supports images and emojis). column_index is 0-3."""
+    if not tag.strip():
+        return "tag is required"
+    uid = universe_id if universe_id is not None else _default_universe()
+    try:
+        w = _db_upsert_dashboard_widget(
+            universe_id=uid,
+            tag=tag,
+            title=title,
+            body=body,
+            column_index=column_index,
+            sort_order=sort_order,
+        )
+    except ValueError as e:
+        return str(e)
+    return widget_to_dict(w)
+
+
+@mcp.tool
+def move_dashboard_widget(
+    tag: str,
+    column_index: int,
+    sort_order: int | None = None,
+    universe_id: int | None = None,
+) -> dict | str:
+    """Move a dashboard widget to another column (0-3) and optional sort position."""
+    if not tag.strip():
+        return "tag is required"
+    uid = universe_id if universe_id is not None else _default_universe()
+    try:
+        w = _db_move_dashboard_widget(uid, tag, column_index, sort_order)
+    except ValueError as e:
+        return str(e)
+    if not w:
+        return f"No dashboard widget with tag {tag!r} in universe {uid}"
+    return widget_to_dict(w)
+
+
+@mcp.tool
+def remove_dashboard_widget(tag: str, universe_id: int | None = None) -> dict | str:
+    """Remove a dashboard widget by tag."""
+    if not tag.strip():
+        return "tag is required"
+    uid = universe_id if universe_id is not None else _default_universe()
+    if not _db_delete_dashboard_widget(uid, tag):
+        return f"No dashboard widget with tag {tag!r} in universe {uid}"
+    return {"ok": True, "tag": tag}
 
 
 # ── Stats ─────────────────────────────────────────────────────────────────

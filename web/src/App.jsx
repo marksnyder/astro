@@ -9,8 +9,11 @@ import TablesPanel, { TableEditorView } from './TablesPanel'
 import AgentTasksPanel from './AgentTasksPanel'
 import CategoryTree, { EmojiPopover } from './CategoryTree'
 import ChatBackground from './ChatBackground'
+import Dashboard from './Dashboard'
 import SlackManifestGenerator from './SlackManifestGenerator'
 import { DEFAULT_AGENT_TASK_MESSAGE_TEMPLATE } from './agentTaskDefaults'
+
+const DASHBOARD_TAB = { id: 'dashboard', type: 'dashboard', title: 'Dashboard', closable: false }
 
 const _originalFetch = window.fetch
 window.fetch = function(url, opts = {}) {
@@ -1660,10 +1663,8 @@ function App() {
   const [tableRefreshKey, setTableRefreshKey] = useState(0)
   const [openFeedRequest, setOpenFeedRequest] = useState(null)
 
-  const [tabs, setTabs] = useState([
-    { id: 'agent-tasks', type: 'agent-tasks', title: 'Agent Tasks', closable: false },
-  ])
-  const [activeTabId, setActiveTabId] = useState('agent-tasks')
+  const [tabs, setTabs] = useState([DASHBOARD_TAB])
+  const [activeTabId, setActiveTabId] = useState('dashboard')
   const [markdownViewMode, setMarkdownViewMode] = useState('edit')
   const resizing = useRef(false)
   const tabsBarRef = useRef(null)
@@ -1735,9 +1736,18 @@ function App() {
       .catch(() => {})
   }, [currentUniverseId])
 
-  const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0]
+  const activeTab = tabs.find(t => t.id === activeTabId) ?? null
 
   const switchToTab = useCallback((tabId) => {
+    setActiveTabId(tabId)
+  }, [])
+
+  const openAgentTasksTab = useCallback(() => {
+    const tabId = 'agent-tasks'
+    setTabs(prev => {
+      if (prev.find(t => t.id === tabId)) return prev
+      return [...prev, { id: tabId, type: 'agent-tasks', title: 'Agent Tasks', closable: true }]
+    })
     setActiveTabId(tabId)
   }, [])
 
@@ -1800,6 +1810,7 @@ function App() {
   }, [])
 
   const closeTab = useCallback((tabId) => {
+    if (tabId === 'dashboard') return
     setTabs((prevTabs) => {
       const idx = prevTabs.findIndex((t) => t.id === tabId)
       if (idx === -1) return prevTabs
@@ -1808,7 +1819,7 @@ function App() {
         if (active !== tabId) return active
         if (idx > 0) return prevTabs[idx - 1].id
         if (nextTabs.length > 0) return nextTabs[0].id
-        return 'agent-tasks'
+        return 'dashboard'
       })
       return nextTabs
     })
@@ -2128,10 +2139,21 @@ function App() {
           </div>
         )}
         <div className="header-controls">
-          {activeTab.type === 'agent-tasks' && (
-            <span className="header-chat-label">Agent Tasks</span>
-          )}
-          {activeTab.type === 'markdown' && (
+          <button
+            type="button"
+            className={`header-agent-tasks-btn ${activeTab?.type === 'agent-tasks' ? 'active' : ''}`}
+            onClick={openAgentTasksTab}
+            title="Open Agent Tasks"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <path d="M16 2v4" /><path d="M8 2v4" />
+              <path d="M3 10h18" />
+              <path d="M8 14h.01" /><path d="M12 14h.01" /><path d="M16 14h.01" />
+            </svg>
+            <span>Agent Tasks</span>
+          </button>
+          {activeTab?.type === 'markdown' && (
             <div className="markdown-mode-toggle">
               <button className={`markdown-mode-btn ${markdownViewMode === 'edit' ? 'active' : ''}`} onClick={() => setMarkdownViewMode('edit')}>Edit</button>
               <button className={`markdown-mode-btn ${markdownViewMode === 'preview' ? 'active' : ''}`} onClick={() => setMarkdownViewMode('preview')}>Preview</button>
@@ -2335,7 +2357,7 @@ function App() {
               {tabs.map(tab => (
                 <button
                   key={tab.id}
-                  className={`workspace-tab ${tab.id === activeTabId ? 'active' : ''}`}
+                  className={`workspace-tab ${tab.id === 'dashboard' ? 'workspace-tab-home' : ''} ${tab.id === activeTabId ? 'active' : ''}`}
                   onClick={() => switchToTab(tab.id)}
                   data-tab-id={tab.id}
                 >
@@ -2388,7 +2410,12 @@ function App() {
               />
             </div>
           ))}
-          {activeTab.type === 'diagram' && activeTab.data ? (
+          {activeTab?.type === 'dashboard' ? (
+            <Dashboard
+              key={currentUniverseId ?? 'none'}
+              universeId={currentUniverseId}
+            />
+          ) : activeTab?.type === 'diagram' && activeTab.data ? (
             <DiagramEditorView
               key={activeTab.id}
               diagram={activeTab.data}

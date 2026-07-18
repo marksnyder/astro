@@ -9,6 +9,7 @@ import { parseDiagramData, EMPTY_DIAGRAM_JSON } from './diagramParse'
 import CategoryTree from './CategoryTree'
 import AgentTasksPanel from './AgentTasksPanel'
 import ChatBackground from './ChatBackground'
+import Dashboard from './Dashboard'
 import { sortCategoriesForTree } from './categorySidebarOrder'
 import { formatCategoryHierarchyLabel } from './categoryHierarchy'
 import { MobileCategoryTree } from './SidebarCategoryTree'
@@ -1516,7 +1517,7 @@ SLACK_DEFAULT_CHANNEL_ID=C0123456789`}</pre>
 function MobileApp() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
-  const [view, setView] = useState('markdowns')
+  const [view, setView] = useState('dashboard')
   const [categories, setCategories] = useState([])
   const [universes, setUniverses] = useState([])
   const [currentUniverseId, setCurrentUniverseId] = useState(null)
@@ -1598,6 +1599,7 @@ function MobileApp() {
       <nav className={`m-menu ${menuOpen ? 'open' : ''}`}>
         <div className="m-menu-section">
           <div className="m-menu-section-title">Actions</div>
+          <button className="m-menu-item" onClick={() => { setView('dashboard'); setMenuOpen(false) }}>Dashboard</button>
           <a className="m-menu-item m-menu-link" href="/">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>
             Desktop Version
@@ -1617,6 +1619,11 @@ function MobileApp() {
       {/* Content area */}
       <div className="m-content">
         <ChatBackground variant="mobile">
+        {view === 'dashboard' && (
+          <div className="m-dashboard-shell">
+            <Dashboard key={currentUniverseId ?? 'none'} universeId={currentUniverseId} variant="mobile" />
+          </div>
+        )}
         {view === 'markdowns' && <MobileMarkdowns categories={categories} universeId={currentUniverseId} />}
         {view === 'feeds' && <MobileFeeds categories={categories} universeId={currentUniverseId} />}
         {view === 'tables' && <MobileTables categories={categories} universeId={currentUniverseId} />}
@@ -1636,6 +1643,12 @@ function MobileApp() {
 
       {/* Bottom tab bar */}
       <nav className="m-tab-bar m-tab-bar-scroll">
+        <button className={`m-tab ${view === 'dashboard' ? 'active' : ''}`} onClick={() => setView('dashboard')}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+          </svg>
+          <span>Home</span>
+        </button>
         <button className={`m-tab ${view === 'markdowns' ? 'active' : ''}`} onClick={() => setView('markdowns')}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
           <span>Markdowns</span>
