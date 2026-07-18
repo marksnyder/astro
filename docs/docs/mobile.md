@@ -6,7 +6,14 @@ nav_id: mobile
 permalink: /docs/mobile/
 ---
 
-Astro serves a **mobile optimized** web app at **`/mobile`** so you can use notes, tasks, feeds, library, categories, and agent tasks on a phone or tablet against the same universe as desktop.
+Astro serves a **mobile optimized** web app at **`/mobile`** so you can use notes, feeds, tables, the universe **dashboard**, **scripts** (run-only), **agent tasks**, **Python tasks**, library, and categories on a phone or tablet—same universe and API as desktop.
+
+### Mobile highlights
+
+- **Home** — universe dashboard with horizontal snap-scroll across the four widget columns
+- **Agent tasks** — run and enable/disable; create and edit on desktop
+- **Python tasks** — run scheduled scripts; create and edit on desktop
+- **Scripts** — listed under menu (edit on desktop); run from task list or script tabs on desktop
 
 ## HTTP API
 

@@ -8,6 +8,15 @@ pages:
   - id: agent-tasks
     title: Agent Tasks
     path: /docs/agent-tasks/
+  - id: python-tasks
+    title: Python Tasks
+    path: /docs/python-tasks/
+  - id: scripts
+    title: Scripts
+    path: /docs/scripts/
+  - id: dashboard
+    title: Universe dashboard
+    path: /docs/dashboard/
   - id: vector-search
     title: Vector search & stats
     path: /docs/vector-search/

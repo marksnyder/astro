@@ -6,7 +6,7 @@ nav_id: agent-tasks
 permalink: /docs/agent-tasks/
 ---
 
-Agent Tasks turn markdown notes into **instructions you can push to Slack on a schedule or on demand**. Use them when an external agent (or a human in Slack) should receive a consistent prompt that references content stored in Astro.
+Agent Tasks turn markdown notes into **instructions you can push to Slack on a schedule or on demand**. For **server-side Python** on a schedule, see [Python Tasks](/docs/python-tasks/) and [Scripts](/docs/scripts/).
 
 ### What you configure
 

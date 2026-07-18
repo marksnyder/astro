@@ -6,25 +6,47 @@ nav_id: home
 permalink: /docs/
 ---
 
-Welcome to the Astro documentation. Use the **table of contents** on the left to open each topic. Every page describes the product feature and lists the **HTTP API** routes and **MCP tools** that relate to it.
+Welcome to Astro documentation. Each page describes a product capability and lists the **HTTP API** routes and **MCP tools** that belong to it.
 
-Astro is a **self hosted platform for building applications on top of AI**: agents, memory, tools, and data in one stack. [MCP](https://modelcontextprotocol.io) (Model Context Protocol) is woven into each feature instead of a separate chapter: point any MCP compatible client at your Astro instance’s `/mcp/` endpoint and use the tools listed on the relevant pages below.
+## The idea
 
-## Browse by topic
+Astro is not a chat app with a memory bolt-on. It is a **self-hosted application layer for AI**: the place where humans and agents share the same notes, tables, diagrams, scripts, feeds, and schedules—so you can **ship experiences** instead of wiring a new stack for every project.
 
-- [Slack Integration](/docs/agent-network/) — Slack bot for agent coordination
+Three principles run through the product:
+
+1. **One corpus, many consumers** — Markdowns, documents, and uploads embed into a local vector index. The UI, REST API, and [MCP](https://modelcontextprotocol.io) server read and write the same objects. Agents do not need a shadow database.
+2. **Composition over monoliths** — Universes isolate projects. Categories organize content. [Agent Tasks](/docs/agent-tasks/) coordinate people in Slack; [Python Tasks](/docs/python-tasks/) run code on the server; [Feeds](/docs/feeds/) ingest streams; the [dashboard](/docs/dashboard/) surfaces what matters now. You assemble apps from blocks.
+3. **Your machine, your rules** — Embeddings run locally. Data lives in volumes you control. Optional Tailscale and API keys let you expose the stack safely without renting someone else’s memory.
+
+Point any MCP client at `https://your-host/mcp/` and use the tools on each page below.
+
+## Automation & coordination
+
+- [Slack Integration](/docs/agent-network/) — bot for agent coordination
 - [Agent Tasks](/docs/agent-tasks/) — scheduled Slack delivery from markdown
-- [Vector search & stats](/docs/vector-search/) — semantic search and index maintenance
+- [Scripts](/docs/scripts/) — Python source with editor and run
+- [Python Tasks](/docs/python-tasks/) — scheduled or manual script execution
+- [Universe dashboard](/docs/dashboard/) — four-column markdown widget board
+
+## Content & memory
+
 - [Markdowns](/docs/markdowns/)
 - [Document archive](/docs/documents/)
 - [Diagrams](/docs/diagrams/)
 - [Tables](/docs/tables/)
 - [Bookmarks](/docs/bookmarks/)
+- [Feeds](/docs/feeds/)
+
+## Organization & discovery
+
 - [Universes](/docs/universes/)
 - [Categories](/docs/categories/)
 - [Pinned items](/docs/pinned-items/)
+- [Vector search & stats](/docs/vector-search/)
 - [Unified search (UI)](/docs/unified-search/)
-- [Mobile interface](/docs/mobile/)
-- [Feeds](/docs/feeds/)
 
-The previous single page “Features” overview now redirects here (`/docs/`).
+## Clients
+
+- [Mobile interface](/docs/mobile/)
+
+The old `/features/` URL redirects here.

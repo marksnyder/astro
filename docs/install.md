@@ -4,7 +4,7 @@ title: Installation
 subtitle: Get Astro running in under a minute
 ---
 
-Astro is **self hosted** software for **building apps on top of AI**: connect MCP clients, run agents, and store memory without handing your data to a third party host.
+Astro is **self hosted** software for **building apps on top of AI**: structured memory, dashboards, scheduled Python and Slack tasks, and MCP—without handing your corpus to a third-party host.
 
 ## Quick Start
 
@@ -112,11 +112,12 @@ The default channel can also be set in **Settings → Agent tasks (Slack)** in t
 
 After installation:
 
-1. Open **http://localhost:8000** in your browser
-2. Configure Slack in Settings (or set `SLACK_BOT_TOKEN` before install) for Agent Tasks
-3. Connect MCP clients, create markdown instructions, or run Agent Tasks
+1. Open **http://localhost:8000** — your universe **dashboard** is the default home tab
+2. Create **markdowns**, **scripts**, or **tables**; pin what you use often
+3. Configure Slack in Settings for [Agent Tasks](/docs/agent-tasks/); schedule [Python Tasks](/docs/python-tasks/) against saved scripts
+4. Point MCP clients at `http://localhost:8000/mcp/` (see [docs](/docs/))
 
-Embeddings are handled locally and no external API keys are required.
+Embeddings are handled locally; no external API keys are required for search.
 
 ## Connecting AI Agents
 
