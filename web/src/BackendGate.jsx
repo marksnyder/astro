@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 
-const PROBE_INTERVAL_MS = 8000
+const PROBE_INTERVAL_MS = 12000
 const PROBE_TIMEOUT_MS = 10000
+/** Require several consecutive failures before blocking the app (avoids brief blips). */
+const FAILURES_BEFORE_DOWN = 3
 
 function probeBackend(signal) {
   return fetch('/api/version', {
@@ -17,20 +19,36 @@ function probeBackend(signal) {
 export default function BackendGate({ children }) {
   const [reachable, setReachable] = useState(null)
   const ctrlRef = useRef(null)
+  const probeGenRef = useRef(0)
+  const failureCountRef = useRef(0)
 
   const doProbe = useCallback(() => {
     ctrlRef.current?.abort()
+    const gen = ++probeGenRef.current
     const ctrl = new AbortController()
     ctrlRef.current = ctrl
-    const tm = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT_MS)
+    let timedOut = false
+    const tm = setTimeout(() => {
+      timedOut = true
+      ctrl.abort()
+    }, PROBE_TIMEOUT_MS)
     return probeBackend(ctrl.signal)
       .then(() => {
+        if (gen !== probeGenRef.current) return
         clearTimeout(tm)
+        failureCountRef.current = 0
         setReachable(true)
       })
       .catch(() => {
+        if (gen !== probeGenRef.current) return
         clearTimeout(tm)
-        setReachable(false)
+        // A newer probe replaced this one — not a real failure.
+        const superseded = !timedOut && ctrl.signal.aborted
+        if (superseded) return
+        failureCountRef.current += 1
+        if (failureCountRef.current >= FAILURES_BEFORE_DOWN) {
+          setReachable(false)
+        }
       })
   }, [])
 
@@ -41,8 +59,14 @@ export default function BackendGate({ children }) {
       if (document.visibilityState === 'visible') doProbe()
     }
     document.addEventListener('visibilitychange', onVis)
-    const onOnline = () => doProbe()
-    const onOffline = () => setReachable(false)
+    const onOnline = () => {
+      failureCountRef.current = 0
+      doProbe()
+    }
+    const onOffline = () => {
+      failureCountRef.current = FAILURES_BEFORE_DOWN
+      setReachable(false)
+    }
     window.addEventListener('online', onOnline)
     window.addEventListener('offline', onOffline)
     return () => {
@@ -55,6 +79,7 @@ export default function BackendGate({ children }) {
   }, [doProbe])
 
   const retry = () => {
+    failureCountRef.current = 0
     setReachable(null)
     doProbe()
   }

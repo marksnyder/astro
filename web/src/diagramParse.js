@@ -1,3 +1,5 @@
+import { generateKeyBetween } from 'fractional-indexing'
+
 const EXCALIDRAW_SOURCE = 'https://excalidraw.com'
 
 export const EMPTY_DIAGRAM_JSON = JSON.stringify({
@@ -9,15 +11,40 @@ export const EMPTY_DIAGRAM_JSON = JSON.stringify({
   files: {},
 })
 
+/** Excalidraw 0.18 expects strict fractional index strings; bad values crash on load. */
+function isValidFractionalIndexKey(key) {
+  if (typeof key !== 'string' || !key) return false
+  try {
+    generateKeyBetween(key, null)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function sanitizeElementIndices(elements) {
+  if (!Array.isArray(elements)) return []
+  return elements.map((el) => {
+    if (!el || el.index == null || isValidFractionalIndexKey(el.index)) return el
+    const { index: _removed, ...rest } = el
+    return rest
+  })
+}
+
 /** Parse stored diagram JSON for Excalidraw (handles legacy v1). */
 export function parseDiagramData(raw) {
   try {
     const parsed = JSON.parse(raw)
-    if (parsed.type === 'excalidraw') return parsed
+    if (parsed.type === 'excalidraw') {
+      return {
+        ...parsed,
+        elements: sanitizeElementIndices(parsed.elements),
+      }
+    }
     if (parsed.version === 1 && Array.isArray(parsed.elements)) {
       return {
         type: 'excalidraw', version: 2, source: EXCALIDRAW_SOURCE,
-        elements: parsed.elements.map(el => {
+        elements: sanitizeElementIndices(parsed.elements.map(el => {
           const base = {
             id: el.id || crypto.randomUUID?.() || Math.random().toString(36).slice(2),
             type: el.type === 'line' ? 'arrow' : el.type,
@@ -47,7 +74,7 @@ export function parseDiagramData(raw) {
             if (el.textColor) base.strokeColor = el.textColor
           }
           return base
-        }),
+        })),
         appState: { viewBackgroundColor: '#ffffff', gridSize: 20 },
         files: {},
       }
