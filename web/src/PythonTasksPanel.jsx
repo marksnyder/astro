@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 function fmtTs(iso) {
   if (!iso) return '—'
@@ -83,7 +83,6 @@ function buildPythonTaskPutBody(t, enabled) {
 export default function PythonTasksPanel({ universeId, mobileReadOnly = false, onEditScript }) {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
   const [universesById, setUniversesById] = useState({})
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -163,27 +162,6 @@ export default function PythonTasksPanel({ universeId, mobileReadOnly = false, o
     }, 300)
     return () => clearTimeout(t)
   }, [scriptPickerQuery, modalOpen])
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return tasks
-    return tasks.filter((t) => {
-      const uName = universesById[t.universe_id] || ''
-      const blob = [
-        t.title,
-        t.script_title,
-        t.cron_expr,
-        t.schedule_mode,
-        t.last_run_status,
-        uName,
-        String(t.universe_id ?? ''),
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-      return blob.includes(q)
-    })
-  }, [tasks, search, universesById])
 
   const openAdd = () => {
     setEditingId(null)
@@ -375,14 +353,6 @@ export default function PythonTasksPanel({ universeId, mobileReadOnly = false, o
           </button>
         )}
       </div>
-      <div className="markdowns-search">
-        <input
-          className="markdowns-search-input"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={mobileReadOnly ? 'Search tasks…' : 'Search by title, script, universe, schedule…'}
-        />
-      </div>
       {loadError && (
         <div className="agent-tasks-load-error" role="alert">
           {loadError}
@@ -392,17 +362,15 @@ export default function PythonTasksPanel({ universeId, mobileReadOnly = false, o
       <div className="agent-tasks-table-wrap">
         {loading ? (
           <div className="markdowns-empty">Loading…</div>
-        ) : filtered.length === 0 ? (
+        ) : tasks.length === 0 ? (
           <div className="markdowns-empty">
-            {tasks.length === 0
-              ? mobileReadOnly
-                ? 'No tasks yet. Create tasks on the desktop app.'
-                : 'No tasks yet. Add one to run a script on a schedule.'
-              : 'No tasks match your search.'}
+            {mobileReadOnly
+              ? 'No tasks yet. Create tasks on the desktop app.'
+              : 'No tasks yet. Add one to run a script on a schedule.'}
           </div>
         ) : mobileReadOnly ? (
           <div className="agent-tasks-mobile-list">
-            {filtered.map((t) => (
+            {tasks.map((t) => (
               <div key={t.id} className="agent-tasks-mobile-card">
                 <div className="agent-tasks-mobile-card-head">
                   <span className="agent-tasks-mobile-card-title">{t.title || 'Untitled'}</span>
@@ -442,7 +410,7 @@ export default function PythonTasksPanel({ universeId, mobileReadOnly = false, o
               </tr>
             </thead>
             <tbody>
-              {filtered.map((t) => (
+              {tasks.map((t) => (
                 <tr
                   key={t.id}
                   className={

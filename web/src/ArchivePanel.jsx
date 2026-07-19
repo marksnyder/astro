@@ -78,7 +78,6 @@ EXT_ICONS.doc = EXT_ICONS.docx
 
 function ArchivePanel({ categories, onPinChange, universeId, universes, onLoaded }) {
   const [docs, setDocs] = useState([])
-  const [search, setSearch] = useState('')
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState('') // e.g. "Uploading 2 of 5..."
   const [uploadError, setUploadError] = useState('')
@@ -87,7 +86,6 @@ function ArchivePanel({ categories, onPinChange, universeId, universes, onLoaded
 
   const fetchDocs = () => {
     const params = new URLSearchParams()
-    if (search) params.set('q', search)
     if (universeId) params.set('universe_id', universeId)
     fetch(`/api/documents?${params}`)
       .then(res => res.json())
@@ -97,10 +95,6 @@ function ArchivePanel({ categories, onPinChange, universeId, universes, onLoaded
   }
 
   useEffect(() => { fetchDocs() }, [universeId])
-  useEffect(() => {
-    const timer = setTimeout(fetchDocs, 300)
-    return () => clearTimeout(timer)
-  }, [search, universeId])
 
   const openDoc = (e, doc) => {
     e.stopPropagation()
@@ -226,14 +220,11 @@ function ArchivePanel({ categories, onPinChange, universeId, universes, onLoaded
       {uploadError && (
         <div className="archive-upload-error" onClick={() => setUploadError('')}>{uploadError}</div>
       )}
-      <div className="markdowns-search">
-        <input className="markdowns-search-input" placeholder="Search documents..." value={search} onChange={(e) => setSearch(e.target.value)} />
-      </div>
       <div className="markdowns-list">
         {(() => {
           if (docs.length === 0) return (
             <div className="markdowns-empty">
-              {search ? 'No matching documents.' : 'No documents in archive.'}
+              No documents in archive.
             </div>
           )
           return (

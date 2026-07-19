@@ -817,7 +817,7 @@ html.m-mobile-shell #root {
   transition: background 0.1s;
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   /* <button> rows do not inherit body color; match div-based list cards */
   color: var(--text-primary);
@@ -843,16 +843,18 @@ html.m-mobile-shell #root {
 }
 
 .mn-markdown-title {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: break-word;
   display: flex;
   flex: 1;
   min-width: 0;
-  align-items: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
   gap: 5px;
+  padding-right: 8px;
 }
 
 .mn-pin-icon {

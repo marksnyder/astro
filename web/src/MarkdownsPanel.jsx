@@ -535,11 +535,9 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
 
 function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMarkdownRequestHandled, universeId, universes, onEditMarkdown, refreshKey, onLoaded }) {
   const [markdowns, setMarkdowns] = useState([])
-  const [search, setSearch] = useState('')
 
   const fetchMarkdowns = () => {
     const params = new URLSearchParams()
-    if (search) params.set('q', search)
     if (universeId) params.set('universe_id', universeId)
     fetch(`/api/markdowns?${params}`)
       .then(res => res.json())
@@ -549,10 +547,6 @@ function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMa
   }
 
   useEffect(() => { fetchMarkdowns() }, [universeId, refreshKey])
-  useEffect(() => {
-    const timer = setTimeout(fetchMarkdowns, 300)
-    return () => clearTimeout(timer)
-  }, [search, universeId])
 
   useEffect(() => {
     if (editMarkdownRequest) {
@@ -615,14 +609,11 @@ function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMa
           </svg>
         </button>
       </div>
-      <div className="markdowns-search">
-        <input className="markdowns-search-input" placeholder="Search markdowns..." value={search} onChange={(e) => setSearch(e.target.value)} />
-      </div>
       <div className="markdowns-list">
         {(() => {
           if (markdowns.length === 0) return (
             <div className="markdowns-empty">
-              {search ? 'No matching markdowns.' : 'No markdowns yet. Click + to create one.'}
+              No markdowns yet. Click + to create one.
             </div>
           )
           return (

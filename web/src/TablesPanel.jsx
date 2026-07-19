@@ -39,27 +39,19 @@ function columnTypeHint(type) {
 
 function TablesPanel({ categories, universeId, universes, onPinChange, onEditTable, refreshKey, onLoaded }) {
   const [tables, setTables] = useState([])
-  const [search, setSearch] = useState('')
   const [editingTable, setEditingTable] = useState(null)
 
   const fetchTables = useCallback(() => {
     const params = new URLSearchParams()
-    if (search) params.set('q', search)
     if (universeId) params.set('universe_id', universeId)
     fetch(`/api/tables?${params}`)
       .then(r => r.json())
       .then(setTables)
       .catch(() => {})
       .finally(() => onLoaded?.())
-  }, [search, universeId])
+  }, [universeId, onLoaded])
 
-  useEffect(() => { fetchTables() }, [universeId])
-  useEffect(() => {
-    const t = setTimeout(fetchTables, 300)
-    return () => clearTimeout(t)
-  }, [search, universeId])
-
-  useEffect(() => { fetchTables() }, [refreshKey])
+  useEffect(() => { fetchTables() }, [universeId, refreshKey, fetchTables])
 
   const startNew = () => {
     const t = { _new: true, universeId }
@@ -138,12 +130,9 @@ function TablesPanel({ categories, universeId, universes, onPinChange, onEditTab
           </svg>
         </button>
       </div>
-      <div className="markdowns-search">
-        <input className="markdowns-search-input" placeholder="Search tables..." value={search} onChange={e => setSearch(e.target.value)} />
-      </div>
       <div className="markdowns-list">
         {tables.length === 0 ? (
-          <div className="markdowns-empty">{search ? 'No matching tables.' : 'No tables yet. Click + to create one.'}</div>
+          <div className="markdowns-empty">No tables yet. Click + to create one.</div>
         ) : (
           <SidebarCategoryTree
             universeId={universeId}

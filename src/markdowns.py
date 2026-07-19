@@ -1544,12 +1544,9 @@ def move_markdown_to_universe(markdown_id: int, universe_id: int, category_id: i
     md = get_markdown(markdown_id)
     if not md:
         return None
-    from src.store import upsert_markdown
+    from src.embedding_queue import schedule_reindex
 
-    try:
-        upsert_markdown(md.id, f"{md.title}\n\n{md.body}", md.title, universe_id=universe_id)
-    except Exception as e:
-        print(f"[Astro] WARNING: Failed to upsert markdown {markdown_id} after universe move: {e}")
+    schedule_reindex("markdown", md.id)
     return md
 
 

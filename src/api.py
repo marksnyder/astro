@@ -148,6 +148,7 @@ from src.markdowns import (
     get_table,
     get_table_row,
     list_diagram_summaries,
+    list_diagrams,
     list_pinned_diagram_summaries,
     list_pinned_tables,
     list_table_rows,
@@ -163,11 +164,21 @@ from src.markdowns import (
 from src.store import (
     add_documents,
     delete_document_chunks,
-    delete_markdown_from_store,
     doc_count,
-    get_retriever,
+    search_content,
+    upsert_item,
     upsert_markdown,
+    INDEXED_CONTENT_TYPES,
 )
+from src.text_search import text_search
+from src.embedding_queue import (
+    EmbeddingQueue,
+    schedule_delete_index,
+    schedule_markdown_delete,
+    schedule_markdown_embed,
+    schedule_reindex,
+)
+from src.index_content import build_index_payload, list_universe_item_ids
 from src.universe_pack import build_universe_export_zip, import_universe_bundle_from_bytes
 
 DOCUMENTS_DIR = Path(__file__).resolve().parent.parent / "documents"
@@ -186,6 +197,7 @@ async def _lifespan(application):
 
     AgentTaskRunner.get()
     PythonTaskRunner.get()
+    EmbeddingQueue.get()
 
     async with _mcp_app.lifespan(application):
         yield
@@ -197,6 +209,8 @@ async def _lifespan(application):
         _ATR._instance.stop()
     if _PTR._instance is not None:
         _PTR._instance.stop()
+    if EmbeddingQueue._instance is not None:
+        EmbeddingQueue._instance.stop()
 
 
 app = FastAPI(title="Astro", version="1.0.0", lifespan=_lifespan)
@@ -354,8 +368,9 @@ def api_delete_universe(uid: int):
         raise HTTPException(status_code=404, detail="Universe not found")
 
     # Clean up vector store entries before deleting DB rows
-    for nid in get_universe_markdown_ids(uid):
-        delete_markdown_from_store(nid)
+    for content_type in INDEXED_CONTENT_TYPES:
+        for item_id in list_universe_item_ids(content_type, uid):
+            schedule_delete_index(content_type, item_id)
     for path in get_universe_document_paths(uid):
         delete_document_chunks(str(DOCUMENTS_DIR / path))
         # Remove physical file
@@ -506,10 +521,7 @@ def api_get_markdown(markdown_id: int):
 @app.post("/api/markdowns", response_model=MarkdownResponse, status_code=201)
 def api_create_markdown(req: MarkdownRequest, universe_id: int = 1):
     markdown = create_markdown(req.title, req.body, req.category_id, universe_id=universe_id)
-    try:
-        upsert_markdown(markdown.id, f"{markdown.title}\n\n{markdown.body}", markdown.title, universe_id=universe_id)
-    except Exception as e:
-        print(f"[Astro] WARNING: Failed to upsert markdown {markdown.id} into vector store: {e}")
+    schedule_markdown_embed(markdown.id, markdown.title, markdown.body, universe_id=universe_id)
     return markdown_to_dict(markdown)
 
 
@@ -518,10 +530,9 @@ def api_update_markdown(markdown_id: int, req: MarkdownRequest):
     markdown = update_markdown(markdown_id, req.title, req.body, req.category_id)
     if not markdown:
         raise HTTPException(status_code=404, detail="Markdown not found")
-    try:
-        upsert_markdown(markdown.id, f"{markdown.title}\n\n{markdown.body}", markdown.title, universe_id=markdown.universe_id)
-    except Exception as e:
-        print(f"[Astro] WARNING: Failed to upsert markdown {markdown.id} into vector store: {e}")
+    schedule_markdown_embed(
+        markdown.id, markdown.title, markdown.body, universe_id=markdown.universe_id
+    )
     return markdown_to_dict(markdown)
 
 
@@ -546,7 +557,7 @@ def api_delete_markdown(markdown_id: int):
     delete_all_markdown_images(markdown_id)
     if not delete_markdown(markdown_id):
         raise HTTPException(status_code=404, detail="Markdown not found")
-    delete_markdown_from_store(markdown_id)
+    schedule_markdown_delete(markdown_id)
     return {"ok": True}
 
 
@@ -621,6 +632,7 @@ def api_get_link(link_id: int):
 @app.post("/api/links", response_model=LinkResponse, status_code=201)
 def api_create_link(req: LinkRequest, universe_id: int = 1):
     link = create_link(req.title, req.url, req.category_id, universe_id=universe_id)
+    schedule_reindex("link", link.id)
     return link_to_dict(link)
 
 
@@ -629,6 +641,7 @@ def api_update_link(link_id: int, req: LinkRequest):
     link = update_link(link_id, req.title, req.url, req.category_id)
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")
+    schedule_reindex("link", link.id)
     return link_to_dict(link)
 
 
@@ -640,6 +653,7 @@ def api_move_link_universe(link_id: int, req: MoveToUniverseRequest):
     link = move_link_to_universe(link_id, req.universe_id, req.category_id)
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")
+    schedule_reindex("link", link.id)
     return link_to_dict(link)
 
 
@@ -647,6 +661,7 @@ def api_move_link_universe(link_id: int, req: MoveToUniverseRequest):
 def api_delete_link(link_id: int):
     if not delete_link(link_id):
         raise HTTPException(status_code=404, detail="Link not found")
+    schedule_delete_index("link", link_id)
     return {"ok": True}
 
 
@@ -911,6 +926,9 @@ def api_upload_document(file: UploadFile, universe_id: int = 1):
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {e}")
     rel = dest.relative_to(DOCUMENTS_DIR)
     set_document_universe(str(rel), universe_id)
+    from src.document_search import index_document_text
+
+    index_document_text(str(rel))
     return {"name": dest.name, "path": str(rel), "chunks": len(chunks)}
 
 
@@ -1213,6 +1231,7 @@ def api_create_script(req: ScriptRequest, universe_id: int = 1):
         s = create_script(req.title, req.source, req.category_id, universe_id=universe_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    schedule_reindex("script", s.id)
     return script_to_dict(s)
 
 
@@ -1224,6 +1243,7 @@ def api_update_script(script_id: int, req: ScriptRequest):
         raise HTTPException(status_code=400, detail=str(e)) from e
     if not s:
         raise HTTPException(status_code=404, detail="Script not found")
+    schedule_reindex("script", s.id)
     return script_to_dict(s)
 
 
@@ -1235,6 +1255,7 @@ def api_move_script_universe(script_id: int, req: MoveToUniverseRequest):
     s = move_script_to_universe(script_id, req.universe_id, req.category_id)
     if not s:
         raise HTTPException(status_code=404, detail="Script not found")
+    schedule_reindex("script", s.id)
     return script_to_dict(s)
 
 
@@ -1242,6 +1263,7 @@ def api_move_script_universe(script_id: int, req: MoveToUniverseRequest):
 def api_delete_script(script_id: int):
     if not delete_script(script_id):
         raise HTTPException(status_code=404, detail="Script not found")
+    schedule_delete_index("script", script_id)
     return {"ok": True}
 
 
@@ -1486,22 +1508,36 @@ def api_reindex():
     Call this after a restore to re-create all embeddings.
     """
     import traceback
-    from src.store import clear, add_documents as add_docs, upsert_markdown
+    from src.store import clear, add_documents as add_docs, upsert_item
 
-    counts = {"markdowns": 0, "document_chunks": 0}
+    counts = {t: 0 for t in INDEXED_CONTENT_TYPES}
+    counts["document_chunks"] = 0
 
     try:
-        # 1. Clear existing vector store
         print("[reindex] Clearing vector store...")
         clear()
 
-        # 2. Re-index markdowns
-        print("[reindex] Indexing markdowns...")
-        for markdown in list_markdowns():
-            upsert_markdown(markdown.id, f"{markdown.title}\n\n{markdown.body}", markdown.title, universe_id=markdown.universe_id)
-            counts["markdowns"] += 1
+        print("[reindex] Indexing structured content...")
+        for content_type in INDEXED_CONTENT_TYPES:
+            list_fn = {
+                "markdown": list_markdowns,
+                "script": list_scripts,
+                "link": list_links,
+                "diagram": list_diagrams,
+                "table": list_tables,
+                "feed": list_feeds,
+            }[content_type]
+            items = list_fn()
+            for item in items:
+                payload = build_index_payload(content_type, item.id)
+                if not payload:
+                    continue
+                content, title, uid, extra = payload
+                if not content.strip():
+                    continue
+                upsert_item(content_type, item.id, content, title, uid, extra)
+                counts[content_type] += 1
 
-        # 3. Re-index documents from the documents/ folder
         print("[reindex] Indexing documents...")
         all_meta = get_all_document_meta()
         if DOCUMENTS_DIR.is_dir():
@@ -1520,6 +1556,9 @@ def api_reindex():
                         chunks = chunk_documents(docs)
                         add_docs(chunks, universe_id=uid)
                         counts["document_chunks"] += len(chunks)
+                    from src.document_search import index_document_text
+
+                    index_document_text(rel)
                 except Exception as e:
                     print(f"[reindex] Error processing {f.name}: {e}")
 
@@ -1602,6 +1641,7 @@ def api_get_feed(feed_id: int):
 @app.post("/api/feeds", response_model=FeedResponse, status_code=201)
 def api_create_feed(req: FeedRequest, universe_id: int = 1):
     feed = create_feed(req.title, req.category_id, universe_id=universe_id)
+    schedule_reindex("feed", feed.id)
     return feed_to_dict(feed)
 
 
@@ -1610,6 +1650,7 @@ def api_update_feed(feed_id: int, req: FeedRequest):
     feed = update_feed(feed_id, req.title, req.category_id)
     if not feed:
         raise HTTPException(status_code=404, detail="Feed not found")
+    schedule_reindex("feed", feed.id)
     return feed_to_dict(feed)
 
 
@@ -1621,6 +1662,7 @@ def api_move_feed_universe(feed_id: int, req: MoveToUniverseRequest):
     feed = move_feed_to_universe(feed_id, req.universe_id, req.category_id)
     if not feed:
         raise HTTPException(status_code=404, detail="Feed not found")
+    schedule_reindex("feed", feed.id)
     return feed_to_dict(feed)
 
 
@@ -1628,6 +1670,7 @@ def api_move_feed_universe(feed_id: int, req: MoveToUniverseRequest):
 def api_delete_feed(feed_id: int):
     if not delete_feed(feed_id):
         raise HTTPException(status_code=404, detail="Feed not found")
+    schedule_delete_index("feed", feed_id)
     return {"ok": True}
 
 
@@ -1688,8 +1731,13 @@ def api_unread_counts(universe_id: Optional[int] = None):
 
 @app.delete("/api/feed-posts/{post_id}")
 def api_delete_feed_post(post_id: int):
+    post = get_feed_post(post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    feed_id = post.feed_id
     if not delete_feed_post(post_id):
         raise HTTPException(status_code=404, detail="Post not found")
+    schedule_reindex("feed", feed_id)
     return {"ok": True}
 
 
@@ -1708,10 +1756,7 @@ def api_post_to_markdown(post_id: int):
     cat_id = feed.category_id if feed else None
     markdown_body = md(post.markdown or "", heading_style="ATX", bullets="-").strip()
     markdown = create_markdown(post.title, markdown_body, category_id=cat_id, universe_id=uid)
-    try:
-        upsert_markdown(markdown.id, f"{markdown.title}\n\n{markdown.body}", markdown.title, universe_id=uid)
-    except Exception as e:
-        print(f"[Astro] WARNING: Failed to upsert markdown {markdown.id} into vector store: {e}")
+    schedule_markdown_embed(markdown.id, markdown.title, markdown.body, universe_id=uid)
     return {"ok": True, "markdown_id": markdown.id}
 
 
@@ -1844,9 +1889,11 @@ async def api_feed_ingest(
     if file and file.filename:
         data = await file.read()
         post = create_feed_post_file(feed_id, title.strip(), file.filename, data)
+        schedule_reindex("feed", feed_id)
         return {"ok": True, "post_id": post.id, "content_type": "file"}
     elif markdown is not None:
         post = create_feed_post_markdown(feed_id, title.strip(), _ensure_markdown(markdown))
+        schedule_reindex("feed", feed_id)
         return {"ok": True, "post_id": post.id, "content_type": "markdown"}
     else:
         raise HTTPException(status_code=400, detail="Provide either 'markdown' or 'file'")
@@ -1956,6 +2003,7 @@ def api_get_diagram(diagram_id: int):
 @app.post("/api/diagrams", response_model=DiagramResponse, status_code=201)
 def api_create_diagram(req: DiagramRequest, universe_id: int = 1):
     diagram = create_diagram(req.title, req.data, req.category_id, universe_id=universe_id)
+    schedule_reindex("diagram", diagram.id)
     return diagram_to_dict(diagram)
 
 
@@ -1964,6 +2012,7 @@ def api_update_diagram(diagram_id: int, req: DiagramRequest):
     diagram = update_diagram(diagram_id, req.title, req.data, req.category_id)
     if not diagram:
         raise HTTPException(status_code=404, detail="Diagram not found")
+    schedule_reindex("diagram", diagram.id)
     return diagram_to_dict(diagram)
 
 
@@ -1975,6 +2024,7 @@ def api_move_diagram_universe(diagram_id: int, req: MoveToUniverseRequest):
     diagram = move_diagram_to_universe(diagram_id, req.universe_id, req.category_id)
     if not diagram:
         raise HTTPException(status_code=404, detail="Diagram not found")
+    schedule_reindex("diagram", diagram.id)
     return diagram_to_dict(diagram)
 
 
@@ -1982,6 +2032,7 @@ def api_move_diagram_universe(diagram_id: int, req: MoveToUniverseRequest):
 def api_delete_diagram(diagram_id: int):
     if not delete_diagram(diagram_id):
         raise HTTPException(status_code=404, detail="Diagram not found")
+    schedule_delete_index("diagram", diagram_id)
     return {"ok": True}
 
 
@@ -2041,6 +2092,7 @@ def api_get_table(table_id: int):
 @app.post("/api/tables", response_model=TableResponse, status_code=201)
 def api_create_table(req: TableRequest, universe_id: int = 1):
     t = create_table(req.title, req.columns, req.category_id, universe_id=universe_id)
+    schedule_reindex("table", t.id)
     return table_to_dict(t)
 
 
@@ -2049,6 +2101,7 @@ def api_update_table(table_id: int, req: TableRequest):
     t = update_table(table_id, req.title, req.columns, req.category_id)
     if not t:
         raise HTTPException(status_code=404, detail="Table not found")
+    schedule_reindex("table", t.id)
     return table_to_dict(t)
 
 
@@ -2060,6 +2113,7 @@ def api_move_table_universe(table_id: int, req: MoveToUniverseRequest):
     t = move_table_to_universe(table_id, req.universe_id, req.category_id)
     if not t:
         raise HTTPException(status_code=404, detail="Table not found")
+    schedule_reindex("table", t.id)
     return table_to_dict(t)
 
 
@@ -2067,6 +2121,7 @@ def api_move_table_universe(table_id: int, req: MoveToUniverseRequest):
 def api_delete_table(table_id: int):
     if not delete_table(table_id):
         raise HTTPException(status_code=404, detail="Table not found")
+    schedule_delete_index("table", table_id)
     return {"ok": True}
 
 
@@ -2115,6 +2170,7 @@ def api_create_table_row(table_id: int, req: TableRowRequest):
     if not get_table(table_id):
         raise HTTPException(status_code=404, detail="Table not found")
     row = create_table_row(table_id, req.data, req.sort_order)
+    schedule_reindex("table", table_id)
     return table_row_to_dict(row)
 
 
@@ -2123,13 +2179,19 @@ def api_update_table_row(row_id: int, req: TableRowRequest):
     row = update_table_row(row_id, req.data, req.sort_order)
     if not row:
         raise HTTPException(status_code=404, detail="Row not found")
+    schedule_reindex("table", row.table_id)
     return table_row_to_dict(row)
 
 
 @app.delete("/api/table-rows/{row_id}")
 def api_delete_table_row(row_id: int):
+    row = get_table_row(row_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Row not found")
+    table_id = row.table_id
     if not delete_table_row(row_id):
         raise HTTPException(status_code=404, detail="Row not found")
+    schedule_reindex("table", table_id)
     return {"ok": True}
 
 
@@ -2189,6 +2251,7 @@ async def api_import_table_csv(table_id: int, file: UploadFile):
                 data[key] = val or ""
         create_table_row(table_id, json.dumps(data), count)
         count += 1
+    schedule_reindex("table", table_id)
     return {"ok": True, "imported": count}
 
 
@@ -2255,6 +2318,7 @@ async def api_import_csv_new_table(file: UploadFile, universe_id: int = 1):
                 data[key] = val or ""
         create_table_row(t.id, json.dumps(data), count)
         count += 1
+    schedule_reindex("table", t.id)
     return {"ok": True, "table_id": t.id, "title": t.title, "columns": len(columns), "rows": count}
 
 
@@ -2262,25 +2326,41 @@ async def api_import_csv_new_table(file: UploadFile, universe_id: int = 1):
 
 
 @app.get("/api/search")
-def api_search(q: str, k: int = 4, universe_id: int = 1):
-    """Semantic search over the vector store. Returns the top-k most relevant
-    chunks for the given query, useful for RAG pipelines and agent tooling."""
+def api_search(
+    q: str,
+    k: int = 20,
+    universe_id: Optional[int] = None,
+    global_search: bool = False,
+    semantic: bool = False,
+):
+    """Search markdowns, scripts, documents, diagrams, tables, links, and feeds.
+
+    Default: fast text search (titles + content). Pass semantic=true to also include
+    vector-store results (better for topical/RAG queries, weaker for exact names).
+    """
     if not q.strip():
         raise HTTPException(status_code=400, detail="Query parameter 'q' is required")
-    k = max(1, min(k, 20))
-    retriever = get_retriever(k=k, universe_id=universe_id)
-    docs = retriever.invoke(q)
+    scope_uid = None if global_search or universe_id is None else universe_id
+    results = text_search(q.strip(), k=k, universe_id=scope_uid)
+
+    if semantic:
+        seen = {
+            f"{r['content_type']}:{r.get('item_id') or r.get('document_path')}"
+            for r in results
+        }
+        for hit in search_content(q.strip(), k=k, universe_id=scope_uid):
+            key = f"{hit['content_type']}:{hit.get('item_id') or hit.get('document_path')}"
+            if key not in seen:
+                seen.add(key)
+                results.append(hit)
+        results = results[: max(1, min(k, 50))]
+
     return {
-        "query": q,
+        "query": q.strip(),
+        "global": scope_uid is None,
         "universe_id": universe_id,
-        "results": [
-            {
-                "content": d.page_content,
-                "source": d.metadata.get("source", ""),
-                "metadata": {k: v for k, v in d.metadata.items() if k != "source"},
-            }
-            for d in docs
-        ],
+        "mode": "hybrid" if semantic else "text",
+        "results": results,
     }
 
 

@@ -25,7 +25,6 @@ function Sparkline({ data, width = 80, height = 20 }) {
 
 function FeedsPanel({ categories, universeId, universes, onPinChange, openFeedRequest, onOpenFeedRequestHandled, onViewPosts, unreadCounts, recent7dCounts, onLoaded }) {
   const [feeds, setFeeds] = useState([])
-  const [search, setSearch] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
   const [editing, setEditing] = useState(null) // null | 'new' | feed object
   const [title, setTitle] = useState('')
@@ -36,7 +35,6 @@ function FeedsPanel({ categories, universeId, universes, onPinChange, openFeedRe
 
   const fetchFeeds = () => {
     const params = new URLSearchParams()
-    if (search) params.set('q', search)
     if (selectedCategoryId !== null) params.set('category_id', selectedCategoryId)
     if (universeId) params.set('universe_id', universeId)
     fetch(`/api/feeds?${params}`)
@@ -50,7 +48,7 @@ function FeedsPanel({ categories, universeId, universes, onPinChange, openFeedRe
   useEffect(() => {
     const t = setTimeout(fetchFeeds, 300)
     return () => clearTimeout(t)
-  }, [search, selectedCategoryId, universeId])
+  }, [selectedCategoryId, universeId])
 
   useEffect(() => {
     if (openFeedRequest) {

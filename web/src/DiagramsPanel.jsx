@@ -286,11 +286,9 @@ export function DiagramEditorView({ diagram, categories, onClose, onSaved }) {
 
 function DiagramsPanel({ categories, onPinChange, universeId, universes, onEditDiagram, refreshKey, onLoaded }) {
   const [diagrams, setDiagrams] = useState([])
-  const [search, setSearch] = useState('')
 
   const fetchDiagrams = () => {
     const params = new URLSearchParams()
-    if (search) params.set('q', search)
     if (universeId) params.set('universe_id', universeId)
     fetch(`/api/diagrams?${params}`)
       .then(res => res.json())
@@ -300,10 +298,6 @@ function DiagramsPanel({ categories, onPinChange, universeId, universes, onEditD
   }
 
   useEffect(() => { fetchDiagrams() }, [universeId, refreshKey])
-  useEffect(() => {
-    const timer = setTimeout(fetchDiagrams, 300)
-    return () => clearTimeout(timer)
-  }, [search, universeId])
 
   const startNew = () => { onEditDiagram?.({ _new: true, universeId }) }
   const startEdit = (d) => { onEditDiagram?.(d) }
@@ -348,13 +342,10 @@ function DiagramsPanel({ categories, onPinChange, universeId, universes, onEditD
           </svg>
         </button>
       </div>
-      <div className="markdowns-search">
-        <input className="markdowns-search-input" placeholder="Search diagrams..." value={search} onChange={e => setSearch(e.target.value)} />
-      </div>
       <div className="markdowns-list">
         {diagrams.length === 0 ? (
           <div className="markdowns-empty">
-            {search ? 'No matching diagrams.' : 'No diagrams yet. Click + to create one.'}
+            No diagrams yet. Click + to create one.
           </div>
         ) : (
           <SidebarCategoryTree

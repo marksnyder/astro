@@ -14,7 +14,7 @@ import Dashboard from './Dashboard'
 import { sortCategoriesForTree } from './categorySidebarOrder'
 import { formatCategoryHierarchyLabel } from './categoryHierarchy'
 import { MobileCategoryTree } from './SidebarCategoryTree'
-import { FeedsFlatCategoryList } from './FeedsFlatCategoryList'
+import GlobalSearch from './GlobalSearch'
 
 // ── Shared mobile category picker ─────────────────────
 
@@ -50,7 +50,6 @@ function MobileCategorySelect({ categories, value, onChange }) {
 
 function MobileMarkdowns({ categories, universeId }) {
   const [markdowns, setMarkdowns] = useState([])
-  const [search, setSearch] = useState('')
   const [filterCatId, setFilterCatId] = useState(null)
   const [viewing, setViewing] = useState(null)
   const [editing, setEditing] = useState(null)
@@ -184,7 +183,6 @@ function MobileMarkdowns({ categories, universeId }) {
 
   const fetchMarkdowns = useCallback(() => {
     const params = new URLSearchParams()
-    if (search) params.set('q', search)
     if (filterCatId !== null) params.set('category_id', filterCatId)
     if (universeId) params.set('universe_id', universeId)
     fetch(`/api/markdowns?${params}`)
@@ -196,13 +194,9 @@ function MobileMarkdowns({ categories, universeId }) {
         setMarkdowns(unique)
       })
       .catch(() => {})
-  }, [search, filterCatId, universeId])
+  }, [filterCatId, universeId])
 
-  useEffect(() => { fetchMarkdowns() }, [universeId])
-  useEffect(() => {
-    const t = setTimeout(fetchMarkdowns, 300)
-    return () => clearTimeout(t)
-  }, [search, filterCatId, universeId])
+  useEffect(() => { fetchMarkdowns() }, [universeId, filterCatId, fetchMarkdowns])
 
   const bumpSaveSession = () => {
     saveSessionRef.current += 1
@@ -404,8 +398,6 @@ function MobileMarkdowns({ categories, universeId }) {
   return (
     <div className="mn-list-view">
       <div className="mn-search-bar">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-        <input className="mn-search-input" placeholder="Search markdowns..." value={search} onChange={(e) => setSearch(e.target.value)} />
         <button className="mn-new-btn" onClick={() => startNew()} title="New markdown">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
         </button>
@@ -415,7 +407,7 @@ function MobileMarkdowns({ categories, universeId }) {
       </div>
       <div className="mn-markdowns-list">
         {markdowns.length === 0 ? (
-          <div className="mn-empty">{search || filterCatId ? 'No matching markdowns.' : 'No markdowns yet. Tap + to create one.'}</div>
+          <div className="mn-empty">{filterCatId ? 'No markdowns in this category.' : 'No markdowns yet. Tap + to create one.'}</div>
         ) : (
           <MobileCategoryTree
             universeId={universeId}
@@ -484,7 +476,6 @@ function MobileSparkline({ data, width = 70, height = 18 }) {
 
 function MobileFeeds({ categories, universeId }) {
   const [feeds, setFeeds] = useState([])
-  const [search, setSearch] = useState('')
   const [filterCatId, setFilterCatId] = useState(null)
   const [editing, setEditing] = useState(null)
   const [title, setTitle] = useState('')
@@ -509,20 +500,15 @@ function MobileFeeds({ categories, universeId }) {
 
   const fetchFeeds = useCallback(() => {
     const params = new URLSearchParams()
-    if (search) params.set('q', search)
     if (filterCatId !== null) params.set('category_id', filterCatId)
     if (universeId) params.set('universe_id', universeId)
     fetch(`/api/feeds?${params}`)
       .then(r => r.json())
       .then(setFeeds)
       .catch(() => {})
-  }, [search, filterCatId, universeId])
+  }, [filterCatId, universeId])
 
-  useEffect(() => { fetchFeeds(); fetchFeedUnreadCounts() }, [universeId])
-  useEffect(() => {
-    const t = setTimeout(fetchFeeds, 300)
-    return () => clearTimeout(t)
-  }, [search, filterCatId, universeId])
+  useEffect(() => { fetchFeeds(); fetchFeedUnreadCounts() }, [universeId, filterCatId, fetchFeeds, fetchFeedUnreadCounts])
 
   const startNew = () => {
     setEditing('new')
@@ -840,7 +826,6 @@ function MobilePostTimeline({ category, onBack }) {
 
 function MobileTables({ categories, universeId }) {
   const [tables, setTables] = useState([])
-  const [search, setSearch] = useState('')
   const [viewing, setViewing] = useState(null)
   const [editing, setEditing] = useState(null)
   const [title, setTitle] = useState('')
@@ -855,7 +840,6 @@ function MobileTables({ categories, universeId }) {
 
   const fetchTables = useCallback(() => {
     const params = new URLSearchParams()
-    if (search) params.set('q', search)
     if (universeId) params.set('universe_id', universeId)
     fetch(`/api/tables?${params}`)
       .then(r => r.json())
@@ -864,13 +848,9 @@ function MobileTables({ categories, universeId }) {
         setTables(data)
       })
       .catch(() => {})
-  }, [search, universeId])
+  }, [universeId])
 
-  useEffect(() => { fetchTables() }, [universeId])
-  useEffect(() => {
-    const t = setTimeout(fetchTables, 300)
-    return () => clearTimeout(t)
-  }, [search, universeId])
+  useEffect(() => { fetchTables() }, [universeId, fetchTables])
 
   const fetchRows = useCallback(() => {
     if (!viewing) return
@@ -1081,15 +1061,13 @@ function MobileTables({ categories, universeId }) {
   return (
     <div className="mn-list-view">
       <div className="mn-search-bar">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-        <input className="mn-search-input" placeholder="Search tables..." value={search} onChange={e => setSearch(e.target.value)} />
         <button className="mn-new-btn" onClick={startNew} title="New table">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
         </button>
       </div>
       <div className="mn-markdowns-list">
         {tables.length === 0 ? (
-          <div className="mn-empty">{search ? 'No matching tables.' : 'No tables yet. Tap + to create one.'}</div>
+          <div className="mn-empty">No tables yet. Tap + to create one.</div>
         ) : (
           <MobileCategoryTree
             universeId={universeId}
@@ -1136,25 +1114,19 @@ function openDocumentFile(doc) {
 
 function MobileDocumentsReadonly({ categories, universeId }) {
   const [docs, setDocs] = useState([])
-  const [search, setSearch] = useState('')
   const [filterCatId, setFilterCatId] = useState(null)
 
   const fetchDocs = useCallback(() => {
     const params = new URLSearchParams()
-    if (search) params.set('q', search)
     if (filterCatId !== null) params.set('category_id', filterCatId)
     if (universeId) params.set('universe_id', universeId)
     fetch(`/api/documents?${params}`)
       .then(r => r.json())
       .then(setDocs)
       .catch(() => {})
-  }, [search, filterCatId, universeId])
+  }, [filterCatId, universeId])
 
-  useEffect(() => { fetchDocs() }, [universeId])
-  useEffect(() => {
-    const t = setTimeout(fetchDocs, 300)
-    return () => clearTimeout(t)
-  }, [search, filterCatId, universeId, fetchDocs])
+  useEffect(() => { fetchDocs() }, [universeId, filterCatId, fetchDocs])
 
   return (
     <div className="mn-list-view">
@@ -1164,13 +1136,9 @@ function MobileDocumentsReadonly({ categories, universeId }) {
       <div className="mn-filter-bar">
         <MobileCategorySelect categories={categories} value={filterCatId} onChange={setFilterCatId} />
       </div>
-      <div className="mn-search-bar">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-        <input className="mn-search-input" placeholder="Search documents..." value={search} onChange={e => setSearch(e.target.value)} />
-      </div>
       <div className="mn-markdowns-list">
         {docs.length === 0 ? (
-          <div className="mn-empty">{search || filterCatId != null ? 'No matching documents.' : 'No documents yet.'}</div>
+          <div className="mn-empty">{filterCatId != null ? 'No documents in this category.' : 'No documents yet.'}</div>
         ) : (
           <MobileCategoryTree
             universeId={universeId}
@@ -1204,25 +1172,19 @@ function MobileDocumentsReadonly({ categories, universeId }) {
 
 function MobileLinksReadonly({ categories, universeId }) {
   const [links, setLinks] = useState([])
-  const [search, setSearch] = useState('')
   const [filterCatId, setFilterCatId] = useState(null)
 
   const fetchLinks = useCallback(() => {
     const params = new URLSearchParams()
-    if (search) params.set('q', search)
     if (filterCatId !== null) params.set('category_id', filterCatId)
     if (universeId) params.set('universe_id', universeId)
     fetch(`/api/links?${params}`)
       .then(r => r.json())
       .then(setLinks)
       .catch(() => {})
-  }, [search, filterCatId, universeId])
+  }, [filterCatId, universeId])
 
-  useEffect(() => { fetchLinks() }, [universeId])
-  useEffect(() => {
-    const t = setTimeout(fetchLinks, 300)
-    return () => clearTimeout(t)
-  }, [search, filterCatId, universeId, fetchLinks])
+  useEffect(() => { fetchLinks() }, [universeId, filterCatId, fetchLinks])
 
   return (
     <div className="mn-list-view">
@@ -1232,13 +1194,9 @@ function MobileLinksReadonly({ categories, universeId }) {
       <div className="mn-filter-bar">
         <MobileCategorySelect categories={categories} value={filterCatId} onChange={setFilterCatId} />
       </div>
-      <div className="mn-search-bar">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-        <input className="mn-search-input" placeholder="Search links..." value={search} onChange={e => setSearch(e.target.value)} />
-      </div>
       <div className="mn-markdowns-list">
         {links.length === 0 ? (
-          <div className="mn-empty">{search || filterCatId != null ? 'No matching links.' : 'No links yet.'}</div>
+          <div className="mn-empty">{filterCatId != null ? 'No links in this category.' : 'No links yet.'}</div>
         ) : (
           <MobileCategoryTree
             universeId={universeId}
@@ -1313,26 +1271,20 @@ function MobileDiagramReadonly({ title, dataJson, onBack }) {
 
 function MobileDiagramsReadonly({ categories, universeId }) {
   const [diagrams, setDiagrams] = useState([])
-  const [search, setSearch] = useState('')
   const [filterCatId, setFilterCatId] = useState(null)
   const [viewing, setViewing] = useState(null)
 
   const fetchDiagrams = useCallback(() => {
     const params = new URLSearchParams()
-    if (search) params.set('q', search)
     if (filterCatId !== null) params.set('category_id', filterCatId)
     if (universeId) params.set('universe_id', universeId)
     fetch(`/api/diagrams?${params}`)
       .then(r => r.json())
       .then(setDiagrams)
       .catch(() => {})
-  }, [search, filterCatId, universeId])
+  }, [filterCatId, universeId])
 
-  useEffect(() => { fetchDiagrams() }, [universeId])
-  useEffect(() => {
-    const t = setTimeout(fetchDiagrams, 300)
-    return () => clearTimeout(t)
-  }, [search, filterCatId, universeId, fetchDiagrams])
+  useEffect(() => { fetchDiagrams() }, [universeId, filterCatId, fetchDiagrams])
 
   const openDiagram = async (d) => {
     let full = d
@@ -1366,13 +1318,9 @@ function MobileDiagramsReadonly({ categories, universeId }) {
       <div className="mn-filter-bar">
         <MobileCategorySelect categories={categories} value={filterCatId} onChange={setFilterCatId} />
       </div>
-      <div className="mn-search-bar">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-        <input className="mn-search-input" placeholder="Search diagrams..." value={search} onChange={e => setSearch(e.target.value)} />
-      </div>
       <div className="mn-markdowns-list">
         {diagrams.length === 0 ? (
-          <div className="mn-empty">{search || filterCatId != null ? 'No matching diagrams.' : 'No diagrams yet.'}</div>
+          <div className="mn-empty">{filterCatId != null ? 'No diagrams in this category.' : 'No diagrams yet.'}</div>
         ) : (
           <MobileCategoryTree
             universeId={universeId}
@@ -1518,6 +1466,7 @@ SLACK_DEFAULT_CHANNEL_ID=C0123456789`}</pre>
 function MobileApp() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false)
   const [view, setView] = useState('dashboard')
   const [categories, setCategories] = useState([])
   const [universes, setUniverses] = useState([])
@@ -1557,6 +1506,24 @@ function MobileApp() {
       .catch(() => {})
   }, [currentUniverseId])
 
+  const handleMobileSearchResult = useCallback((result) => {
+    const viewMap = {
+      markdown: 'markdowns',
+      script: 'scripts',
+      document: 'documents',
+      link: 'links',
+      feed: 'feeds',
+      diagram: 'diagrams',
+      table: 'tables',
+    }
+    if (result.content_type === 'link' && result.url) {
+      window.open(result.url, '_blank', 'noopener,noreferrer')
+      return
+    }
+    const next = viewMap[result.content_type]
+    if (next) setView(next)
+  }, [])
+
   return (
     <div className="m-app">
       {/* Header */}
@@ -1569,6 +1536,11 @@ function MobileApp() {
           </svg>
         </button>
         <span style={{ flex: 1 }} />
+        <button type="button" className="m-menu-btn" onClick={() => setGlobalSearchOpen(true)} title="Search">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </button>
         {universes.length > 0 && (
           <div className="m-universe-switcher">
             {universes.length > 1 && (
@@ -1704,6 +1676,13 @@ function MobileApp() {
         </button>
       </nav>
       {showHelp && <MobileHelpView onClose={() => setShowHelp(false)} />}
+      <GlobalSearch
+        open={globalSearchOpen}
+        onClose={() => setGlobalSearchOpen(false)}
+        universeId={currentUniverseId}
+        universes={universes}
+        onSelectResult={handleMobileSearchResult}
+      />
     </div>
   )
 }

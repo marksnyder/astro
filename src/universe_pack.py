@@ -45,7 +45,8 @@ from src.markdowns import (
     set_table_pinned,
     update_markdown,
 )
-from src.store import add_documents, upsert_markdown
+from src.store import add_documents
+from src.embedding_queue import schedule_reindex
 
 DOCUMENTS_DIR = Path(__file__).resolve().parent.parent / "documents"
 
@@ -451,7 +452,7 @@ def import_universe_bundle(zip_path: Path, new_universe_name: str) -> int:
             md_old_to_new[oid] = md.id  # type: ignore[union-attr]
             if m.get("pinned"):
                 set_markdown_pinned(md.id, True)
-            upsert_markdown(md.id, f"{md.title}\n\n{md.body}", md.title, universe_id=new_uid)
+            schedule_reindex("markdown", md.id)
 
         filename_map: dict[str, str] = {}
         for im in manifest.get("markdown_images") or []:
@@ -478,7 +479,7 @@ def import_universe_bundle(zip_path: Path, new_universe_name: str) -> int:
             md_obj = get_markdown(mid)
             if md_obj:
                 update_markdown(mid, md_obj.title, body, md_obj.category_id)
-                upsert_markdown(mid, f"{md_obj.title}\n\n{body}", md_obj.title, universe_id=new_uid)
+                schedule_reindex("markdown", mid)
 
         for lk in manifest.get("links") or []:
             lnk = create_link(
@@ -591,6 +592,9 @@ def import_universe_bundle(zip_path: Path, new_universe_name: str) -> int:
             set_document_category(rel, map_cat(d.get("category_id")), new_uid)
             if d.get("pinned"):
                 set_document_pinned(rel, True, new_uid)
+            from src.document_search import index_document_text
+
+            index_document_text(rel)
 
         return new_uid
 

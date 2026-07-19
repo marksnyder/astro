@@ -13,6 +13,8 @@ import CategoryTree, { EmojiPopover } from './CategoryTree'
 import ChatBackground from './ChatBackground'
 import Dashboard from './Dashboard'
 import SlackManifestGenerator from './SlackManifestGenerator'
+import GlobalSearch, { GlobalSearchTrigger } from './GlobalSearch'
+import { formatCategoryHierarchyLabel } from './categoryHierarchy'
 import { DEFAULT_AGENT_TASK_MESSAGE_TEMPLATE } from './agentTaskDefaults'
 
 const DASHBOARD_TAB = { id: 'dashboard', type: 'dashboard', title: 'Dashboard', closable: false }
@@ -1665,6 +1667,7 @@ function App() {
   const [tableRefreshKey, setTableRefreshKey] = useState(0)
   const [scriptRefreshKey, setScriptRefreshKey] = useState(0)
   const [openFeedRequest, setOpenFeedRequest] = useState(null)
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false)
 
   const [tabs, setTabs] = useState([DASHBOARD_TAB])
   const [activeTabId, setActiveTabId] = useState('dashboard')
@@ -1832,6 +1835,81 @@ function App() {
       return [...prev, { id: tabId, type: 'script', title: script.title || 'Untitled Script', closable: true, data: script }]
     })
     setActiveTabId(tabId)
+  }, [])
+
+  const handleSearchResult = useCallback(async (result) => {
+    const { content_type, item_id, document_path, url, category_id, universe_id: resultUid } = result
+    switch (content_type) {
+      case 'markdown': {
+        setSidebarTab('markdowns')
+        try {
+          const res = await fetch(`/api/markdowns/${item_id}`)
+          if (res.ok) openMarkdownTab(await res.json())
+        } catch { /* ignore */ }
+        break
+      }
+      case 'script': {
+        setSidebarTab('scripts')
+        try {
+          const res = await fetch(`/api/scripts/${item_id}`)
+          if (res.ok) openScriptTab(await res.json())
+        } catch { /* ignore */ }
+        break
+      }
+      case 'diagram': {
+        setSidebarTab('diagrams')
+        openDiagramTab({ id: item_id })
+        break
+      }
+      case 'table': {
+        setSidebarTab('tables')
+        openTableTab({ id: item_id })
+        break
+      }
+      case 'link': {
+        if (url) {
+          window.open(url, '_blank', 'noopener,noreferrer')
+        } else {
+          setSidebarTab('links')
+        }
+        break
+      }
+      case 'feed': {
+        setSidebarTab('feeds')
+        openFeedTab({
+          id: category_id ?? null,
+          name: formatCategoryHierarchyLabel(categories, category_id) || result.title || 'Feed',
+        })
+        break
+      }
+      case 'document': {
+        setSidebarTab('archive')
+        try {
+          const params = resultUid ? `?universe_id=${resultUid}` : ''
+          const res = await fetch(`/api/documents${params}`)
+          if (res.ok) {
+            const docs = await res.json()
+            const path = document_path || result.source
+            const doc = docs.find(d => d.path === path || path?.endsWith(d.path))
+            if (doc) setQuickView({ ...doc, type: 'doc' })
+          }
+        } catch { /* ignore */ }
+        break
+      }
+      default:
+        break
+    }
+  }, [categories, openDiagramTab, openFeedTab, openMarkdownTab, openScriptTab, openTableTab])
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setGlobalSearchOpen(true)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
   const closeTab = useCallback((tabId) => {
@@ -2172,6 +2250,7 @@ function App() {
           </div>
         )}
         <div className="header-controls">
+          <GlobalSearchTrigger onClick={() => setGlobalSearchOpen(true)} />
           <button
             type="button"
             className={`header-agent-tasks-btn ${activeTab?.type === 'python-tasks' ? 'active' : ''}`}
@@ -2582,6 +2661,13 @@ function App() {
           onRefresh={fetchUniverses}
         />
       )}
+      <GlobalSearch
+        open={globalSearchOpen}
+        onClose={() => setGlobalSearchOpen(false)}
+        universeId={currentUniverseId}
+        universes={universes}
+        onSelectResult={handleSearchResult}
+      />
     </div>
   )
 }

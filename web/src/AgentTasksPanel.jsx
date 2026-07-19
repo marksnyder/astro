@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 function fmtTs(iso) {
   if (!iso) return '—'
@@ -79,7 +79,6 @@ function buildAgentTaskPutBody(t, enabled) {
 export default function AgentTasksPanel({ universeId, mobileReadOnly = false }) {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
   const [universesById, setUniversesById] = useState({})
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -193,28 +192,6 @@ export default function AgentTasksPanel({ universeId, mobileReadOnly = false }) 
     }, 300)
     return () => clearTimeout(t)
   }, [mdPickerQuery, modalOpen])
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return tasks
-    return tasks.filter((t) => {
-      const uName = universesById[t.universe_id] || ''
-      const blob = [
-        t.title,
-        t.markdown_title,
-        t.channel,
-        t.slack_user_id,
-        t.cron_expr,
-        t.schedule_mode,
-        uName,
-        String(t.universe_id ?? ''),
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-      return blob.includes(q)
-    })
-  }, [tasks, search, universesById])
 
   const openAdd = () => {
     setEditingId(null)
@@ -411,18 +388,6 @@ export default function AgentTasksPanel({ universeId, mobileReadOnly = false }) 
           </button>
         )}
       </div>
-      <div className="markdowns-search">
-        <input
-          className="markdowns-search-input"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={
-            mobileReadOnly
-              ? 'Search tasks…'
-              : 'Search by title, markdown, universe, channel, mention, schedule…'
-          }
-        />
-      </div>
       {loadError && (
         <div className="agent-tasks-load-error" role="alert">
           {loadError}
@@ -434,19 +399,17 @@ export default function AgentTasksPanel({ universeId, mobileReadOnly = false }) 
       <div className="agent-tasks-table-wrap">
         {loading ? (
           <div className="markdowns-empty">Loading…</div>
-        ) : filtered.length === 0 ? (
+        ) : tasks.length === 0 ? (
           <div className="markdowns-empty">
             {loadError && tasks.length === 0
               ? 'Could not load tasks.'
-              : tasks.length === 0
-                ? mobileReadOnly
-                  ? 'No tasks yet. Create and edit tasks on the desktop app.'
-                  : 'No tasks yet. Add one to send markdown instructions to Slack.'
-                : 'No tasks match your search.'}
+              : mobileReadOnly
+                ? 'No tasks yet. Create and edit tasks on the desktop app.'
+                : 'No tasks yet. Add one to send markdown instructions to Slack.'}
           </div>
         ) : mobileReadOnly ? (
           <div className="agent-tasks-mobile-list">
-            {filtered.map((t) => {
+            {tasks.map((t) => {
               const isCurrentUniverse =
                 universeId != null && Number(t.universe_id) === Number(universeId)
               return (
@@ -529,7 +492,7 @@ export default function AgentTasksPanel({ universeId, mobileReadOnly = false }) 
               </tr>
             </thead>
             <tbody>
-              {filtered.map((t) => (
+              {tasks.map((t) => (
                 <tr
                   key={t.id}
                   className={

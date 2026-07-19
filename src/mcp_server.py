@@ -92,14 +92,9 @@ from src.scripts import (
     update_script as _db_update_script,
 )
 from src.ingest import load_document as _load_document, chunk_documents as _chunk_documents
-from src.store import (
-    add_documents as _add_documents,
-    delete_document_chunks,
-    delete_markdown_from_store,
-    doc_count,
-    get_retriever,
-    upsert_markdown,
-)
+from src.embedding_queue import schedule_delete_index, schedule_reindex
+from src.text_search import text_search
+from src.store import add_documents as _add_documents, delete_document_chunks
 
 DOCUMENTS_DIR = Path(__file__).resolve().parent.parent / "documents"
 
@@ -187,22 +182,36 @@ def set_default_universe(universe_id: int) -> dict:
 
 
 @mcp.tool
-def search(query: str, k: int = 4, universe_id: int | None = None) -> list[dict]:
-    """Semantic search over the user's knowledge base using the vector store.
-    Returns the top-k most relevant text chunks for a given natural-language query.
-    Useful for finding notes and documents related to a topic."""
-    uid = universe_id if universe_id is not None else _default_universe()
-    k = max(1, min(k, 20))
-    retriever = get_retriever(k=k, universe_id=uid)
-    docs = retriever.invoke(query)
-    return [
-        {
-            "content": d.page_content,
-            "source": d.metadata.get("source", ""),
-            "metadata": {k_: v for k_, v in d.metadata.items() if k_ != "source"},
+def search(
+    query: str,
+    k: int = 20,
+    universe_id: int | None = None,
+    global_search: bool = False,
+    semantic: bool = False,
+) -> list[dict]:
+    """Search markdowns, scripts, documents, diagrams, tables, links, and feeds.
+    Uses fast text matching by default. Set semantic=true for vector similarity (RAG/topics)."""
+    if global_search:
+        scope_uid = None
+    elif universe_id is not None:
+        scope_uid = universe_id
+    else:
+        scope_uid = _default_universe()
+    results = text_search(query, k=k, universe_id=scope_uid)
+    if semantic:
+        from src.store import search_content
+
+        seen = {
+            f"{r['content_type']}:{r.get('item_id') or r.get('document_path')}"
+            for r in results
         }
-        for d in docs
-    ]
+        for hit in search_content(query, k=k, universe_id=scope_uid):
+            key = f"{hit['content_type']}:{hit.get('item_id') or hit.get('document_path')}"
+            if key not in seen:
+                seen.add(key)
+                results.append(hit)
+        results = results[: max(1, min(k, 50))]
+    return results
 
 
 # ── Markdowns (notes) ────────────────────────────────────────────────────
@@ -234,10 +243,7 @@ def write_markdown(
     """Create a new markdown note. Returns the created note."""
     uid = universe_id if universe_id is not None else _default_universe()
     md = create_markdown(title, body, category_id, uid)
-    try:
-        upsert_markdown(md.id, f"{md.title}\n\n{md.body}", md.title, md.universe_id)
-    except Exception as e:
-        print(f"[Astro] WARNING: Failed to upsert markdown {md.id} into vector store: {e}")
+    schedule_reindex("markdown", md.id)
     return markdown_to_dict(md)
 
 
@@ -264,10 +270,7 @@ def update_markdown(
     md = _db_update_markdown(markdown_id, title, body, cat)
     if md is None:
         return "Markdown not found"
-    try:
-        upsert_markdown(md.id, f"{md.title}\n\n{md.body}", md.title, md.universe_id)
-    except Exception as e:
-        print(f"[Astro] WARNING: Failed to upsert markdown {md.id} into vector store: {e}")
+    schedule_reindex("markdown", md.id)
     return markdown_to_dict(md)
 
 
@@ -276,7 +279,7 @@ def delete_markdown(markdown_id: int) -> str:
     """Permanently delete a markdown note by ID."""
     if not _db_delete_markdown(markdown_id):
         return "Markdown not found"
-    delete_markdown_from_store(markdown_id)
+    schedule_delete_index("markdown", markdown_id)
     return "Deleted"
 
 

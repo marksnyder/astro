@@ -5,7 +5,6 @@ import { MoveToUniverseButton } from './MoveToUniverseButton'
 
 function LinksPanel({ categories, onPinChange, universeId, universes, onLoaded }) {
   const [links, setLinks] = useState([])
-  const [search, setSearch] = useState('')
   const [editing, setEditing] = useState(null) // null | 'new' | link object
   const [title, setTitle] = useState('')
   const [url, setUrl] = useState('')
@@ -15,7 +14,6 @@ function LinksPanel({ categories, onPinChange, universeId, universes, onLoaded }
 
   const fetchLinks = () => {
     const params = new URLSearchParams()
-    if (search) params.set('q', search)
     if (universeId) params.set('universe_id', universeId)
     fetch(`/api/links?${params}`)
       .then(res => res.json())
@@ -25,10 +23,6 @@ function LinksPanel({ categories, onPinChange, universeId, universes, onLoaded }
   }
 
   useEffect(() => { fetchLinks() }, [universeId])
-  useEffect(() => {
-    const timer = setTimeout(fetchLinks, 300)
-    return () => clearTimeout(timer)
-  }, [search, universeId])
 
   const startNew = () => {
     setEditing('new')
@@ -131,14 +125,11 @@ function LinksPanel({ categories, onPinChange, universeId, universes, onLoaded }
           </button>
         </div>
       </div>
-      <div className="markdowns-search">
-        <input className="markdowns-search-input" placeholder="Search links..." value={search} onChange={(e) => setSearch(e.target.value)} />
-      </div>
       <div className="markdowns-list">
         {(() => {
           if (links.length === 0) return (
             <div className="markdowns-empty">
-              {search ? 'No matching links.' : 'No links yet. Click + to add one.'}
+              No links yet. Click + to add one.
             </div>
           )
           return (

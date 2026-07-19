@@ -23,31 +23,20 @@ function ScriptsPanel({
   onLoaded,
 }) {
   const [scripts, setScripts] = useState([])
-  const [search, setSearch] = useState('')
 
   const fetchScripts = useCallback(() => {
     const params = new URLSearchParams()
-    if (search) params.set('q', search)
     if (universeId) params.set('universe_id', universeId)
     fetch(`/api/scripts?${params}`)
       .then((r) => r.json())
       .then(setScripts)
       .catch(() => setScripts([]))
       .finally(() => onLoaded?.())
-  }, [search, universeId, onLoaded])
+  }, [universeId, onLoaded])
 
   useEffect(() => {
     fetchScripts()
-  }, [universeId])
-
-  useEffect(() => {
-    const t = setTimeout(fetchScripts, 300)
-    return () => clearTimeout(t)
-  }, [search, universeId])
-
-  useEffect(() => {
-    fetchScripts()
-  }, [refreshKey])
+  }, [universeId, refreshKey, fetchScripts])
 
   const startNew = () => {
     const s = { _new: true, universeId, source: DEFAULT_SOURCE }
@@ -98,18 +87,10 @@ function ScriptsPanel({
           </svg>
         </button>
       </div>
-      <div className="markdowns-search">
-        <input
-          className="markdowns-search-input"
-          placeholder="Search scripts..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
       <div className="markdowns-list">
         {scripts.length === 0 ? (
           <div className="markdowns-empty">
-            {search ? 'No matching scripts.' : 'No scripts yet. Click + to create one.'}
+            No scripts yet. Click + to create one.
           </div>
         ) : (
           <SidebarCategoryTree
@@ -156,7 +137,6 @@ function ScriptsPanel({
                     </svg>
                   </button>
                 </div>
-                <div className="script-card-meta">Python</div>
               </div>
             )}
           />
