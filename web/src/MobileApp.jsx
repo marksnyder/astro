@@ -48,7 +48,7 @@ function MobileCategorySelect({ categories, value, onChange }) {
 
 // ── Markdowns view ──────────────────────────────────────
 
-function MobileMarkdowns({ categories, universeId }) {
+function MobileMarkdowns({ categories, universeId, openMarkdown = null, onOpenMarkdownConsumed }) {
   const [markdowns, setMarkdowns] = useState([])
   const [filterCatId, setFilterCatId] = useState(null)
   const [viewing, setViewing] = useState(null)
@@ -197,6 +197,13 @@ function MobileMarkdowns({ categories, universeId }) {
   }, [filterCatId, universeId])
 
   useEffect(() => { fetchMarkdowns() }, [universeId, filterCatId, fetchMarkdowns])
+
+  useEffect(() => {
+    if (!openMarkdown?.id) return
+    setEditing(null)
+    setViewing(openMarkdown)
+    onOpenMarkdownConsumed?.()
+  }, [openMarkdown, onOpenMarkdownConsumed])
 
   const bumpSaveSession = () => {
     saveSessionRef.current += 1
@@ -1471,6 +1478,7 @@ function MobileApp() {
   const [categories, setCategories] = useState([])
   const [universes, setUniverses] = useState([])
   const [currentUniverseId, setCurrentUniverseId] = useState(null)
+  const [openMarkdownRequest, setOpenMarkdownRequest] = useState(null)
 
   useEffect(() => {
     document.documentElement.classList.add('m-mobile-shell')
@@ -1595,10 +1603,26 @@ function MobileApp() {
         <ChatBackground variant="mobile">
         {view === 'dashboard' && (
           <div className="m-dashboard-shell">
-            <Dashboard key={currentUniverseId ?? 'none'} universeId={currentUniverseId} variant="mobile" />
+            <Dashboard
+              key={currentUniverseId ?? 'none'}
+              universeId={currentUniverseId}
+              categories={categories}
+              variant="mobile"
+              onOpenMarkdown={(markdown) => {
+                setOpenMarkdownRequest(markdown)
+                setView('markdowns')
+              }}
+            />
           </div>
         )}
-        {view === 'markdowns' && <MobileMarkdowns categories={categories} universeId={currentUniverseId} />}
+        {view === 'markdowns' && (
+          <MobileMarkdowns
+            categories={categories}
+            universeId={currentUniverseId}
+            openMarkdown={openMarkdownRequest}
+            onOpenMarkdownConsumed={() => setOpenMarkdownRequest(null)}
+          />
+        )}
         {view === 'feeds' && <MobileFeeds categories={categories} universeId={currentUniverseId} />}
         {view === 'tables' && <MobileTables categories={categories} universeId={currentUniverseId} />}
         {view === 'documents' && <MobileDocumentsReadonly categories={categories} universeId={currentUniverseId} />}

@@ -21,10 +21,16 @@ load_dotenv()
 
 from src.backup import create_backup, estimate_backup_size, restore_backup
 from src.dashboard import (
+    create_dashboard_markdown_link,
     create_dashboard_widget,
+    delete_dashboard_markdown_link,
     delete_dashboard_widget,
+    list_dashboard_markdown_links,
     list_dashboard_widgets,
+    markdown_link_to_dict,
+    move_dashboard_markdown_link,
     move_dashboard_widget,
+    reorder_dashboard_items,
     reorder_dashboard_widgets,
     update_dashboard_widget,
     upsert_dashboard_widget,
@@ -2392,6 +2398,28 @@ class DashboardWidgetReorderRequest(BaseModel):
     widgets: list[dict]
 
 
+class DashboardMarkdownLinkRequest(BaseModel):
+    """Link an existing markdown, or create a new markdown and link it."""
+    universe_id: int = 1
+    markdown_id: int | None = None
+    title: str | None = None
+    body: str = ""
+    category_id: int | None = None
+    column_index: int = 0
+    sort_order: int | None = None
+
+
+class DashboardMarkdownLinkMoveRequest(BaseModel):
+    column_index: int
+    sort_order: int | None = None
+    universe_id: int = 1
+
+
+class DashboardReorderRequest(BaseModel):
+    universe_id: int = 1
+    items: list[dict]
+
+
 @app.get("/api/dashboard/widgets")
 def api_list_dashboard_widgets(universe_id: int = 1):
     return [widget_to_dict(w) for w in list_dashboard_widgets(universe_id)]
@@ -2467,6 +2495,71 @@ def api_delete_dashboard_widget(tag: str, universe_id: int = 1):
     if not delete_dashboard_widget(universe_id, tag):
         raise HTTPException(status_code=404, detail="Widget not found")
     return {"ok": True, "tag": tag}
+
+
+@app.get("/api/dashboard/markdown-links")
+def api_list_dashboard_markdown_links(universe_id: int = 1):
+    return [markdown_link_to_dict(link) for link in list_dashboard_markdown_links(universe_id)]
+
+
+@app.post("/api/dashboard/markdown-links", status_code=201)
+def api_create_dashboard_markdown_link(req: DashboardMarkdownLinkRequest):
+    try:
+        markdown_id = req.markdown_id
+        if markdown_id is None:
+            title = (req.title or "").strip()
+            if not title:
+                raise ValueError("Provide markdown_id to link an existing markdown, or title to create one")
+            markdown = create_markdown(
+                title=title,
+                body=req.body or "",
+                category_id=req.category_id,
+                universe_id=req.universe_id,
+            )
+            schedule_markdown_embed(
+                markdown.id, markdown.title, markdown.body, universe_id=req.universe_id
+            )
+            markdown_id = markdown.id
+        link = create_dashboard_markdown_link(
+            universe_id=req.universe_id,
+            markdown_id=markdown_id,
+            column_index=req.column_index,
+            sort_order=req.sort_order,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return markdown_link_to_dict(link)
+
+
+@app.patch("/api/dashboard/markdown-links/{link_id}/move")
+def api_move_dashboard_markdown_link(link_id: int, req: DashboardMarkdownLinkMoveRequest):
+    try:
+        link = move_dashboard_markdown_link(
+            req.universe_id,
+            link_id,
+            req.column_index,
+            req.sort_order,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if not link:
+        raise HTTPException(status_code=404, detail="Markdown link not found")
+    return markdown_link_to_dict(link)
+
+
+@app.delete("/api/dashboard/markdown-links/{link_id}")
+def api_delete_dashboard_markdown_link(link_id: int, universe_id: int = 1):
+    if not delete_dashboard_markdown_link(universe_id, link_id):
+        raise HTTPException(status_code=404, detail="Markdown link not found")
+    return {"ok": True, "id": link_id}
+
+
+@app.post("/api/dashboard/reorder")
+def api_reorder_dashboard(req: DashboardReorderRequest):
+    try:
+        return reorder_dashboard_items(req.universe_id, req.items)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 # ── Stats ────────────────────────────────────────────────────────────────

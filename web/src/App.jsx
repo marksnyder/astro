@@ -2554,6 +2554,8 @@ function App() {
             <Dashboard
               key={currentUniverseId ?? 'none'}
               universeId={currentUniverseId}
+              categories={categories}
+              onOpenMarkdown={openMarkdownTab}
             />
           ) : activeTab?.type === 'diagram' && activeTab.data ? (
             <DiagramEditorView

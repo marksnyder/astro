@@ -185,6 +185,8 @@ def delete_universe(uid: int) -> bool:
                 fp.unlink()
         conn.execute("DELETE FROM feed_artifacts WHERE feed_id = ?", (fid,))
     conn.execute("DELETE FROM feeds WHERE universe_id = ?", (uid,))
+    conn.execute("DELETE FROM dashboard_markdown_links WHERE universe_id = ?", (uid,))
+    conn.execute("DELETE FROM dashboard_widgets WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM markdowns WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM links WHERE universe_id = ?", (uid,))
     conn.execute("DELETE FROM diagrams WHERE universe_id = ?", (uid,))
@@ -484,6 +486,7 @@ def update_markdown(markdown_id: int, title: str, body: str, category_id: int | 
 
 def delete_markdown(markdown_id: int) -> bool:
     conn = _get_conn()
+    conn.execute("DELETE FROM dashboard_markdown_links WHERE markdown_id = ?", (markdown_id,))
     cur = conn.execute("DELETE FROM markdowns WHERE id = ?", (markdown_id,))
     conn.commit()
     conn.close()

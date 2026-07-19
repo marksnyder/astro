@@ -65,9 +65,15 @@ from src.markdowns import (
 )
 from src.agent_task_runner import ChannelCooldownError, send_agent_task_message_now
 from src.dashboard import (
+    delete_dashboard_markdown_link as _db_delete_dashboard_markdown_link,
     delete_dashboard_widget as _db_delete_dashboard_widget,
+    list_dashboard_markdown_links as _db_list_dashboard_markdown_links,
     list_dashboard_widgets as _db_list_dashboard_widgets,
+    markdown_link_to_dict,
+    move_dashboard_markdown_link as _db_move_dashboard_markdown_link,
     move_dashboard_widget as _db_move_dashboard_widget,
+    reorder_dashboard_items as _db_reorder_dashboard_items,
+    create_dashboard_markdown_link as _db_create_dashboard_markdown_link,
     upsert_dashboard_widget as _db_upsert_dashboard_widget,
     widget_to_dict,
 )
@@ -153,7 +159,9 @@ mcp = FastMCP(
         "write_script, update_script, delete_script, and run_script. Scripts receive "
         "ASTRO_BASE_URL, ASTRO_API_KEY (if configured), and ASTRO_UNIVERSE_ID. "
         "Universe dashboards (shown when no workspace tab is open) use list_dashboard_widgets, "
-        "upsert_dashboard_widget, move_dashboard_widget, and remove_dashboard_widget."
+        "upsert_dashboard_widget, move_dashboard_widget, remove_dashboard_widget, "
+        "list_dashboard_markdown_links, add_dashboard_markdown_link, "
+        "move_dashboard_markdown_link, remove_dashboard_markdown_link, and reorder_dashboard."
     ),
 )
 
@@ -1121,6 +1129,93 @@ def remove_dashboard_widget(tag: str, universe_id: int | None = None) -> dict | 
     if not _db_delete_dashboard_widget(uid, tag):
         return f"No dashboard widget with tag {tag!r} in universe {uid}"
     return {"ok": True, "tag": tag}
+
+
+@mcp.tool
+def list_dashboard_markdown_links(universe_id: int | None = None) -> list[dict]:
+    """List markdown links pinned on the universe dashboard (title only; opens the real markdown)."""
+    uid = universe_id if universe_id is not None else _default_universe()
+    return [markdown_link_to_dict(link) for link in _db_list_dashboard_markdown_links(uid)]
+
+
+@mcp.tool
+def add_dashboard_markdown_link(
+    markdown_id: int | None = None,
+    title: str | None = None,
+    body: str = "",
+    column_index: int = 0,
+    sort_order: int | None = None,
+    universe_id: int | None = None,
+) -> dict | str:
+    """Pin a markdown on the dashboard. Pass markdown_id to link an existing note,
+    or title (and optional body) to create a new markdown and link it."""
+    uid = universe_id if universe_id is not None else _default_universe()
+    try:
+        mid = markdown_id
+        if mid is None:
+            clean_title = (title or "").strip()
+            if not clean_title:
+                return "Provide markdown_id, or title to create a new markdown"
+            markdown = create_markdown(clean_title, body or "", universe_id=uid)
+            schedule_reindex("markdown", markdown.id)
+            mid = markdown.id
+        link = _db_create_dashboard_markdown_link(
+            universe_id=uid,
+            markdown_id=mid,
+            column_index=column_index,
+            sort_order=sort_order,
+        )
+    except ValueError as e:
+        return str(e)
+    return markdown_link_to_dict(link)
+
+
+@mcp.tool
+def move_dashboard_markdown_link(
+    link_id: int,
+    column_index: int,
+    sort_order: int | None = None,
+    universe_id: int | None = None,
+) -> dict | str:
+    """Move a dashboard markdown link to another column (0-3) and optional sort position."""
+    uid = universe_id if universe_id is not None else _default_universe()
+    try:
+        link = _db_move_dashboard_markdown_link(uid, link_id, column_index, sort_order)
+    except ValueError as e:
+        return str(e)
+    if not link:
+        return f"No dashboard markdown link with id {link_id} in universe {uid}"
+    return markdown_link_to_dict(link)
+
+
+@mcp.tool
+def remove_dashboard_markdown_link(
+    link_id: int,
+    universe_id: int | None = None,
+) -> dict | str:
+    """Remove a markdown link from the dashboard (does not delete the markdown itself)."""
+    uid = universe_id if universe_id is not None else _default_universe()
+    if not _db_delete_dashboard_markdown_link(uid, link_id):
+        return f"No dashboard markdown link with id {link_id} in universe {uid}"
+    return {"ok": True, "id": link_id}
+
+
+@mcp.tool
+def reorder_dashboard(
+    items: list[dict],
+    universe_id: int | None = None,
+) -> dict | str:
+    """Batch-reorder dashboard widgets and markdown links.
+
+    Each item is either:
+      {"type": "widget", "tag": "...", "column_index": 0, "sort_order": 0}
+      {"type": "markdown_link", "id": 1, "column_index": 0, "sort_order": 1}
+    """
+    uid = universe_id if universe_id is not None else _default_universe()
+    try:
+        return _db_reorder_dashboard_items(uid, items or [])
+    except ValueError as e:
+        return str(e)
 
 
 # ── Stats ─────────────────────────────────────────────────────────────────

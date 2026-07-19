@@ -26,7 +26,7 @@ Point any MCP client at `https://your-host/mcp/` and use the tools on each page 
 - [Agent Tasks](/docs/agent-tasks/) — scheduled Slack delivery from markdown
 - [Scripts](/docs/scripts/) — Python source with editor and run
 - [Python Tasks](/docs/python-tasks/) — scheduled or manual script execution
-- [Universe dashboard](/docs/dashboard/) — four-column markdown widget board
+- [Universe dashboard](/docs/dashboard/) — four-column board of widgets and markdown links
 
 ## Content & memory
 
