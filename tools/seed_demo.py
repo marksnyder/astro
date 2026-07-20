@@ -17,7 +17,6 @@ sys.path.insert(0, str(ROOT))
 DB_PATH = ROOT / "data" / "astro.db"
 DOCUMENTS_DIR = ROOT / "documents"
 IMAGES_DIR = ROOT / "data" / "images"
-FEED_FILES_DIR = ROOT / "data" / "feed_files"
 CHROMA_DIR = ROOT / "data" / "chroma"
 
 
@@ -27,8 +26,6 @@ def clear_all():
     conn.execute("PRAGMA foreign_keys = ON")
 
     tables_to_clear = [
-        "feed_artifacts",
-        "feeds",
         "markdown_images",
         "markdowns",
         "links",
@@ -51,10 +48,6 @@ def clear_all():
     if IMAGES_DIR.exists():
         shutil.rmtree(IMAGES_DIR)
     IMAGES_DIR.mkdir(parents=True, exist_ok=True)
-
-    if FEED_FILES_DIR.exists():
-        shutil.rmtree(FEED_FILES_DIR)
-    FEED_FILES_DIR.mkdir(parents=True, exist_ok=True)
 
     if CHROMA_DIR.exists():
         shutil.rmtree(CHROMA_DIR)
@@ -983,118 +976,11 @@ Instead of passive reading:
             (title, url, cat_id, HOME, ts(3), ts(3)),
         )
 
-    # ── WORK Feeds ───────────────────────────────────────────────────────
-
-    import uuid
-
-    work_feeds = [
-        ("CI/CD Pipeline Alerts", work_cats["DevOps & CI/CD"]),
-        ("Security Advisories", work_cats["DevOps & CI/CD"]),
-        ("Tech Blog Digest", work_cats["Reference & Learning"]),
-    ]
-
-    for title, cat_id in work_feeds:
-        api_key = f"fk_{uuid.uuid4().hex}"
-        conn.execute(
-            "INSERT INTO feeds (title, category_id, universe_id, api_key, pinned, created_at, updated_at) VALUES (?,?,?,?,0,?,?)",
-            (title, cat_id, WORK, api_key, ts(5), ts(5)),
-        )
-
-    # ── HOME Feeds ───────────────────────────────────────────────────────
-
-    home_feeds = [
-        ("Career Opportunities", home_cats["Career Development"]),
-        ("Health & Wellness Tips", home_cats["Wellness"]),
-        ("Course Recommendations", home_cats["Online Courses"]),
-    ]
-
-    for title, cat_id in home_feeds:
-        api_key = f"fk_{uuid.uuid4().hex}"
-        conn.execute(
-            "INSERT INTO feeds (title, category_id, universe_id, api_key, pinned, created_at, updated_at) VALUES (?,?,?,?,0,?,?)",
-            (title, cat_id, HOME, api_key, ts(5), ts(5)),
-        )
-
-    # ── Feed Artifacts ───────────────────────────────────────────────────
-
-    # Collect feed IDs by title for referencing
-    feed_rows = conn.execute("SELECT id, title FROM feeds").fetchall()
-    feed_ids = {r[0]: r[1] for r in feed_rows}
-    # We'll reference feeds by insertion order: 1-3 work, 4-6 home
-
-    _artifact_data = [
-        # Feed 1: CI/CD Pipeline Alerts
-        (1, "Deploy v2.14.0 — Production rollout complete", ts(0, 3),
-         "## Production Deploy: v2.14.0\n\n![Deployment Dashboard](https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600)\n\n**Status:** SUCCESS\n**Environment:** production\n**Duration:** 4m 32s\n**Deployed by:** github-actions\n\n### Changes Included\n- feat: WebSocket support for real-time notifications\n- fix: Connection pool leak in auth service\n- perf: Lazy-load dashboard widgets (40% faster page load)\n- chore: Upgrade Node.js to 20.11.1\n\n### Health Check\nAll endpoints responding within SLA. Error rate: 0.02%"),
-        (1, "Build failed: feature/JIRA-891-user-prefs", ts(0, 8),
-         "## Build Failure\n\n![Terminal Output](https://images.unsplash.com/photo-1629654297299-c8506221ca97?w=600)\n\n**Branch:** `feature/JIRA-891-user-prefs`\n**Stage:** Unit Tests\n**Exit code:** 1\n\n### Failing Tests\n```\nFAIL src/services/user-prefs.test.ts\n  ✕ should save notification preferences (timeout 5000ms exceeded)\n  ✕ should validate email frequency enum\n  ✓ should return defaults for new users (14ms)\n```\n\n### Action Required\nAssign back to developer."),
-        (1, "Staging environment recycled — new pods healthy", ts(1, 2),
-         "## Staging Recycle Complete\n\n**Trigger:** Scheduled weekly recycle\n**Pods restarted:** 12\n**Downtime:** 0s (rolling restart)\n\nAll health checks passing. Staging ready for QA."),
-        (1, "Docker image scan: 2 medium vulnerabilities", ts(2, 5),
-         "## Image Vulnerability Scan Results\n\n**Image:** `myapp/api:v2.13.2`\n**Scanner:** Trivy v0.49.0\n\n| Severity | Count |\n|----------|-------|\n| Critical | 0 |\n| High | 0 |\n| Medium | 2 |\n| Low | 5 |\n\n### Recommendation\nUpdate base image from `python:3.12-slim-bookworm` to latest tag."),
-
-        # Feed 2: Security Advisories
-        (2, "Critical: GitHub Actions supply chain attack vector", ts(0, 6),
-         "## Security Advisory: GitHub Actions Supply Chain Risk\n\n![Security](https://images.unsplash.com/photo-1555949963-ff9fe0c870eb?w=600)\n\n**Severity:** HIGH\n\n### Mitigation Steps\n1. Pin actions to commit SHAs instead of tags\n2. Enable Dependabot alerts for GitHub Actions\n3. Audit all third-party actions\n\nAudit complete: 3 workflows updated. No evidence of compromise."),
-        (2, "Dependency update: FastAPI 0.115 patches request smuggling", ts(1, 4),
-         "## Dependency Security Patch\n\n**Package:** FastAPI 0.115.0\n**Severity:** Medium\n\nHTTP request smuggling via malformed Transfer-Encoding headers. Updated requirements.txt, staging tested and verified."),
-        (2, "SOC2 audit reminder: rotate service account keys", ts(3),
-         "## Quarterly Key Rotation — Q1 2026\n\n**Deadline:** March 31, 2026\n\n### Service Accounts to Rotate\n- AWS IAM, GCP Service Account, Database credentials, Redis auth, Sentry API key, DataDog keys\n\nLast rotation: December 15, 2025 (within 90-day policy)."),
-
-        # Feed 3: Tech Blog Digest
-        (3, "How Stripe built idempotent APIs at scale", ts(0, 5),
-         "## How Stripe Built Idempotent APIs at Scale\n\n![Code on screen](https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600)\n\nEvery mutating API call accepts an Idempotency-Key header. Keys stored in Redis with 24h TTL. Atomic check-and-set using Lua scripts.\n\n**Relevance:** High — consider for Q2 architecture planning."),
-        (3, "PostgreSQL 17 performance benchmarks: 30% faster JSON", ts(1, 3),
-         "## PostgreSQL 17 Performance Deep Dive\n\n| Operation | PG 16 | PG 17 | Improvement |\n|-----------|-------|-------|-------------|\n| JSONB query | 12ms | 8.4ms | 30% |\n| Parallel seq scan | 45ms | 31ms | 31% |\n\nPropose upgrading staging to PG 17 in Sprint 26."),
-        (3, "The hidden cost of microservices — lessons from Segment", ts(2, 8),
-         "## The Hidden Cost of Microservices\n\n![Server infrastructure](https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=600)\n\nSegment moved from monolith → microservices → modular monolith. 140+ services caused operational overhead, distributed debugging pain, and data consistency bugs.\n\nBefore splitting further, ask: does this service need to scale independently?"),
-        (3, "Rust in production: a 2-year retrospective from Discord", ts(4),
-         "## Rust in Production: Discord's 2-Year Retrospective\n\nMemory usage down 90%, p99 latency dropped from 130ms to 5ms, zero Rust-related incidents in 2 years.\n\nGood for performance-critical services. Not ideal for rapid prototyping."),
-
-        # Feed 4: Career Opportunities
-        (4, "5 skills that will define senior engineers in 2026", ts(0, 4),
-         "## 5 Skills That Will Define Senior Engineers in 2026\n\n![Career growth](https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=600)\n\n1. **System Thinking** — understanding ripple effects\n2. **AI-Augmented Development** — leveraging AI tools effectively\n3. **Communication & Writing** — RFCs, ADRs, design docs\n4. **Business Acumen** — understanding revenue impact\n5. **Mentorship** — force multiplication through others"),
-        (4, "Remote-friendly companies with the best engineering culture", ts(1, 6),
-         "## Top Remote-Friendly Engineering Employers (2026)\n\n![Networking event](https://images.unsplash.com/photo-1515187029135-18ee286d815b?w=600)\n\n| Company | Remote Policy | Comp Range (Sr.) |\n|---------|--------------|-------------------|\n| Stripe | Remote-first | $220-350K |\n| Vercel | Remote-first | $190-280K |\n| Linear | Remote-first | $200-300K |\n| Datadog | Hybrid/Remote | $200-320K |"),
-        (4, "How to negotiate a 20% raise without changing jobs", ts(3, 2),
-         "## Negotiating a Raise: A Playbook\n\nDocument your wins with metrics. Research market rate. Anchor high (ask 25% to get 20%). Negotiate total comp. Get it in writing."),
-
-        # Feed 5: Health & Wellness Tips
-        (5, "The science of Zone 2 cardio: why slow running makes you faster", ts(0, 7),
-         "## Zone 2 Cardio: The Most Underrated Training Method\n\n![Running outdoors](https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=600)\n\nZone 2 builds mitochondrial density, improves fat oxidation, and increases cardiac output. 3-4 sessions/week, 30-60 min. 80% of training volume should be Zone 2."),
-        (5, "Meal timing for desk workers: when to eat for energy", ts(1, 5),
-         "## Optimal Meal Timing for Knowledge Workers\n\n![Healthy food](https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=600)\n\n7 AM: protein-forward breakfast. 12:30: balanced lunch. 3:30: proactive afternoon snack. No caffeine after 2 PM. Most afternoon hunger is actually dehydration."),
-        (5, "5-minute desk stretches to prevent back pain", ts(2, 3),
-         "## Desk Worker Stretch Routine\n\n![Yoga and stretching](https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=600)\n\nDo every 2 hours: neck rolls, chest opener, seated spinal twist, hip flexor stretch, wrist circles, standing forward fold. 5 minutes total."),
-        (5, "Sleep optimization: the non-negotiable habits", ts(4),
-         "## Sleep Optimization Guide\n\n![Peaceful landscape](https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600)\n\nConsistent schedule. Bedroom 65-68°F. Morning sunlight. No caffeine after 2 PM. Wind-down routine 30-60 min before bed. Target 7-8 hours."),
-
-        # Feed 6: Course Recommendations
-        (6, "New: MIT Distributed Systems course — free on YouTube", ts(0, 2),
-         "## MIT 6.5840 Distributed Systems (Spring 2026)\n\n![Studying](https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=600)\n\n23 video lectures, 4 hands-on labs in Go. Topics: MapReduce, Raft consensus, distributed transactions, CRDTs. 2 lectures/week = 12 weeks to complete."),
-        (6, "Coursera: Andrew Ng's AI for Everyone updated for 2026", ts(1, 8),
-         "## AI for Everyone — Updated Course\n\n![Laptop with code](https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=600)\n\nNew modules on LLM agents, AI safety, and evaluating AI vendors. 6 hours self-paced. Free to audit, $49 for certificate."),
-        (6, "AWS Solutions Architect Associate — study guide & resources", ts(2, 6),
-         "## AWS SAA-C04 Certification Study Guide\n\n![Cloud infrastructure](https://images.unsplash.com/photo-1559757175-5700dde675bc?w=600)\n\n8-week study plan. Top resources: Stephane Maarek (Udemy), Tutorials Dojo (practice exams), Adrian Cantrill (deep dives). Exam: 65 questions, 130 min, $150."),
-        (6, "The best free resources for learning system design", ts(5),
-         "## Free System Design Resources\n\n![Books and learning](https://images.unsplash.com/photo-1513001900722-370f803f498d?w=600)\n\nMIT 6.824, Gaurav Sen (YouTube), System Design Primer (GitHub 240K stars), Engineering blogs (Stripe, Netflix, Uber). Design a system every week."),
-    ]
-
-    for feed_id_offset, title, created, markdown in _artifact_data:
-        # feed_id_offset maps to the Nth feed inserted above
-        actual_feed_id = conn.execute(
-            "SELECT id FROM feeds ORDER BY id LIMIT 1 OFFSET ?", (feed_id_offset - 1,)
-        ).fetchone()[0]
-        conn.execute(
-            "INSERT INTO feed_artifacts (feed_id, title, content_type, markdown, created_at) VALUES (?,?,'markdown',?,?)",
-            (actual_feed_id, title, markdown, created),
-        )
-
     conn.commit()
 
     # Print summary
     counts = {}
-    for table in ["categories", "markdowns", "links", "feeds", "feed_artifacts"]:
+    for table in ["categories", "markdowns", "links"]:
         counts[table] = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
 
     conn.close()

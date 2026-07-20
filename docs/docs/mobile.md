@@ -6,7 +6,7 @@ nav_id: mobile
 permalink: /docs/mobile/
 ---
 
-Astro serves a **mobile optimized** web app at **`/mobile`** so you can use notes, feeds, tables, the universe **dashboard**, **scripts** (run-only), **agent tasks**, **Python tasks**, library, and categories on a phone or tablet—same universe and API as desktop.
+Astro serves a **mobile optimized** web app at **`/mobile`** so you can use notes, tables, the universe **dashboard**, **scripts** (run-only), **agent tasks**, **Python tasks**, library, and categories on a phone or tablet—same universe and API as desktop.
 
 ### Mobile highlights
 

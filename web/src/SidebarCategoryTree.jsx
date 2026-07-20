@@ -56,14 +56,6 @@ function SidebarTreeItemIcon({ kind }) {
           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
         </svg>
       )
-    case 'feeds':
-      return (
-        <svg {...svgProps}>
-          <path d="M4 11a9 9 0 0 1 9 9" />
-          <path d="M4 4a16 16 0 0 1 16 16" />
-          <circle cx="5" cy="19" r="1" />
-        </svg>
-      )
     case 'diagrams':
       return (
         <svg {...svgProps}>
@@ -329,7 +321,7 @@ function CategoryTreeInner({
   renderItem,
   renderCategoryHeaderExtra,
   showExpandCollapse = false,
-  /** Matches left rail tab: markdowns, archive, links, feeds, diagrams, tables */
+  /** Matches left rail tab: markdowns, archive, links, diagrams, tables */
   itemKind,
 }) {
   const itemsByCat = useMemo(

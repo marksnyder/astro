@@ -6,12 +6,10 @@ import json
 
 from src.markdowns import (
     get_diagram,
-    get_feed,
     get_link,
     get_markdown,
     get_table,
     list_all_table_rows,
-    list_feed_posts,
 )
 from src.scripts import get_script
 
@@ -52,20 +50,6 @@ def table_search_text(title: str, columns: str, rows: list) -> str:
         except json.JSONDecodeError:
             pass
     return "\n".join(p for p in parts if str(p).strip())
-
-
-def feed_search_text(title: str, posts: list) -> str:
-    parts = [title or ""]
-    for post in posts:
-        if getattr(post, "title", None):
-            parts.append(post.title)
-        md = getattr(post, "markdown", None)
-        if md:
-            parts.append(md)
-        fn = getattr(post, "original_filename", None)
-        if fn:
-            parts.append(fn)
-    return "\n".join(p for p in parts if p.strip())
 
 
 def build_index_payload(content_type: str, item_id: int) -> tuple[str, str, int, dict] | None:
@@ -126,18 +110,6 @@ def build_index_payload(content_type: str, item_id: int) -> tuple[str, str, int,
             {"category_id": t.category_id},
         )
 
-    if content_type == "feed":
-        feed = get_feed(item_id)
-        if not feed:
-            return None
-        posts, _ = list_feed_posts(item_id, page=1, page_size=500)
-        return (
-            feed_search_text(feed.title, posts),
-            feed.title,
-            feed.universe_id,
-            {"category_id": feed.category_id, "feed_id": feed.id},
-        )
-
     return None
 
 
@@ -150,7 +122,6 @@ def list_universe_item_ids(content_type: str, universe_id: int) -> list[int]:
         "link": "links",
         "diagram": "diagrams",
         "table": "tables_",
-        "feed": "feeds",
     }.get(content_type)
     if not table:
         return []

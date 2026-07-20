@@ -8,7 +8,7 @@ permalink: /docs/python-tasks/
 
 **Python Tasks** are the server-side cousin of [Agent Tasks](/docs/agent-tasks/): instead of posting markdown instructions to Slack, they **run a saved [Script](/docs/scripts/)** on the Astro host on a schedule or when you click **Run**.
 
-Use them when automation should **do work inside your stack**—fetch a page, call an API, aggregate table data, push results into a [feed](/docs/feeds/)—without standing up a separate worker or pasting code into a task form.
+Use them when automation should **do work inside your stack**—fetch a page, call an API, aggregate table data, write results into a markdown note—without standing up a separate worker or pasting code into a task form.
 
 ### What you configure
 

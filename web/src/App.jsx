@@ -3,7 +3,6 @@ import './App.css'
 import MarkdownsPanel, { MarkdownEditorView } from './MarkdownsPanel'
 import ArchivePanel from './ArchivePanel'
 import LinksPanel from './LinksPanel'
-import FeedsPanel, { PostTimeline } from './FeedsPanel'
 import DiagramsPanel, { DiagramEditorView } from './DiagramsPanel'
 import TablesPanel, { TableEditorView } from './TablesPanel'
 import AgentTasksPanel from './AgentTasksPanel'
@@ -14,7 +13,6 @@ import ChatBackground from './ChatBackground'
 import Dashboard from './Dashboard'
 import SlackManifestGenerator from './SlackManifestGenerator'
 import GlobalSearch, { GlobalSearchTrigger } from './GlobalSearch'
-import { formatCategoryHierarchyLabel } from './categoryHierarchy'
 import { DEFAULT_AGENT_TASK_MESSAGE_TEMPLATE } from './agentTaskDefaults'
 
 const DASHBOARD_TAB = { id: 'dashboard', type: 'dashboard', title: 'Dashboard', closable: false }
@@ -132,7 +130,7 @@ function UniverseBundleSection({ universes, currentId, onRefresh, onSwitch, onCl
   const [tab, setTab] = useState('export')
   const [exportUid, setExportUid] = useState(currentId)
   const [inc, setInc] = useState({
-    markdowns: false, links: false, tables: false, diagrams: false, feeds: false, documents: false,
+    markdowns: false, links: false, tables: false, diagrams: false, documents: false,
   })
   /** 'all' = export every item of that type; 'pick' = only checked rows */
   const [selMode, setSelMode] = useState({
@@ -140,17 +138,16 @@ function UniverseBundleSection({ universes, currentId, onRefresh, onSwitch, onCl
     links: 'all',
     tables: 'all',
     diagrams: 'all',
-    feeds: 'all',
     documents: 'all',
   })
   const [pick, setPick] = useState({
-    markdowns: [], links: [], tables: [], diagrams: [], feeds: [], documents: [],
+    markdowns: [], links: [], tables: [], diagrams: [], documents: [],
   })
   const [itemFilter, setItemFilter] = useState({
-    markdowns: '', links: '', tables: '', diagrams: '', feeds: '', documents: '',
+    markdowns: '', links: '', tables: '', diagrams: '', documents: '',
   })
   const [lists, setLists] = useState({
-    markdowns: [], links: [], tables: [], diagrams: [], feeds: [], documents: [],
+    markdowns: [], links: [], tables: [], diagrams: [], documents: [],
   })
   const [busy, setBusy] = useState(false)
   const [impName, setImpName] = useState('')
@@ -166,17 +163,16 @@ function UniverseBundleSection({ universes, currentId, onRefresh, onSwitch, onCl
     if (!uid) return
     try {
       const q = `universe_id=${uid}`
-      const [md, lk, tb, dg, fd, docs] = await Promise.all([
+      const [md, lk, tb, dg, docs] = await Promise.all([
         fetch(`/api/markdowns?${q}`).then(r => r.json()),
         fetch(`/api/links?${q}`).then(r => r.json()),
         fetch(`/api/tables?${q}`).then(r => r.json()),
         fetch(`/api/diagrams?${q}`).then(r => r.json()),
-        fetch(`/api/feeds?${q}`).then(r => r.json()),
         fetch(`/api/documents?${q}`).then(r => r.json()),
       ])
-      setLists({ markdowns: md, links: lk, tables: tb, diagrams: dg, feeds: fd, documents: docs })
+      setLists({ markdowns: md, links: lk, tables: tb, diagrams: dg, documents: docs })
     } catch {
-      setLists({ markdowns: [], links: [], tables: [], diagrams: [], feeds: [], documents: [] })
+      setLists({ markdowns: [], links: [], tables: [], diagrams: [], documents: [] })
     }
   }, [exportUid])
 
@@ -237,7 +233,7 @@ function UniverseBundleSection({ universes, currentId, onRefresh, onSwitch, onCl
       alert('Select at least one content type to export.')
       return
     }
-    const keys = ['markdowns', 'links', 'tables', 'diagrams', 'feeds', 'documents']
+    const keys = ['markdowns', 'links', 'tables', 'diagrams', 'documents']
     for (const k of keys) {
       if (inc[k] && selMode[k] === 'pick' && (!pick[k] || pick[k].length === 0)) {
         alert(`Choose at least one item for "${k}", or switch to "All in universe".`)
@@ -254,8 +250,6 @@ function UniverseBundleSection({ universes, currentId, onRefresh, onSwitch, onCl
       table_ids: inc.tables ? idsFor('tables') : [],
       diagrams: inc.diagrams,
       diagram_ids: inc.diagrams ? idsFor('diagrams') : [],
-      feeds: inc.feeds,
-      feed_ids: inc.feeds ? idsFor('feeds') : [],
       documents: inc.documents,
       document_paths: inc.documents ? idsFor('documents') : [],
     }
@@ -483,7 +477,6 @@ function UniverseBundleSection({ universes, currentId, onRefresh, onSwitch, onCl
           {typeRow('links', 'Links', 'link')}
           {typeRow('tables', 'Tables', 'table')}
           {typeRow('diagrams', 'Diagrams', 'diagram')}
-          {typeRow('feeds', 'Feeds', 'feed (including posts & comments)')}
           {typeRow('documents', 'Documents', 'document file')}
           <button type="button" className="markdown-save-btn universe-bundle-download" onClick={doExport} disabled={busy || !exportUid}>
             {busy ? 'Preparing…' : 'Download ZIP'}
@@ -756,7 +749,7 @@ function HelpDialog({ onClose }) {
                 <div className="help-code-title">mcp_config.json</div>
                 <pre>{JSON.stringify({ mcpServers: { astro: { url: `${origin}/mcp` } } }, null, 2)}</pre>
               </div>
-              <p className="help-note">The MCP server provides tools for managing markdowns, documents, links, and feeds.</p>
+              <p className="help-note">The MCP server provides tools for managing markdowns, documents, and links.</p>
             </div>
           )}
         </div>
@@ -1131,7 +1124,7 @@ function SettingsDialog({ onClose, onRestored }) {
       const r = data.restored
       setStatus({
         type: 'success',
-        text: `Restore complete! DB: ${r.db ? 'yes' : 'no'}, Images: ${r.images}, Documents: ${r.documents}, Feed files: ${r.feed_files ?? 0}, Vector store: ${r.chroma ? 'yes' : 'no (use Rebuild Index)'}.`,
+        text: `Restore complete! DB: ${r.db ? 'yes' : 'no'}, Images: ${r.images}, Documents: ${r.documents}, Vector store: ${r.chroma ? 'yes' : 'no (use Rebuild Index)'}.`,
       })
       setSelectedFile(null)
       if (restoreInputRef.current) restoreInputRef.current.value = ''
@@ -1526,14 +1519,13 @@ const MCP_DIRECT_TEMPLATES = {
   write_link: (uid) => `> Use the \`write_link\` tool to save a bookmark with title: "<title>", url: "<url>"${uid ? ` (universe_id: ${uid})` : ''}\n`,
   list_documents: (uid) => `> Use the \`list_documents\` tool to list all uploaded documents${uid ? ` (universe_id: ${uid})` : ''}\n`,
   upload_document: (uid) => `> Use the \`upload_document\` tool to upload a document with filename: "<filename>", content: "<content>"${uid ? ` (universe_id: ${uid})` : ''}\n`,
-  search_feeds: (uid) => `> Use the \`search_feeds\` tool to list available feeds${uid ? ` (universe_id: ${uid})` : ''}\n`,
   get_stats: () => '> Use the `get_stats` tool to get vector store statistics\n',
 }
 
 const UNIVERSE_TOOLS = new Set([
   'search', 'search_markdowns', 'write_markdown',
   'list_all_categories', 'write_category',
-  'search_links', 'write_link', 'list_documents', 'upload_document', 'search_feeds',
+  'search_links', 'write_link', 'list_documents', 'upload_document',
 ])
 
 function McpUniversePicker({ tool, onConfirm, onClose }) {
@@ -1570,7 +1562,6 @@ function McpToolLookup({ tool, onInsert, onClose }) {
     update_category: '/api/categories', delete_category: '/api/categories',
     update_link: '/api/links', delete_link: '/api/links',
     delete_document: '/api/documents',
-    read_feed_posts: '/api/feeds', write_feed_post: '/api/feeds', delete_feed_post: '/api/feeds',
   }
 
   const titles = {
@@ -1578,7 +1569,6 @@ function McpToolLookup({ tool, onInsert, onClose }) {
     update_category: 'Update Category', delete_category: 'Delete Category',
     update_link: 'Update Link', delete_link: 'Delete Link',
     delete_document: 'Delete Document',
-    read_feed_posts: 'Read Feed Posts', write_feed_post: 'Post to Feed', delete_feed_post: 'Delete Feed Post',
   }
 
   const descs = {
@@ -1586,7 +1576,6 @@ function McpToolLookup({ tool, onInsert, onClose }) {
     update_category: 'Select a category to update.', delete_category: 'Select a category to delete.',
     update_link: 'Select a link to update.', delete_link: 'Select a link to delete.',
     delete_document: 'Select a document to delete.',
-    read_feed_posts: 'Select a feed to read posts from.', write_feed_post: 'Select a feed to post to.', delete_feed_post: 'Select a feed, then a post to delete.',
   }
 
   useEffect(() => {
@@ -1613,9 +1602,6 @@ function McpToolLookup({ tool, onInsert, onClose }) {
       update_link: `> Use the \`update_link\` tool to update link "${name}" (link_id: ${id}) with title: "<title>", url: "<url>"\n`,
       delete_link: `> Use the \`delete_link\` tool to delete link "${name}" (link_id: ${id})\n`,
       delete_document: `> Use the \`delete_document\` tool to delete document "${name}" (path: "${path}")\n`,
-      read_feed_posts: `> Use the \`read_feed_posts\` tool to read posts from feed "${name}" (feed_id: ${id})\n`,
-      write_feed_post: `> Use the \`write_feed_post\` tool to create a post in feed "${name}" (feed_id: ${id}) with title: "<title>", markdown: "<content>"\n`,
-      delete_feed_post: `> Use the \`read_feed_posts\` tool to list posts from feed "${name}" (feed_id: ${id}), then use the \`delete_feed_post\` tool with the post_id to delete\n`,
     }
     onInsert(templates[tool] || '')
     onClose()
@@ -1646,8 +1632,6 @@ function McpToolLookup({ tool, onInsert, onClose }) {
 
 function App() {
   const [stats, setStats] = useState(null)
-  const [feedUnreadCounts, setFeedUnreadCounts] = useState({})
-  const [feedRecent7d, setFeedRecent7d] = useState({})
   const [universes, setUniverses] = useState([])
   const [currentUniverseId, setCurrentUniverseId] = useState(null)
   const [sidebarTab, setSidebarTab] = useState('markdowns')
@@ -1659,14 +1643,13 @@ function App() {
     const match = document.cookie.match(/(?:^|;\s*)sidebarWidth=(\d+)/)
     return match ? Number(match[1]) : 320
   })
-  const [pinnedItems, setPinnedItems] = useState({ markdowns: [], documents: [], links: [], feed_categories: [] })
+  const [pinnedItems, setPinnedItems] = useState({ markdowns: [], documents: [], links: [] })
   const [quickView, setQuickView] = useState(null)
   const [editMarkdownRequest, setEditMarkdownRequest] = useState(null)
   const [markdownRefreshKey, setMarkdownRefreshKey] = useState(0)
   const [diagramRefreshKey, setDiagramRefreshKey] = useState(0)
   const [tableRefreshKey, setTableRefreshKey] = useState(0)
   const [scriptRefreshKey, setScriptRefreshKey] = useState(0)
-  const [openFeedRequest, setOpenFeedRequest] = useState(null)
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false)
 
   const [tabs, setTabs] = useState([DASHBOARD_TAB])
@@ -1730,18 +1713,6 @@ function App() {
       .catch(() => {})
   }, [currentUniverseId])
 
-  const fetchUnreadCounts = useCallback(() => {
-    const params = currentUniverseId ? `?universe_id=${currentUniverseId}` : ''
-    fetch(`/api/feed-posts/unread-counts${params}`)
-      .then(r => r.json())
-      .then(data => {
-        const parse = (obj) => { const m = {}; for (const [k, v] of Object.entries(obj || {})) { m[k === 'null' ? null : Number(k)] = v } return m }
-        setFeedUnreadCounts(parse(data.counts))
-        setFeedRecent7d(parse(data.recent_7d))
-      })
-      .catch(() => {})
-  }, [currentUniverseId])
-
   const activeTab = tabs.find(t => t.id === activeTabId) ?? null
 
   const switchToTab = useCallback((tabId) => {
@@ -1775,15 +1746,6 @@ function App() {
         return prev.map(t => t.id === tabId ? { ...t, data: markdown, title: markdown.title || 'Untitled' } : t)
       }
       return [...prev, { id: tabId, type: 'markdown', title: markdown.title || 'Untitled', closable: true, data: markdown }]
-    })
-    setActiveTabId(tabId)
-  }, [])
-
-  const openFeedTab = useCallback((category) => {
-    const tabId = `feed-${category.id}`
-    setTabs(prev => {
-      if (prev.find(t => t.id === tabId)) return prev
-      return [...prev, { id: tabId, type: 'feed', title: category.name || 'Feed', closable: true, data: category }]
     })
     setActiveTabId(tabId)
   }, [])
@@ -1838,7 +1800,7 @@ function App() {
   }, [])
 
   const handleSearchResult = useCallback(async (result) => {
-    const { content_type, item_id, document_path, url, category_id, universe_id: resultUid } = result
+    const { content_type, item_id, document_path, url, universe_id: resultUid } = result
     switch (content_type) {
       case 'markdown': {
         setSidebarTab('markdowns')
@@ -1874,14 +1836,6 @@ function App() {
         }
         break
       }
-      case 'feed': {
-        setSidebarTab('feeds')
-        openFeedTab({
-          id: category_id ?? null,
-          name: formatCategoryHierarchyLabel(categories, category_id) || result.title || 'Feed',
-        })
-        break
-      }
       case 'document': {
         setSidebarTab('archive')
         try {
@@ -1899,7 +1853,7 @@ function App() {
       default:
         break
     }
-  }, [categories, openDiagramTab, openFeedTab, openMarkdownTab, openScriptTab, openTableTab])
+  }, [openDiagramTab, openMarkdownTab, openScriptTab, openTableTab])
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -2003,13 +1957,7 @@ function App() {
     if (currentUniverseId === null) return
     fetchCategories()
     fetchPinned()
-    fetchUnreadCounts()
-  }, [currentUniverseId, fetchCategories, fetchPinned, fetchUnreadCounts])
-
-  useEffect(() => {
-    const iv = setInterval(fetchUnreadCounts, 30000)
-    return () => clearInterval(iv)
-  }, [fetchUnreadCounts])
+  }, [currentUniverseId, fetchCategories, fetchPinned])
 
   const startResize = (e) => {
     e.preventDefault()
@@ -2181,7 +2129,7 @@ function App() {
             </button>
           )}
         </div>
-        {(pinnedItems.markdowns.length > 0 || pinnedItems.documents.length > 0 || pinnedItems.links?.length > 0 || pinnedItems.feed_categories?.length > 0 || pinnedItems.diagrams?.length > 0 || pinnedItems.tables?.length > 0 || pinnedItems.scripts?.length > 0) && (
+        {(pinnedItems.markdowns.length > 0 || pinnedItems.documents.length > 0 || pinnedItems.links?.length > 0 || pinnedItems.diagrams?.length > 0 || pinnedItems.tables?.length > 0 || pinnedItems.scripts?.length > 0) && (
           <div className="pinned-bar">
             {pinnedItems.markdowns.map((n) => (
               <button key={`n-${n.id}`} className="pinned-chip pinned-markdown" onClick={() => { setSidebarTab('markdowns'); setEditMarkdownRequest(n); }} title={n.title || 'Untitled'}>
@@ -2208,19 +2156,6 @@ function App() {
                   <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
                 </svg>
                 <span className="pinned-chip-label">{l.title || l.url}</span>
-              </button>
-            ))}
-            {(pinnedItems.feed_categories || []).map((c) => (
-              <button key={`fc-${c.id}`} className="pinned-chip pinned-feed" onClick={() => openFeedTab({ id: c.id, name: c.name })} title={`Posts for ${c.name}`}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 11a9 9 0 0 1 9 9" />
-                  <path d="M4 4a16 16 0 0 1 16 16" />
-                  <circle cx="5" cy="19" r="1" />
-                </svg>
-                <span className="pinned-chip-label">{c.name}</span>
-                {(feedUnreadCounts[c.id] || 0) > 0 && (
-                  <span className="pinned-chip-unread">{feedUnreadCounts[c.id]}</span>
-                )}
               </button>
             ))}
             {(pinnedItems.diagrams || []).map((d) => (
@@ -2316,13 +2251,6 @@ function App() {
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-              </svg>
-            </button>
-            <button className={`rail-tab ${sidebarTab === 'feeds' ? 'active' : ''}`} onClick={() => setSidebarTab('feeds')} title="Feeds">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 11a9 9 0 0 1 9 9" />
-                <path d="M4 4a16 16 0 0 1 16 16" />
-                <circle cx="5" cy="19" r="1" />
               </svg>
             </button>
             <button className={`rail-tab ${sidebarTab === 'diagrams' ? 'active' : ''}`} onClick={() => setSidebarTab('diagrams')} title="Diagrams">
@@ -2424,20 +2352,6 @@ function App() {
               onPinChange={fetchPinned}
               universeId={currentUniverseId}
               universes={universes}
-              onLoaded={() => setSidebarLoading(false)}
-            />
-          )}
-          {sidebarTab === 'feeds' && (
-            <FeedsPanel
-              categories={categories}
-              universeId={currentUniverseId}
-              universes={universes}
-              onPinChange={fetchPinned}
-              openFeedRequest={openFeedRequest}
-              onOpenFeedRequestHandled={() => setOpenFeedRequest(null)}
-              onViewPosts={(cat) => openFeedTab(cat)}
-              unreadCounts={feedUnreadCounts}
-              recent7dCounts={feedRecent7d}
               onLoaded={() => setSidebarLoading(false)}
             />
           )}
@@ -2608,13 +2522,6 @@ function App() {
                 }
               }}
             />
-          ) : activeTab.type === 'feed' && activeTab.data ? (
-            <PostTimeline
-              key={activeTab.id}
-              category={activeTab.data}
-              onClose={() => { closeTab(activeTab.id); fetchUnreadCounts() }}
-              onUnreadChange={fetchUnreadCounts}
-            />
           ) : activeTab.type === 'agent-tasks' ? (
             <AgentTasksPanel universeId={currentUniverseId} />
           ) : activeTab.type === 'python-tasks' ? (
@@ -2649,7 +2556,6 @@ function App() {
             fetchUniverses()
             fetchCategories()
             fetchPinned()
-            fetchUnreadCounts()
             fetch('/api/stats').then(r => r.json()).then(d => setStats(d)).catch(() => {})
           }}
         />

@@ -17,7 +17,6 @@ const MD_MCP_DIRECT = {
   write_link: (uid) => `> Use the \`write_link\` tool to save a bookmark with title: "<title>", url: "<url>"${uid ? ` (universe_id: ${uid})` : ''}\n`,
   list_documents: (uid) => `> Use the \`list_documents\` tool to list all uploaded documents${uid ? ` (universe_id: ${uid})` : ''}\n`,
   upload_document: (uid) => `> Use the \`upload_document\` tool to upload a document with filename: "<filename>", content: "<content>"${uid ? ` (universe_id: ${uid})` : ''}\n`,
-  search_feeds: (uid) => `> Use the \`search_feeds\` tool to list available feeds${uid ? ` (universe_id: ${uid})` : ''}\n`,
   list_all_universes: () => '> Use the `list_all_universes` tool to list all available universes\n',
   set_default_universe: () => '> Use the `set_default_universe` tool to set the default universe (universe_id: <id>)\n',
   get_stats: () => '> Use the `get_stats` tool to get vector store statistics\n',
@@ -26,7 +25,7 @@ const MD_MCP_DIRECT = {
 const MD_UNIVERSE_TOOLS = new Set([
   'search', 'search_markdowns', 'write_markdown',
   'list_all_categories', 'write_category',
-  'search_links', 'write_link', 'list_documents', 'upload_document', 'search_feeds',
+  'search_links', 'write_link', 'list_documents', 'upload_document',
 ])
 
 function MdUniversePicker({ tool, onConfirm, onClose }) {
@@ -63,21 +62,18 @@ function MdMcpLookup({ tool, onInsert, onClose }) {
     update_category: '/api/categories', delete_category: '/api/categories',
     update_link: '/api/links', delete_link: '/api/links',
     delete_document: '/api/documents',
-    read_feed_posts: '/api/feeds', write_feed_post: '/api/feeds', delete_feed_post: '/api/feeds',
   }
   const titles = {
     read_markdown: 'Read Markdown', update_markdown: 'Update Markdown', delete_markdown: 'Delete Markdown',
     update_category: 'Update Category', delete_category: 'Delete Category',
     update_link: 'Update Link', delete_link: 'Delete Link',
     delete_document: 'Delete Document',
-    read_feed_posts: 'Read Feed Posts', write_feed_post: 'Post to Feed', delete_feed_post: 'Delete Feed Post',
   }
   const descs = {
     read_markdown: 'Select a markdown to read.', update_markdown: 'Select a markdown to update.', delete_markdown: 'Select a markdown to delete.',
     update_category: 'Select a category to update.', delete_category: 'Select a category to delete.',
     update_link: 'Select a link to update.', delete_link: 'Select a link to delete.',
     delete_document: 'Select a document to delete.',
-    read_feed_posts: 'Select a feed to read posts from.', write_feed_post: 'Select a feed to post to.', delete_feed_post: 'Select a feed, then a post to delete.',
   }
 
   useEffect(() => {
@@ -103,9 +99,6 @@ function MdMcpLookup({ tool, onInsert, onClose }) {
       update_link: `> Use the \`update_link\` tool to update link "${name}" (link_id: ${id}) with title: "<title>", url: "<url>"\n`,
       delete_link: `> Use the \`delete_link\` tool to delete link "${name}" (link_id: ${id})\n`,
       delete_document: `> Use the \`delete_document\` tool to delete document "${name}" (path: "${path}")\n`,
-      read_feed_posts: `> Use the \`read_feed_posts\` tool to read posts from feed "${name}" (feed_id: ${id})\n`,
-      write_feed_post: `> Use the \`write_feed_post\` tool to create a post in feed "${name}" (feed_id: ${id}) with title: "<title>", markdown: "<content>"\n`,
-      delete_feed_post: `> Use the \`read_feed_posts\` tool to list posts from feed "${name}" (feed_id: ${id}), then use the \`delete_feed_post\` tool with the post_id to delete\n`,
     }
     onInsert(tpls[tool] || '')
     onClose()
@@ -278,9 +271,6 @@ function MarkdownEditor({ value, onChange, placeholder }) {
                 { type: 'sep' },
                 { type: 'direct', name: 'list_documents' }, { type: 'direct', name: 'upload_document' },
                 { type: 'lookup', name: 'delete_document' },
-                { type: 'sep' },
-                { type: 'direct', name: 'search_feeds' }, { type: 'lookup', name: 'read_feed_posts' },
-                { type: 'lookup', name: 'write_feed_post' }, { type: 'lookup', name: 'delete_feed_post' },
                 { type: 'sep' },
                 { type: 'direct', name: 'list_all_universes' }, { type: 'direct', name: 'set_default_universe' },
                 { type: 'sep' },

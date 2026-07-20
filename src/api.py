@@ -57,18 +57,12 @@ from src.scripts import (
 )
 from src.ingest import SUPPORTED_EXTENSIONS, chunk_documents, load_document
 from src.markdowns import (
-    FEED_FILES_DIR,
     IMAGES_DIR,
     agent_task_to_dict,
     add_markdown_image,
     category_to_dict,
     create_agent_task,
     create_category,
-    create_feed,
-    create_feed_post_file,
-    create_feed_post_markdown,
-    list_pinned_feeds,
-    list_pinned_categories,
     create_link,
     create_markdown,
     create_universe,
@@ -76,22 +70,15 @@ from src.markdowns import (
     delete_all_markdown_images,
     delete_category,
     delete_document_meta,
-    delete_feed,
-    delete_feed_post,
     delete_link,
     delete_markdown,
     delete_markdown_image,
     delete_universe,
-    feed_post_to_dict,
-    feed_to_dict,
     get_agent_task,
     get_all_document_categories,
     get_all_document_meta,
     get_document_paths_for_category,
     get_document_pinned,
-    get_feed,
-    get_feed_post,
-    set_feed_pinned,
     set_category_pinned,
     get_link,
     get_markdown,
@@ -99,12 +86,6 @@ from src.markdowns import (
     get_universe_document_paths,
     get_universe_markdown_ids,
     list_agent_tasks,
-    list_feed_posts,
-    list_feed_posts_by_category,
-    mark_feed_posts_read,
-    get_unread_counts_by_category,
-    get_recent_counts_by_category,
-    list_feeds,
     list_links,
     list_categories,
     list_markdown_images,
@@ -119,12 +100,10 @@ from src.markdowns import (
     markdown_to_dict,
     move_category,
     move_diagram_to_universe,
-    move_feed_to_universe,
     move_link_to_universe,
     move_markdown_to_universe,
     move_table_to_universe,
     update_category,
-    update_feed,
     rename_universe,
     set_document_category,
     set_document_pinned,
@@ -137,11 +116,6 @@ from src.markdowns import (
     update_agent_task,
     update_link,
     update_markdown,
-    list_post_comments,
-    create_post_comment,
-    update_post_comment,
-    delete_post_comment,
-    post_comment_to_dict,
     create_diagram,
     create_table,
     create_table_row,
@@ -398,8 +372,6 @@ class UniverseExportRequest(BaseModel):
     table_ids: list[int] = []
     diagrams: bool = False
     diagram_ids: list[int] = []
-    feeds: bool = False
-    feed_ids: list[int] = []
     documents: bool = False
     document_paths: list[str] = []
 
@@ -413,7 +385,6 @@ def api_export_universe(universe_id: int, body: UniverseExportRequest, backgroun
             body.links,
             body.tables,
             body.diagrams,
-            body.feeds,
             body.documents,
         ]
     ):
@@ -429,8 +400,6 @@ def api_export_universe(universe_id: int, body: UniverseExportRequest, backgroun
             table_ids=body.table_ids if body.tables else None,
             diagrams=body.diagrams,
             diagram_ids=body.diagram_ids if body.diagrams else None,
-            feeds=body.feeds,
-            feed_ids=body.feed_ids if body.feeds else None,
             documents=body.documents,
             document_paths=body.document_paths if body.documents else None,
         )
@@ -602,8 +571,6 @@ def api_list_pinned(universe_id: Optional[int] = None):
                 "size": f.stat().st_size,
             })
     links = [link_to_dict(l) for l in list_pinned_links(universe_id=universe_id)]
-    feeds = [feed_to_dict(f) for f in list_pinned_feeds(universe_id=universe_id)]
-    pinned_cats = [category_to_dict(c) for c in list_pinned_categories(universe_id=universe_id)]
     diagrams = [diagram_summary_to_dict(d) for d in list_pinned_diagram_summaries(universe_id=universe_id)]
     tables = [table_to_dict(t) for t in list_pinned_tables(universe_id=universe_id)]
     scripts = [script_to_dict(s) for s in list_pinned_scripts(universe_id=universe_id)]
@@ -611,8 +578,6 @@ def api_list_pinned(universe_id: Optional[int] = None):
         "markdowns": markdowns,
         "documents": docs,
         "links": links,
-        "feeds": feeds,
-        "feed_categories": pinned_cats,
         "diagrams": diagrams,
         "tables": tables,
         "scripts": scripts,
@@ -1531,7 +1496,6 @@ def api_reindex():
                 "link": list_links,
                 "diagram": list_diagrams,
                 "table": list_tables,
-                "feed": list_feeds,
             }[content_type]
             items = list_fn()
             for item in items:
@@ -1575,342 +1539,6 @@ def api_reindex():
         print(f"[reindex] FATAL: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Reindex failed: {str(e)}")
-
-
-
-
-# ── Feeds ─────────────────────────────────────────────────────────────────
-
-
-class FeedRequest(BaseModel):
-    title: str
-    category_id: Optional[int] = None
-
-
-class FeedResponse(BaseModel):
-    id: int
-    title: str
-    category_id: Optional[int]
-    universe_id: int
-    api_key: str
-    pinned: bool = False
-    created_at: str
-    updated_at: str
-    post_count: int = 0
-    trend_14d: list[int] = []
-    avg_14d: float = 0
-    days_since_last: Optional[int] = None
-
-
-class FeedPostResponse(BaseModel):
-    id: int
-    feed_id: int
-    title: str
-    content_type: str
-    markdown: Optional[str]
-    file_path: Optional[str]
-    original_filename: Optional[str]
-    created_at: str
-
-
-class PostCommentRequest(BaseModel):
-    author: str = "astro"
-    content: str
-
-
-class PostCommentUpdateRequest(BaseModel):
-    content: str
-
-
-class PostCommentResponse(BaseModel):
-    id: int
-    post_id: int
-    author: str
-    content: str
-    created_at: str
-    updated_at: str
-
-
-@app.get("/api/feeds", response_model=list[FeedResponse])
-def api_list_feeds(q: str = "", category_id: Optional[int] = None, universe_id: Optional[int] = None):
-    return [feed_to_dict(f) for f in list_feeds(q, category_id, universe_id=universe_id)]
-
-
-@app.get("/api/feeds/{feed_id}", response_model=FeedResponse)
-def api_get_feed(feed_id: int):
-    feed = get_feed(feed_id)
-    if not feed:
-        raise HTTPException(status_code=404, detail="Feed not found")
-    return feed_to_dict(feed)
-
-
-@app.post("/api/feeds", response_model=FeedResponse, status_code=201)
-def api_create_feed(req: FeedRequest, universe_id: int = 1):
-    feed = create_feed(req.title, req.category_id, universe_id=universe_id)
-    schedule_reindex("feed", feed.id)
-    return feed_to_dict(feed)
-
-
-@app.put("/api/feeds/{feed_id}", response_model=FeedResponse)
-def api_update_feed(feed_id: int, req: FeedRequest):
-    feed = update_feed(feed_id, req.title, req.category_id)
-    if not feed:
-        raise HTTPException(status_code=404, detail="Feed not found")
-    schedule_reindex("feed", feed.id)
-    return feed_to_dict(feed)
-
-
-@app.post("/api/feeds/{feed_id}/move-universe", response_model=FeedResponse)
-def api_move_feed_universe(feed_id: int, req: MoveToUniverseRequest):
-    if not get_universe(req.universe_id):
-        raise HTTPException(status_code=400, detail="Universe not found")
-    _validate_move_category(req)
-    feed = move_feed_to_universe(feed_id, req.universe_id, req.category_id)
-    if not feed:
-        raise HTTPException(status_code=404, detail="Feed not found")
-    schedule_reindex("feed", feed.id)
-    return feed_to_dict(feed)
-
-
-@app.delete("/api/feeds/{feed_id}")
-def api_delete_feed(feed_id: int):
-    if not delete_feed(feed_id):
-        raise HTTPException(status_code=404, detail="Feed not found")
-    schedule_delete_index("feed", feed_id)
-    return {"ok": True}
-
-
-@app.put("/api/feeds/{feed_id}/pin")
-def api_pin_feed(feed_id: int, pinned: bool = True):
-    if not set_feed_pinned(feed_id, pinned):
-        raise HTTPException(status_code=404, detail="Feed not found")
-    return {"ok": True}
-
-
-# ── Feed posts ────────────────────────────────────────────────────────
-
-
-@app.get("/api/feeds/{feed_id}/posts")
-def api_list_feed_posts(feed_id: int, q: str = "", page: int = 1, page_size: int = 100):
-    if not get_feed(feed_id):
-        raise HTTPException(status_code=404, detail="Feed not found")
-    page_size = min(page_size, 100)
-    posts, total = list_feed_posts(feed_id, q, page=page, page_size=page_size)
-    return {
-        "posts": [feed_post_to_dict(p) for p in posts],
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "has_more": (page * page_size) < total,
-    }
-
-
-@app.get("/api/feed-posts/by-category")
-def api_list_feed_posts_by_category(category_id: int = None, q: str = "", page: int = 1, page_size: int = 5):
-    page_size = min(page_size, 50)
-    posts, total = list_feed_posts_by_category(category_id, q, page=page, page_size=page_size)
-    return {
-        "posts": posts,
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "has_more": (page * page_size) < total,
-    }
-
-
-@app.post("/api/feed-posts/mark-read")
-def api_mark_posts_read(body: dict):
-    ids = body.get("ids", [])
-    if not isinstance(ids, list):
-        raise HTTPException(status_code=400, detail="ids must be a list")
-    updated = mark_feed_posts_read(ids)
-    return {"ok": True, "updated": updated}
-
-
-@app.get("/api/feed-posts/unread-counts")
-def api_unread_counts(universe_id: Optional[int] = None):
-    counts = get_unread_counts_by_category(universe_id)
-    recent = get_recent_counts_by_category(universe_id, days=7)
-    fmt = lambda d: {str(k) if k is not None else "null": v for k, v in d.items()}
-    return {"counts": fmt(counts), "recent_7d": fmt(recent)}
-
-
-@app.delete("/api/feed-posts/{post_id}")
-def api_delete_feed_post(post_id: int):
-    post = get_feed_post(post_id)
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-    feed_id = post.feed_id
-    if not delete_feed_post(post_id):
-        raise HTTPException(status_code=404, detail="Post not found")
-    schedule_reindex("feed", feed_id)
-    return {"ok": True}
-
-
-@app.post("/api/feed-posts/{post_id}/to-markdown")
-def api_post_to_markdown(post_id: int):
-    """Convert a markdown feed post into a markdown note, preserving links and images as Markdown."""
-    from markdownify import markdownify as md
-
-    post = get_feed_post(post_id)
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-    if post.content_type != "markdown":
-        raise HTTPException(status_code=400, detail="Only markdown posts can be converted to markdowns")
-    feed = get_feed(post.feed_id)
-    uid = feed.universe_id if feed else 1
-    cat_id = feed.category_id if feed else None
-    markdown_body = md(post.markdown or "", heading_style="ATX", bullets="-").strip()
-    markdown = create_markdown(post.title, markdown_body, category_id=cat_id, universe_id=uid)
-    schedule_markdown_embed(markdown.id, markdown.title, markdown.body, universe_id=uid)
-    return {"ok": True, "markdown_id": markdown.id}
-
-
-@app.post("/api/feed-posts/{post_id}/to-document")
-def api_post_to_document(post_id: int):
-    """Copy a file post into the document archive and ingest it."""
-    post = get_feed_post(post_id)
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-    if post.content_type != "file":
-        raise HTTPException(status_code=400, detail="Only file posts can be converted to documents")
-    if not post.file_path:
-        raise HTTPException(status_code=400, detail="Post has no file")
-    src_path = FEED_FILES_DIR / post.file_path
-    if not src_path.is_file():
-        raise HTTPException(status_code=404, detail="Post file missing from disk")
-    feed = get_feed(post.feed_id)
-    uid = feed.universe_id if feed else 1
-    filename = post.original_filename or post.file_path
-    ext = Path(filename).suffix.lower()
-    if ext not in SUPPORTED_EXTENSIONS:
-        raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
-    archive_folder = ext.lstrip(".")
-    archive_dir = DOCUMENTS_DIR / archive_folder
-    archive_dir.mkdir(exist_ok=True)
-    dest = archive_dir / filename
-    counter = 1
-    while dest.exists():
-        stem = Path(filename).stem
-        dest = archive_dir / f"{stem}_{counter}{ext}"
-        counter += 1
-    shutil.copy2(str(src_path), str(dest))
-    try:
-        documents = load_document(str(dest))
-        if documents:
-            for doc in documents:
-                doc.metadata["source"] = str(dest)
-            chunks = chunk_documents(documents)
-            add_documents(chunks, universe_id=uid)
-    except Exception as e:
-        print(f"[Astro] WARNING: Failed to ingest post file as document: {e}")
-    rel = dest.relative_to(DOCUMENTS_DIR)
-    set_document_universe(str(rel), uid)
-    delete_feed_post(post_id)
-    return {"ok": True, "path": str(rel)}
-
-
-# ── Post comments ─────────────────────────────────────────────────────────
-
-
-@app.get("/api/feed-posts/{post_id}/comments", response_model=list[PostCommentResponse])
-def api_list_post_comments(post_id: int):
-    return [post_comment_to_dict(c) for c in list_post_comments(post_id)]
-
-
-@app.post("/api/feed-posts/{post_id}/comments", response_model=PostCommentResponse, status_code=201)
-def api_create_post_comment(post_id: int, req: PostCommentRequest):
-    if not get_feed_post(post_id):
-        raise HTTPException(status_code=404, detail="Post not found")
-    return post_comment_to_dict(create_post_comment(post_id, req.author.strip() or "astro", req.content.strip()))
-
-
-@app.put("/api/post-comments/{comment_id}", response_model=PostCommentResponse)
-def api_update_post_comment(comment_id: int, req: PostCommentUpdateRequest):
-    c = update_post_comment(comment_id, req.content.strip())
-    if not c:
-        raise HTTPException(status_code=404, detail="Comment not found")
-    return post_comment_to_dict(c)
-
-
-@app.delete("/api/post-comments/{comment_id}")
-def api_delete_post_comment(comment_id: int):
-    if not delete_post_comment(comment_id):
-        raise HTTPException(status_code=404, detail="Comment not found")
-    return {"ok": True}
-
-
-# ── Feed external ingest endpoint ─────────────────────────────────────────
-
-
-def _ensure_markdown(text: str) -> str:
-    """If *text* looks like HTML, convert it to Markdown; otherwise return as-is."""
-    import re
-    if re.search(r"<(?:p|div|span|h[1-6]|ul|ol|li|table|br|img|a|strong|em)\b", text, re.I):
-        from markdownify import markdownify as md
-        return md(text, heading_style="ATX", bullets="-").strip()
-    return text
-
-
-@app.post("/api/feeds/{feed_id}/ingest")
-async def api_feed_ingest(
-    feed_id: int,
-    title: str = fastapi.Form(""),
-    markdown: Optional[str] = fastapi.Form(None),
-    file: Optional[UploadFile] = None,
-    x_feed_key: Optional[str] = fastapi.Header(None),
-):
-    """External endpoint for pushing posts into a feed.
-
-    Authenticate with the X-Feed-Key header matching the feed's api_key.
-
-    Content in the ``markdown`` field can be Markdown or HTML.  If HTML is
-    detected it is automatically converted to Markdown before storage.
-
-    To send markdown (Markdown or HTML):
-      POST /api/feeds/{id}/ingest
-      Content-Type: multipart/form-data
-      X-Feed-Key: fk_...
-      title=...&markdown=...
-
-    To send a file:
-      POST /api/feeds/{id}/ingest
-      Content-Type: multipart/form-data
-      X-Feed-Key: fk_...
-      title=...
-      file=@document.pdf
-    """
-    feed = get_feed(feed_id)
-    if not feed:
-        raise HTTPException(status_code=404, detail="Feed not found")
-
-    if not x_feed_key:
-        raise HTTPException(status_code=401, detail="Missing X-Feed-Key header")
-    if x_feed_key != feed.api_key:
-        raise HTTPException(status_code=403, detail="Invalid API key")
-
-    if not title.strip():
-        title = "Untitled post"
-
-    if file and file.filename:
-        data = await file.read()
-        post = create_feed_post_file(feed_id, title.strip(), file.filename, data)
-        schedule_reindex("feed", feed_id)
-        return {"ok": True, "post_id": post.id, "content_type": "file"}
-    elif markdown is not None:
-        post = create_feed_post_markdown(feed_id, title.strip(), _ensure_markdown(markdown))
-        schedule_reindex("feed", feed_id)
-        return {"ok": True, "post_id": post.id, "content_type": "markdown"}
-    else:
-        raise HTTPException(status_code=400, detail="Provide either 'markdown' or 'file'")
-
-
-@app.get("/api/feed-files/{filename}")
-def api_serve_feed_file(filename: str):
-    safe = (FEED_FILES_DIR / filename).resolve()
-    if not str(safe).startswith(str(FEED_FILES_DIR.resolve())) or not safe.is_file():
-        raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(safe)
 
 
 @app.get("/api/agent-tasks/delivery")
@@ -2339,7 +1967,7 @@ def api_search(
     global_search: bool = False,
     semantic: bool = False,
 ):
-    """Search markdowns, scripts, documents, diagrams, tables, links, and feeds.
+    """Search markdowns, scripts, documents, diagrams, tables, and links.
 
     Default: fast text search (titles + content). Pass semantic=true to also include
     vector-store results (better for topical/RAG queries, weaker for exact names).

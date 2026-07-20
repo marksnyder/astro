@@ -2,7 +2,7 @@
 
 **Build apps on top of AI.**
 
-Astro is a self hosted platform for composing agent workflows, tools, and data around your models. It gives you **Slack** integration for agent coordination, scheduled **Agent Tasks**, markdown and document memory, diagrams, tables, bookmarks, feeds, and a full **MCP** surface so you can ship AI backed experiences instead of only filing notes.
+Astro is a self hosted platform for composing agent workflows, tools, and data around your models. It gives you **Slack** integration for agent coordination, scheduled **Agent Tasks**, markdown and document memory, diagrams, tables, bookmarks, and a full **MCP** surface so you can ship AI backed experiences instead of only filing notes.
 
 Everything lives inside **Universes**: separate workspaces so each app or project keeps its own data and agents clean.
 
@@ -40,10 +40,7 @@ Isolate content and categories per project, client, or environment so each AI ap
 Parent and child categories across markdowns, documents, tables, and links. Optional emojis for quick scanning.
 
 ### Pinned Items Bar
-Pin markdowns, documents, diagrams, tables, links, and feeds to the header for fast access while building or operating workflows.
-
-### Feeds
-HTTP endpoints with per feed API keys: post markdown or files into timelines. Pipe CI output, alerts, or agent artifacts into Astro for humans and models to consume.
+Pin markdowns, documents, diagrams, tables, and links to the header for fast access while building or operating workflows.
 
 ### Vector Search API
 `GET /api/search` exposes semantic search for scripts and services you wrap around AI.
@@ -52,7 +49,7 @@ HTTP endpoints with per feed API keys: post markdown or files into timelines. Pi
 A [Model Context Protocol](https://modelcontextprotocol.io) server at `/mcp/` exposes tools so clients such as Claude Desktop, Cursor, or custom agents can read and write Astro data as part of an application.
 
 ### Mobile Interface
-`/mobile` offers a phone friendly UI for notes, feeds, tables, library, categories, and agent tasks.
+`/mobile` offers a phone friendly UI for notes, tables, library, categories, and agent tasks.
 
 ---
 
@@ -219,11 +216,6 @@ The MCP server is available at `http://localhost:8000/mcp/` and exposes 43 tools
 | `list_documents` | List uploaded documents with metadata |
 | `upload_document` | Upload a new document |
 | `delete_document` | Delete a document |
-| **Feeds** | |
-| `search_feeds` | List or search feeds |
-| `read_feed_posts` | Read posts from a feed |
-| `write_feed_post` | Push a post into a feed |
-| `delete_feed_post` | Delete a feed post |
 | **Universes** | |
 | `list_all_universes` | List all universes |
 | `set_default_universe` | Set the active universe |

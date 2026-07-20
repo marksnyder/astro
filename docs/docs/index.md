@@ -10,12 +10,12 @@ Welcome to Astro documentation. Each page describes a product capability and lis
 
 ## The idea
 
-Astro is not a chat app with a memory bolt-on. It is a **self-hosted application layer for AI**: the place where humans and agents share the same notes, tables, diagrams, scripts, feeds, and schedules—so you can **ship experiences** instead of wiring a new stack for every project.
+Astro is not a chat app with a memory bolt-on. It is a **self-hosted application layer for AI**: the place where humans and agents share the same notes, tables, diagrams, scripts, and schedules—so you can **ship experiences** instead of wiring a new stack for every project.
 
 Three principles run through the product:
 
 1. **One corpus, many consumers** — Markdowns, documents, and uploads embed into a local vector index. The UI, REST API, and [MCP](https://modelcontextprotocol.io) server read and write the same objects. Agents do not need a shadow database.
-2. **Composition over monoliths** — Universes isolate projects. Categories organize content. [Agent Tasks](/docs/agent-tasks/) coordinate people in Slack; [Python Tasks](/docs/python-tasks/) run code on the server; [Feeds](/docs/feeds/) ingest streams; the [dashboard](/docs/dashboard/) surfaces what matters now. You assemble apps from blocks.
+2. **Composition over monoliths** — Universes isolate projects. Categories organize content. [Agent Tasks](/docs/agent-tasks/) coordinate people in Slack; [Python Tasks](/docs/python-tasks/) run code on the server; the [dashboard](/docs/dashboard/) surfaces what matters now. You assemble apps from blocks.
 3. **Your machine, your rules** — Embeddings run locally. Data lives in volumes you control. Optional Tailscale and API keys let you expose the stack safely without renting someone else’s memory.
 
 Point any MCP client at `https://your-host/mcp/` and use the tools on each page below.
@@ -35,7 +35,6 @@ Point any MCP client at `https://your-host/mcp/` and use the tools on each page 
 - [Diagrams](/docs/diagrams/)
 - [Tables](/docs/tables/)
 - [Bookmarks](/docs/bookmarks/)
-- [Feeds](/docs/feeds/)
 
 ## Organization & discovery
 

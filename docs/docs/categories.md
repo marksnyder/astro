@@ -16,7 +16,7 @@ A parent and child category tree labels markdowns, documents, diagrams, tables, 
 | `POST` | `/api/categories` | Create |
 | `PUT` | `/api/categories/{cat_id}` | Update |
 | `DELETE` | `/api/categories/{cat_id}` | Delete |
-| `PUT` | `/api/categories/{cat_id}/pin` | Pin category (feeds sidebar) |
+| `PUT` | `/api/categories/{cat_id}/pin` | Pin category |
 
 ## MCP tools
 

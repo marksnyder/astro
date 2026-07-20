@@ -11,7 +11,6 @@ from src.markdowns import (
     category_to_dict,
     create_category,
     create_diagram,
-    create_feed_post_markdown,
     create_table,
     create_table_row,
     create_link,
@@ -22,18 +21,14 @@ from src.markdowns import (
     delete_document_meta,
     delete_table as _db_delete_table,
     delete_table_row as _db_delete_table_row,
-    delete_feed_post as _db_delete_feed_post,
     delete_link as _db_delete_link,
     delete_markdown as _db_delete_markdown,
     delete_agent_task as _db_delete_agent_task,
     diagram_to_dict,
-    feed_post_to_dict,
-    feed_to_dict,
     get_all_document_meta,
     get_diagram,
     get_table,
     get_table_row,
-    get_feed,
     get_link,
     get_agent_task as _db_get_agent_task,
     get_markdown,
@@ -41,10 +36,8 @@ from src.markdowns import (
     link_to_dict,
     list_categories,
     list_diagrams,
-    list_feed_posts,
     list_table_rows,
     list_tables,
-    list_feeds,
     list_links,
     list_agent_tasks as _db_list_agent_tasks,
     list_markdowns,
@@ -144,7 +137,7 @@ mcp = FastMCP(
     instructions=(
         "Astro is a personal knowledge base and productivity app. "
         "Use these tools to search the user's notes, "
-        "bookmarks, diagrams, and feeds. The vector store enables semantic "
+        "bookmarks, and diagrams. The vector store enables semantic "
         "search across all indexed content. Content is organized into "
         "Universes (isolated workspaces). Most tools accept an optional "
         "universe_id; if omitted, the configured default universe is used. "
@@ -197,7 +190,7 @@ def search(
     global_search: bool = False,
     semantic: bool = False,
 ) -> list[dict]:
-    """Search markdowns, scripts, documents, diagrams, tables, links, and feeds.
+    """Search markdowns, scripts, documents, diagrams, tables, and links.
     Uses fast text matching by default. Set semantic=true for vector similarity (RAG/topics)."""
     if global_search:
         scope_uid = None
@@ -297,7 +290,7 @@ def delete_markdown(markdown_id: int) -> str:
 @mcp.tool
 def list_all_categories(universe_id: int | None = None) -> list[dict]:
     """List all categories in the knowledge base. Categories organize
-    markdowns, links, and feeds."""
+    markdowns and links."""
     uid = universe_id if universe_id is not None else _default_universe()
     return [category_to_dict(c) for c in list_categories(uid)]
 
@@ -458,45 +451,6 @@ def delete_document(path: str) -> str:
     rel = str(safe.relative_to(DOCUMENTS_DIR))
     delete_document_meta(rel)
     safe.unlink()
-    return "Deleted"
-
-
-# ── Feeds ─────────────────────────────────────────────────────────────────
-
-
-@mcp.tool
-def search_feeds(
-    query: str = "", category_id: int | None = None, universe_id: int | None = None
-) -> list[dict]:
-    """List or search RSS/Atom feeds the user subscribes to."""
-    uid = universe_id if universe_id is not None else _default_universe()
-    return [feed_to_dict(f) for f in list_feeds(query, category_id, uid)]
-
-
-@mcp.tool
-def read_feed_posts(
-    feed_id: int, query: str = "", page: int = 1, page_size: int = 20
-) -> dict:
-    """Read posts from a specific feed. Supports pagination and text search."""
-    posts, total = list_feed_posts(feed_id, query, page, page_size)
-    return {"posts": [feed_post_to_dict(p) for p in posts], "total": total}
-
-
-@mcp.tool
-def write_feed_post(feed_id: int, title: str, markdown: str) -> dict | str:
-    """Create a new markdown post in a feed. The post content is markdown text."""
-    feed = get_feed(feed_id)
-    if not feed:
-        return "Feed not found"
-    post = create_feed_post_markdown(feed_id, title, markdown)
-    return feed_post_to_dict(post)
-
-
-@mcp.tool
-def delete_feed_post(post_id: int) -> str:
-    """Permanently delete a feed post by ID."""
-    if not _db_delete_feed_post(post_id):
-        return "Post not found"
     return "Deleted"
 
 

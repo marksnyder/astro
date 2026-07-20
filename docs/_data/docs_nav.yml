@@ -50,6 +50,3 @@ pages:
   - id: mobile
     title: Mobile interface
     path: /docs/mobile/
-  - id: feeds
-    title: Feeds
-    path: /docs/feeds/

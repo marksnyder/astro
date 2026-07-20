@@ -228,43 +228,6 @@ def text_search(query: str, k: int = 25, universe_id: int | None = None) -> list
             },
         )
 
-    feed_uid = uid_sql.replace("universe_id", "f.universe_id") if uid_sql else ""
-    feed_parts: list[str] = []
-    feed_params: list = []
-    for term in terms:
-        like = f"%{term}%"
-        feed_parts.append("(f.title LIKE ? OR a.title LIKE ? OR a.markdown LIKE ?)")
-        feed_params.extend([like, like, like])
-    feed_term_sql = "(" + " OR ".join(feed_parts) + ")"
-    for row in conn.execute(
-        f"SELECT DISTINCT f.id, f.title, f.universe_id, f.category_id,"
-        f" a.title AS post_title, a.markdown AS post_md"
-        f" FROM feeds f LEFT JOIN feed_artifacts a ON a.feed_id = f.id"
-        f" WHERE {feed_term_sql}{feed_uid}",
-        [*feed_params, *uid_params],
-    ):
-        title = row["title"] or ""
-        post_title = row["post_title"] or ""
-        post_md = row["post_md"] or ""
-        body = f"{post_title}\n{post_md}".strip()
-        score = _rank_terms(terms, title, body)
-        if score <= 0:
-            continue
-        snippet_src = post_md or post_title or title
-        push(
-            score,
-            {
-                "content_type": "feed",
-                "item_id": row["id"],
-                "title": title or "Untitled",
-                "snippet": _snippet(snippet_src, terms),
-                "universe_id": row["universe_id"],
-                "score": score,
-                "category_id": row["category_id"],
-                "feed_id": row["id"],
-            },
-        )
-
     conn.close()
 
     meta_map_sql = "SELECT path, universe_id, category_id, search_text FROM document_meta"

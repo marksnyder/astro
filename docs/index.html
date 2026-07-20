@@ -38,7 +38,7 @@ layout: default
     <h2>What Is Astro?</h2>
     <p class="what-is-lead">
       Astro is a self-hosted <strong>application layer for AI</strong>. It gives you structured memory (markdown, documents, tables, diagrams),
-      <strong>automation</strong> (Python scripts and schedules, Slack agent tasks, feeds), and a full <strong>MCP + REST</strong> surface so models and humans operate on the same data—not parallel silos.
+      <strong>automation</strong> (Python scripts and schedules, Slack agent tasks), and a full <strong>MCP + REST</strong> surface so models and humans operate on the same data—not parallel silos.
       <strong>Universes</strong> split projects cleanly; each one gets its own dashboard, categories, and agent context.
     </p>
     <div class="what-is-points">
@@ -160,16 +160,6 @@ layout: default
           </div>
           <div class="pillar">
             <div class="pillar-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
-            </div>
-            <h3>Feeds</h3>
-            <p>
-              Authenticated HTTP endpoints push markdown or files into timeline views—ideal for CI, alerts, and bots.
-              Watch streams inside Astro instead of building a separate dashboard for every source.
-            </p>
-          </div>
-          <div class="pillar">
-            <div class="pillar-icon">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
             </div>
             <h3>Universe Dashboard</h3>
@@ -205,7 +195,7 @@ layout: default
             <h3>MCP Server</h3>
             <p>
               A built-in <a href="https://modelcontextprotocol.io" style="color: inherit; text-decoration: underline;">Model Context Protocol</a>
-              server exposes tools for search, notes, tables, diagrams, scripts, Python tasks, dashboard widgets, Slack agent tasks, feeds, and more.
+              server exposes tools for search, notes, tables, diagrams, scripts, Python tasks, dashboard widgets, Slack agent tasks, and more.
               Point any MCP-compatible client at your instance so agents read and write the same corpus you see in the UI.
             </p>
           </div>
@@ -339,7 +329,7 @@ layout: default
       <p>
         Astro separates <strong>coordination</strong> from <strong>execution</strong>. Agent Tasks push markdown instructions to Slack so people and external agents pick up work in the channel where decisions happen.
         Python Tasks run saved scripts on the server—scraping, API calls, transforms—on a schedule you control.
-        Feeds ingest streams; the universe dashboard shows what matters now. Same database, same MCP tools, different rhythms.
+        The universe dashboard shows what matters now. Same database, same MCP tools, different rhythms.
       </p>
       <p>
         Categories, pins, and hierarchical folders keep the corpus navigable for humans while agents use search and IDs.
@@ -364,15 +354,6 @@ layout: default
         <div>
           <strong>Pinned items bar</strong>
           <p>Markdowns, scripts, documents, diagrams, tables, and links one click away.</p>
-        </div>
-      </div>
-      <div class="org-feature">
-        <div class="org-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
-        </div>
-        <div>
-          <strong>Feeds &amp; timelines</strong>
-          <p>CI, alerts, and agent output in streams humans and models can scan.</p>
         </div>
       </div>
       <div class="org-feature">

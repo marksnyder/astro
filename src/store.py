@@ -13,7 +13,7 @@ COLLECTION = "astro"
 
 _store_lock = threading.Lock()
 
-INDEXED_CONTENT_TYPES = ("markdown", "script", "link", "diagram", "table", "feed")
+INDEXED_CONTENT_TYPES = ("markdown", "script", "link", "diagram", "table")
 
 
 def _embeddings() -> FastEmbedEmbeddings:
@@ -203,8 +203,6 @@ def search_content(query: str, k: int = 20, universe_id: int | None = None) -> l
             entry["url"] = meta["url"]
         if meta.get("category_id") is not None:
             entry["category_id"] = meta["category_id"]
-        if meta.get("feed_id") is not None:
-            entry["feed_id"] = meta["feed_id"]
 
         results.append(entry)
         if len(results) >= k:

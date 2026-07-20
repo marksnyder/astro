@@ -14,17 +14,12 @@ from typing import Any
 from src.ingest import SUPPORTED_EXTENSIONS, chunk_documents, load_document
 from src.markdowns import (
     DB_PATH,
-    FEED_FILES_DIR,
     IMAGES_DIR,
     add_markdown_image,
     create_category,
     create_diagram,
-    create_feed,
-    create_feed_post_file,
-    create_feed_post_markdown,
     create_link,
     create_markdown,
-    create_post_comment,
     create_table,
     create_table_row,
     create_universe,
@@ -39,7 +34,6 @@ from src.markdowns import (
     set_document_category,
     set_document_pinned,
     set_document_universe,
-    set_feed_pinned,
     set_link_pinned,
     set_markdown_pinned,
     set_table_pinned,
@@ -117,8 +111,6 @@ def build_universe_export_zip(
     table_ids: list[int] | None,
     diagrams: bool,
     diagram_ids: list[int] | None,
-    feeds: bool,
-    feed_ids: list[int] | None,
     documents: bool,
     document_paths: list[str] | None,
 ) -> Path:
@@ -140,9 +132,6 @@ def build_universe_export_zip(
         "diagrams": [],
         "tables": [],
         "table_rows": [],
-        "feeds": [],
-        "feed_artifacts": [],
-        "post_comments": [],
         "documents": [],
     }
 
@@ -245,41 +234,6 @@ def build_universe_export_zip(
                     }
                 )
 
-    # ── Feeds ─────────────────────────────────────────────────
-    feed_rows: list[sqlite3.Row] = []
-    artifact_ids: list[int] = []
-    if feeds:
-        if feed_ids is None:
-            raise ValueError("feed_ids required when feeds is true")
-        if len(feed_ids) == 0:
-            feed_rows = conn.execute(
-                "SELECT * FROM feeds WHERE universe_id = ? ORDER BY id",
-                (universe_id,),
-            ).fetchall()
-        else:
-            ph = ",".join("?" * len(feed_ids))
-            feed_rows = conn.execute(
-                f"SELECT * FROM feeds WHERE universe_id = ? AND id IN ({ph})",
-                [universe_id, *feed_ids],
-            ).fetchall()
-        feed_dicts: list[dict[str, Any]] = []
-        for r in feed_rows:
-            if r["category_id"]:
-                cat_ids_needed.add(int(r["category_id"]))
-            fd = _row_dict(r)
-            fd.pop("api_key", None)
-            feed_dicts.append(fd)
-        manifest["feeds"] = feed_dicts
-        for fr in feed_rows:
-            fid = int(fr["id"])
-            arts = conn.execute(
-                "SELECT * FROM feed_artifacts WHERE feed_id = ? ORDER BY id",
-                (fid,),
-            ).fetchall()
-            for a in arts:
-                manifest["feed_artifacts"].append(_row_dict(a))
-                artifact_ids.append(int(a["id"]))
-
     # ── Documents ─────────────────────────────────────────────
     if documents:
         if document_paths is None:
@@ -324,24 +278,12 @@ def build_universe_export_zip(
                 }
             )
 
-    # Post comments for exported artifacts
-    if artifact_ids:
-        conn = _conn()
-        ph = ",".join("?" * len(artifact_ids))
-        crows = conn.execute(
-            f"SELECT * FROM post_comments WHERE post_id IN ({ph}) ORDER BY id",
-            artifact_ids,
-        ).fetchall()
-        manifest["post_comments"] = [_row_dict(r) for r in crows]
-        conn.close()
-
     if not any(
         [
             manifest["markdowns"],
             manifest["links"],
             manifest["diagrams"],
             manifest["tables"],
-            manifest["feeds"],
             manifest["documents"],
         ]
     ):
@@ -368,13 +310,6 @@ def build_universe_export_zip(
             if not str(safe).startswith(str(DOCUMENTS_DIR.resolve())) or not safe.is_file():
                 raise ValueError(f"Missing document file: {rel}")
             zf.write(safe, f"files/documents/{rel.replace(chr(92), '/')}")
-        # Feed files
-        for art in manifest["feed_artifacts"]:
-            if art.get("content_type") == "file" and art.get("file_path"):
-                fp = art["file_path"]
-                src = FEED_FILES_DIR / fp
-                if src.is_file():
-                    zf.write(src, f"files/feed_files/{fp.replace(chr(92), '/')}")
 
     return out_path
 
@@ -522,44 +457,6 @@ def import_universe_bundle(zip_path: Path, new_universe_name: str) -> int:
                 table_old_to_new[told],
                 tr.get("data") or "{}",
                 int(tr.get("sort_order") or 0),
-            )
-
-        feed_old_to_new: dict[int, int] = {}
-        for f in manifest.get("feeds") or []:
-            oid = int(f["id"])
-            fd = create_feed(f.get("title") or "Feed", map_cat(f.get("category_id")), universe_id=new_uid)
-            feed_old_to_new[oid] = fd.id
-            if f.get("pinned"):
-                set_feed_pinned(fd.id, True)
-
-        post_old_to_new: dict[int, int] = {}
-        for a in manifest.get("feed_artifacts") or []:
-            fold = int(a["feed_id"])
-            if fold not in feed_old_to_new:
-                continue
-            nfid = feed_old_to_new[fold]
-            ct = a.get("content_type") or "markdown"
-            title = a.get("title") or ""
-            if ct == "markdown":
-                post = create_feed_post_markdown(nfid, title, a.get("markdown") or "")
-            else:
-                fp = a.get("file_path") or ""
-                zpath_ff = f"files/feed_files/{fp.replace(chr(92), '/')}"
-                try:
-                    data = zf.read(zpath_ff)
-                except KeyError:
-                    data = b""
-                post = create_feed_post_file(nfid, title, a.get("original_filename") or "file", data)
-            post_old_to_new[int(a["id"])] = post.id  # type: ignore[union-attr]
-
-        for c in manifest.get("post_comments") or []:
-            p_old = int(c["post_id"])
-            if p_old not in post_old_to_new:
-                continue
-            create_post_comment(
-                post_old_to_new[p_old],
-                c.get("author") or "astro",
-                c.get("content") or "",
             )
 
         for d in manifest.get("documents") or []:
