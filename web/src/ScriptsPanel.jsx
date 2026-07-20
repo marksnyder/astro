@@ -159,6 +159,8 @@ export function ScriptEditorView({ script, categories, onSaved }) {
   const titleRef = useRef(null)
   const autosaveTimer = useRef(null)
   const initializedRef = useRef(false)
+  const createdIdRef = useRef(null)
+  const createInFlightRef = useRef(false)
   const latestFieldsRef = useRef({ title: '', source: '', categoryId: null })
   const doAutosaveRef = useRef(null)
 
@@ -169,6 +171,7 @@ export function ScriptEditorView({ script, categories, onSaved }) {
   useEffect(() => {
     if (script == null) return
     setCreatedId(null)
+    createdIdRef.current = isNew ? null : (script.id ?? null)
     setRunOutput(null)
     setRunStatus(null)
     initializedRef.current = false
@@ -190,23 +193,31 @@ export function ScriptEditorView({ script, categories, onSaved }) {
     const { silent } = opts
     if (!t.trim() && !src.trim()) return
     const payload = { title: t, source: src, category_id: catId }
-    const effectiveId = createdId || (!isNew ? script.id : null)
+    const effectiveId = createdIdRef.current || createdId || (!isNew ? script.id : null)
     if (effectiveId) {
-      await fetch(`/api/scripts/${effectiveId}`, {
+      const res = await fetch(`/api/scripts/${effectiveId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      onSaved?.(null)
+      if (res.ok) onSaved?.(null)
     } else {
-      const res = await fetch(`/api/scripts?universe_id=${script.universeId || 1}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      const created = await res.json()
-      if (!silent) setCreatedId(created.id)
-      onSaved?.(created)
+      if (createInFlightRef.current) return
+      createInFlightRef.current = true
+      try {
+        const res = await fetch(`/api/scripts?universe_id=${script.universeId || 1}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        const created = await res.json()
+        if (!res.ok) return
+        createdIdRef.current = created.id
+        if (!silent) setCreatedId(created.id)
+        onSaved?.(created)
+      } finally {
+        createInFlightRef.current = false
+      }
     }
   }, [script?.id, script?.universeId, isNew, onSaved, createdId])
 
@@ -226,12 +237,15 @@ export function ScriptEditorView({ script, categories, onSaved }) {
       if (!initializedRef.current) return
       const { title: t, source: s, categoryId: c } = latestFieldsRef.current
       if (!t.trim() && !s.trim()) return
+      // Never create on unmount — only flush pending edits to an existing script.
+      if (!createdIdRef.current) return
+      if (createInFlightRef.current) return
       const save = doAutosaveRef.current
       if (save) void save(t, s, c, { silent: true })
     }
   }, [])
 
-  const currentId = createdId || (isNew ? null : script.id)
+  const currentId = createdIdRef.current || createdId || (isNew ? null : script.id)
 
   const runScript = async () => {
     setRunning(true)

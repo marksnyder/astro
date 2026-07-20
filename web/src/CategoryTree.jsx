@@ -45,31 +45,78 @@ export function CategoryFilterPicker({ categories, value, onChange }) {
 
 // ── Emoji picker popover ─────────────────────────────
 
-export function EmojiPopover({ emoji, onSelect, onClear }) {
+export function EmojiPopover({
+  emoji,
+  onSelect,
+  onClear,
+  title,
+  triggerEmoji,
+  showClear = true,
+  preserveFocus = false,
+  className = '',
+}) {
   const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState(null)
   const ref = useRef(null)
+  const triggerRef = useRef(null)
   const pickerRef = useRef(null)
   const onSelectRef = useRef(onSelect)
   const onClearRef = useRef(onClear)
   onSelectRef.current = onSelect
   onClearRef.current = onClear
 
+  const computePos = () => {
+    if (!triggerRef.current) return null
+    const r = triggerRef.current.getBoundingClientRect()
+    const pickerH = 420
+    const pickerW = 352
+    const spaceBelow = window.innerHeight - r.bottom - 8
+    const top = spaceBelow >= Math.min(pickerH, 280)
+      ? r.bottom + 4
+      : Math.max(8, r.top - pickerH - 4)
+    const left = Math.min(Math.max(8, r.left), window.innerWidth - pickerW - 8)
+    return { top, left }
+  }
+
   useEffect(() => {
     if (!open) return
     const handler = (e) => {
       if (ref.current && !ref.current.contains(e.target)) setOpen(false)
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    const timer = window.setTimeout(() => {
+      document.addEventListener('mousedown', handler)
+    }, 0)
+    return () => {
+      window.clearTimeout(timer)
+      document.removeEventListener('mousedown', handler)
+    }
   }, [open])
 
   useEffect(() => {
-    if (!open || !pickerRef.current) return
+    if (!open) {
+      setPos(null)
+      return
+    }
+    const place = () => {
+      const next = computePos()
+      if (next) setPos(next)
+    }
+    place()
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
+    return () => {
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open || !pos || !pickerRef.current) return
     const el = pickerRef.current
     if (el.childElementCount > 0) return
     const picker = new Picker({
       data,
-      onEmojiSelect: (e) => { onSelectRef.current(e.native); setOpen(false) },
+      onEmojiSelect: (e) => { onSelectRef.current?.(e.native); setOpen(false) },
       theme: 'dark',
       previewPosition: 'none',
       skinTonePosition: 'search',
@@ -78,22 +125,44 @@ export function EmojiPopover({ emoji, onSelect, onClear }) {
     })
     el.appendChild(picker)
     return () => { el.replaceChildren() }
-  }, [open])
+  }, [open, pos])
+
+  const display = emoji || triggerEmoji || '🏷️'
+  const tip = title || (emoji ? 'Change emoji' : 'Set emoji')
 
   return (
-    <div className="emoji-popover-wrap" ref={ref}>
+    <div className={`emoji-popover-wrap ${className}`.trim()} ref={ref}>
       <button
+        ref={triggerRef}
         type="button"
         className={`emoji-trigger-btn ${emoji ? 'has-emoji' : ''}`}
-        onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
-        title={emoji ? 'Change emoji' : 'Set emoji'}
+        onMouseDown={(e) => {
+          if (preserveFocus) e.preventDefault()
+          e.stopPropagation()
+        }}
+        onClick={(e) => {
+          e.stopPropagation()
+          e.preventDefault()
+          if (open) {
+            setOpen(false)
+            return
+          }
+          const next = computePos()
+          if (next) setPos(next)
+          setOpen(true)
+        }}
+        title={tip}
       >
-        {emoji || '🏷️'}
+        {display}
       </button>
-      {open && (
-        <div className="emoji-popover" onClick={(e) => e.stopPropagation()}>
+      {open && pos && (
+        <div
+          className="emoji-popover emoji-popover--fixed"
+          style={{ top: pos.top, left: pos.left }}
+          onClick={(e) => e.stopPropagation()}
+        >
           <div ref={pickerRef} />
-          {emoji && (
+          {showClear && emoji && onClear && (
             <button type="button" className="emoji-clear-btn" onClick={() => { onClear(); setOpen(false) }}>
               Remove emoji
             </button>

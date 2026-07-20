@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { CategoryPicker } from './CategoryTree'
+import { CategoryPicker, EmojiPopover } from './CategoryTree'
 import { SidebarCategoryTree } from './SidebarCategoryTree'
 import { MoveToUniverseButton } from './MoveToUniverseButton'
 
@@ -129,10 +129,17 @@ function MdMcpLookup({ tool, onInsert, onClose }) {
 function MarkdownEditor({ value, onChange, placeholder }) {
   const ref = useRef(null)
   const mcpBtnRef = useRef(null)
+  const selectionRef = useRef({ start: 0, end: 0 })
   const [showInsertMenu, setShowInsertMenu] = useState(false)
   const [insertMenuPos, setInsertMenuPos] = useState(null)
   const [mcpLookup, setMcpLookup] = useState(null)
   const [universePicker, setUniversePicker] = useState(null)
+
+  const rememberSelection = () => {
+    const ta = ref.current
+    if (!ta) return
+    selectionRef.current = { start: ta.selectionStart, end: ta.selectionEnd }
+  }
 
   const insert = (before, after = '') => {
     const ta = ref.current
@@ -176,6 +183,20 @@ function MarkdownEditor({ value, onChange, placeholder }) {
       ta.focus()
       const pos = start + needsNewline.length + block.length + 1
       ta.setSelectionRange(pos, pos)
+    }, 0)
+  }
+
+  const insertTextAtCursor = (text) => {
+    const ta = ref.current
+    if (!ta) return
+    const { start, end } = selectionRef.current
+    const newVal = value.slice(0, start) + text + value.slice(end)
+    onChange(newVal)
+    setTimeout(() => {
+      ta.focus()
+      const pos = start + text.length
+      ta.setSelectionRange(pos, pos)
+      selectionRef.current = { start: pos, end: pos }
     }, 0)
   }
 
@@ -248,6 +269,15 @@ function MarkdownEditor({ value, onChange, placeholder }) {
           <button className="md-toolbar-btn" onMouseDown={e => e.preventDefault()} onClick={() => insertBlock('| Header | Header |\n| ------ | ------ |\n| Cell   | Cell   |')} title="Table">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
           </button>
+          <div className="md-toolbar-emoji" onMouseDown={rememberSelection}>
+            <EmojiPopover
+              triggerEmoji="😀"
+              title="Insert emoji"
+              showClear={false}
+              preserveFocus
+              onSelect={insertTextAtCursor}
+            />
+          </div>
         </div>
         <div className="md-toolbar-sep" />
         <div className="md-toolbar-group" style={{ position: 'relative' }}>
@@ -292,6 +322,9 @@ function MarkdownEditor({ value, onChange, placeholder }) {
         value={value}
         onChange={e => onChange(e.target.value)}
         onKeyDown={handleTab}
+        onSelect={rememberSelection}
+        onClick={rememberSelection}
+        onKeyUp={rememberSelection}
         placeholder={placeholder}
         spellCheck
       />

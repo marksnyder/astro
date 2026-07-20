@@ -2489,7 +2489,7 @@ function App() {
                 if (closed) closeTab(activeTab.id)
               }}
             />
-          ) : activeTab.type === 'table' && activeTab.data ? (
+          ) : activeTab?.type === 'table' && activeTab.data ? (
             <TableEditorView
               key={activeTab.id}
               table={activeTab.data}
@@ -2499,7 +2499,7 @@ function App() {
                 fetchPinned()
               }}
             />
-          ) : activeTab.type === 'script' && activeTab.data ? (
+          ) : activeTab?.type === 'script' && activeTab.data ? (
             <ScriptEditorView
               key={activeTab.id}
               script={activeTab.data}
@@ -2508,23 +2508,20 @@ function App() {
                 setScriptRefreshKey(k => k + 1)
                 fetchPinned()
                 if (created) {
-                  const tabId = `script-${created.id}`
                   setTabs(prev => prev.map(t => t.id === activeTab.id
                     ? {
                         ...t,
-                        id: tabId,
-                        data: { ...created, universeId: activeTab.data.universeId },
+                        data: { ...created, universeId: t.data?.universeId ?? activeTab.data?.universeId },
                         title: created.title || 'Untitled Script',
                       }
                     : t
                   ))
-                  setActiveTabId(tabId)
                 }
               }}
             />
-          ) : activeTab.type === 'agent-tasks' ? (
+          ) : activeTab?.type === 'agent-tasks' ? (
             <AgentTasksPanel universeId={currentUniverseId} />
-          ) : activeTab.type === 'python-tasks' ? (
+          ) : activeTab?.type === 'python-tasks' ? (
             <PythonTasksPanel universeId={currentUniverseId} onEditScript={openScriptTab} />
           ) : null}
         </div>

@@ -488,11 +488,11 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
   padding: 8px 20px 20px;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .dashboard-column {
-  min-height: 120px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -501,6 +501,9 @@
   border: 1px dashed rgba(255, 255, 255, 0.08);
   background: rgba(0, 0, 0, 0.12);
   transition: border-color 0.15s, background 0.15s;
+  overflow-y: auto;
+  overflow-x: hidden;
+  align-self: stretch;
 }
 
 .dashboard-column.drop-target {
@@ -5833,6 +5836,42 @@
 @keyframes update-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
+}
+
+/* ── Markdown inline editor ───────────────────────────── */
+
+.markdown-inline-editor {
+  height: 100%;
+  width: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.markdown-inline-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  gap: 12px;
+  overflow-y: auto;
+  min-height: 0;
+  width: 85%;
+  max-width: 85%;
+  margin: 0 auto;
+  align-self: center;
+}
+
+.markdown-inline-body .markdown-preview,
+.markdown-inline-body .md-editor-wrapper,
+.markdown-inline-body .markdown-title-input,
+.markdown-inline-body .category-select {
+  width: 100%;
+}
+
+.markdown-inline-body .md-editor-wrapper {
+  flex: 1;
+  min-height: 200px;
 }
 
 /* ── Diagrams ─────────────────────────────────────────── */

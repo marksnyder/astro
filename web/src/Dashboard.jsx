@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { CategoryPicker } from './CategoryTree'
+import { CategoryPicker, EmojiPopover } from './CategoryTree'
 
 const COLUMNS = [0, 1, 2, 3]
 const REFRESH_MS = 30_000
@@ -129,6 +129,28 @@ function WidgetEditorModal({ mode, initial, onSave, onClose }) {
   const [columnIndex, setColumnIndex] = useState(initial?.column_index ?? 0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const bodyRef = useRef(null)
+  const selectionRef = useRef({ start: 0, end: 0 })
+
+  const rememberSelection = () => {
+    const ta = bodyRef.current
+    if (!ta) return
+    selectionRef.current = { start: ta.selectionStart, end: ta.selectionEnd }
+  }
+
+  const insertEmoji = (emoji) => {
+    const ta = bodyRef.current
+    const { start, end } = selectionRef.current
+    const next = body.slice(0, start) + emoji + body.slice(end)
+    setBody(next)
+    setTimeout(() => {
+      if (!ta) return
+      ta.focus()
+      const pos = start + emoji.length
+      ta.setSelectionRange(pos, pos)
+      selectionRef.current = { start: pos, end: pos }
+    }, 0)
+  }
 
   const submit = async (e) => {
     e.preventDefault()
@@ -171,10 +193,25 @@ function WidgetEditorModal({ mode, initial, onSave, onClose }) {
             </select>
           </label>
           <label className="dashboard-field dashboard-field-grow">
-            <span>Markdown body</span>
+            <span className="dashboard-field-label-row">
+              Markdown body
+              <span onMouseDown={rememberSelection}>
+                <EmojiPopover
+                  triggerEmoji="😀"
+                  title="Insert emoji"
+                  showClear={false}
+                  preserveFocus
+                  onSelect={insertEmoji}
+                />
+              </span>
+            </span>
             <textarea
+              ref={bodyRef}
               value={body}
               onChange={(e) => setBody(e.target.value)}
+              onSelect={rememberSelection}
+              onClick={rememberSelection}
+              onKeyUp={rememberSelection}
               placeholder={'Markdown supported — images, emojis, lists…\n\nFull width:\n![](https://example.com/photo.jpg)\n\nHalf width, text wraps beside it:\n![half-left:Caption](https://example.com/photo.jpg)\n![half-right](https://example.com/other.jpg)'}
               rows={10}
             />
@@ -193,7 +230,7 @@ function WidgetEditorModal({ mode, initial, onSave, onClose }) {
 }
 
 function MarkdownLinkModal({ universeId, categories = [], initialColumn = 0, onSave, onClose }) {
-  const [mode, setMode] = useState('existing') // existing | new
+  const [mode, setMode] = useState('new') // existing | new
   const [markdowns, setMarkdowns] = useState([])
   const [markdownId, setMarkdownId] = useState('')
   const [title, setTitle] = useState('')
