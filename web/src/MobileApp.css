@@ -301,33 +301,7 @@ html.m-mobile-shell #root {
   position: relative;
 }
 
-.m-chat-bg-layer {
-  position: absolute;
-  inset: 0;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  z-index: 0;
-  transition: opacity 1.5s ease-in-out;
-}
-
-.m-chat-bg-next {
-  opacity: 0;
-}
-
-.m-chat-bg-next.fade-in {
-  opacity: 1;
-}
-
-.m-chat-bg-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(10, 10, 20, 0.72);
-  backdrop-filter: blur(1px);
-  z-index: 1;
-}
-
-.m-chat-bg-wrap > *:not(.m-chat-bg-layer):not(.m-chat-bg-overlay) {
+.m-chat-bg-wrap > *:not(.astro-space-bg) {
   position: relative;
   z-index: 2;
 }
@@ -1412,29 +1386,6 @@ html.m-mobile-shell #root {
 
 .ma-cat-new-md-btn:active {
   opacity: 0.85;
-}
-
-/* ── Background attribution (mobile) ─────────────── */
-
-.m-bg-attribution {
-  position: absolute;
-  bottom: 62px;
-  right: 10px;
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.7);
-  background: rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(6px);
-  padding: 3px 8px;
-  border-radius: 5px;
-  z-index: 5;
-  pointer-events: auto;
-}
-
-.m-bg-attribution a {
-  color: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  text-decoration-color: rgba(255, 255, 255, 0.35);
 }
 
 /* ── IRC styles (mobile) ──────────────────────────── */

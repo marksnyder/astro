@@ -19,6 +19,21 @@
   })
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === 'open-links') {
+      window.postMessage({
+        source: 'astro-extension',
+        type: 'open-links',
+        link: message.link?.url
+          ? {
+              url: message.link.url,
+              title: message.link.title || message.link.url,
+            }
+          : null,
+      }, '*')
+      sendResponse({ ok: true })
+      return true
+    }
+
     if (message?.type !== 'offer-link' || !message.link?.url) {
       return undefined
     }

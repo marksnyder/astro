@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import './App.css'
 import MarkdownsPanel, { MarkdownEditorView } from './MarkdownsPanel'
 import ArchivePanel from './ArchivePanel'
-import LinksPanel from './LinksPanel'
+import LinksCanvasTab from './BrowseLinks'
 import DiagramsPanel, { DiagramEditorView } from './DiagramsPanel'
 import TablesPanel, { TableEditorView } from './TablesPanel'
 import AgentTasksPanel from './AgentTasksPanel'
@@ -1651,6 +1651,7 @@ function App() {
   const [tableRefreshKey, setTableRefreshKey] = useState(0)
   const [scriptRefreshKey, setScriptRefreshKey] = useState(0)
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false)
+  const [pendingLinkOffer, setPendingLinkOffer] = useState(null)
 
   const [tabs, setTabs] = useState([DASHBOARD_TAB])
   const [activeTabId, setActiveTabId] = useState('dashboard')
@@ -1716,6 +1717,15 @@ function App() {
   const activeTab = tabs.find(t => t.id === activeTabId) ?? null
 
   const switchToTab = useCallback((tabId) => {
+    setActiveTabId(tabId)
+  }, [])
+
+  const openLinksCanvasTab = useCallback(() => {
+    const tabId = 'links-canvas'
+    setTabs(prev => {
+      if (prev.find(t => t.id === tabId)) return prev
+      return [...prev, { id: tabId, type: 'links-canvas', title: 'Links', closable: true }]
+    })
     setActiveTabId(tabId)
   }, [])
 
@@ -1832,7 +1842,7 @@ function App() {
         if (url) {
           window.open(url, '_blank', 'noopener,noreferrer')
         } else {
-          setSidebarTab('links')
+          openLinksCanvasTab()
         }
         break
       }
@@ -1853,7 +1863,75 @@ function App() {
       default:
         break
     }
-  }, [openDiagramTab, openMarkdownTab, openScriptTab, openTableTab])
+  }, [openDiagramTab, openLinksCanvasTab, openMarkdownTab, openScriptTab, openTableTab])
+
+  const clearLinkDeepLinkParams = useCallback(() => {
+    const params = new URLSearchParams(window.location.search)
+    let changed = false
+    for (const key of ['view', 'offer', 'url', 'title', 'save']) {
+      if (params.has(key)) {
+        params.delete(key)
+        changed = true
+      }
+    }
+    if (!changed) return
+    const query = params.toString()
+    window.history.replaceState(
+      {},
+      '',
+      `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`,
+    )
+  }, [])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const wantsLinks = params.get('view') === 'links' || params.get('offer') === '1' || params.get('save') === '1'
+    if (!wantsLinks) return
+
+    if (params.get('offer') === '1' && params.get('url')) {
+      setPendingLinkOffer({
+        url: params.get('url'),
+        title: params.get('title') || params.get('url'),
+      })
+    } else if (params.get('save') === '1' && params.get('url')) {
+      setPendingLinkOffer({
+        url: params.get('url'),
+        title: params.get('title') || params.get('url'),
+      })
+    }
+
+    openLinksCanvasTab()
+    clearLinkDeepLinkParams()
+  }, [clearLinkDeepLinkParams, openLinksCanvasTab])
+
+  useEffect(() => {
+    const onMessage = (event) => {
+      if (event.source !== window) return
+      const data = event.data
+      if (!data || data.source !== 'astro-extension') return
+
+      if (data.type === 'open-links') {
+        if (data.link?.url) {
+          setPendingLinkOffer({
+            url: data.link.url,
+            title: data.link.title || data.link.url,
+          })
+        }
+        openLinksCanvasTab()
+        return
+      }
+
+      if (data.type === 'offer-link' && data.link?.url) {
+        setPendingLinkOffer({
+          url: data.link.url,
+          title: data.link.title || data.link.url,
+        })
+        openLinksCanvasTab()
+      }
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [openLinksCanvasTab])
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -1942,6 +2020,8 @@ function App() {
       if (selectedCategoryId === payload.id) setSelectedCategoryId(null)
     } else if (action === 'move') {
       await fetch(`/api/categories/${payload.id}/move?direction=${payload.direction}`, { method: 'PUT' })
+    } else if (action === 'move-to-root') {
+      await fetch(`/api/categories/${payload.id}/move-to-root`, { method: 'PUT' })
     }
     fetchCategories()
   }
@@ -2228,7 +2308,7 @@ function App() {
       </header>
 
       <div className="app-body">
-        <ChatBackground />
+        <ChatBackground hideLogo={activeTab?.type === 'links-canvas'} />
         <div className="sidebar" style={{ width: sidebarWidth, minWidth: sidebarWidth }}>
           <div className="sidebar-rail">
             <button className={`rail-tab ${sidebarTab === 'markdowns' ? 'active' : ''}`} onClick={() => setSidebarTab('markdowns')} title="Markdowns">
@@ -2247,7 +2327,11 @@ function App() {
                 <line x1="10" y1="12" x2="14" y2="12" />
               </svg>
             </button>
-            <button className={`rail-tab ${sidebarTab === 'links' ? 'active' : ''}`} onClick={() => setSidebarTab('links')} title="Links">
+            <button
+              className={`rail-tab ${activeTab?.type === 'links-canvas' ? 'active' : ''}`}
+              onClick={openLinksCanvasTab}
+              title="Links"
+            >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
@@ -2321,6 +2405,7 @@ function App() {
                 onDelete={(id, name) => handleCategoryAction('delete', { id, name })}
                 onUpdateEmoji={(id, emoji) => handleCategoryAction('emoji', { id, emoji })}
                 onMoveCategory={(id, direction) => handleCategoryAction('move', { id, direction })}
+                onMoveToRoot={(id) => handleCategoryAction('move-to-root', { id })}
               />
             </div>
           )}
@@ -2339,15 +2424,6 @@ function App() {
           )}
           {sidebarTab === 'archive' && (
             <ArchivePanel
-              categories={categories}
-              onPinChange={fetchPinned}
-              universeId={currentUniverseId}
-              universes={universes}
-              onLoaded={() => setSidebarLoading(false)}
-            />
-          )}
-          {sidebarTab === 'links' && (
-            <LinksPanel
               categories={categories}
               onPinChange={fetchPinned}
               universeId={currentUniverseId}
@@ -2524,6 +2600,21 @@ function App() {
           ) : activeTab?.type === 'python-tasks' ? (
             <PythonTasksPanel universeId={currentUniverseId} onEditScript={openScriptTab} />
           ) : null}
+          {tabs.filter(t => t.type === 'links-canvas').map(tab => (
+            <div
+              key={tab.id}
+              className={`workspace-links-canvas-panel ${tab.id !== activeTabId ? 'workspace-links-canvas-panel-hidden' : ''}`}
+              aria-hidden={tab.id !== activeTabId}
+            >
+              <LinksCanvasTab
+                universeId={currentUniverseId}
+                categories={categories}
+                offeredLink={pendingLinkOffer}
+                onOfferHandled={() => setPendingLinkOffer(null)}
+                onCategoriesChange={fetchCategories}
+              />
+            </div>
+          ))}
         </div>
         </div>
       </div>

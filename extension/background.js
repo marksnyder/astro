@@ -1,85 +1,117 @@
 const DEFAULT_SERVER = 'http://localhost:8000'
 
-async function getBrowseUrl() {
+async function getAppUrl() {
   const stored = await chrome.storage.local.get('astroServer')
   const base = (stored.astroServer || DEFAULT_SERVER).replace(/\/+$/, '')
-  return new URL(`${base}/browse`)
+  return new URL(`${base}/`)
 }
 
-function matchesBrowse(tabUrl, browseUrl) {
+function matchesAstroApp(tabUrl, appUrl) {
   try {
     const candidate = new URL(tabUrl)
-    return candidate.origin === browseUrl.origin
-      && candidate.pathname.replace(/\/+$/, '') === browseUrl.pathname.replace(/\/+$/, '')
+    return candidate.origin === appUrl.origin
   } catch {
     return false
   }
 }
 
-function canOfferTab(tab, browseUrl) {
+function canOfferTab(tab, appUrl) {
   try {
     const candidate = new URL(tab?.url || '')
     return ['http:', 'https:'].includes(candidate.protocol)
-      && candidate.origin !== browseUrl.origin
+      && candidate.origin !== appUrl.origin
   } catch {
     return false
   }
+}
+
+function chooseAstroTab(tabs, sourceWindowId) {
+  return tabs.find((tab) => tab.windowId === sourceWindowId && tab.active)
+    || tabs.find((tab) => tab.windowId === sourceWindowId)
+    || tabs.find((tab) => tab.active)
+    || tabs[0]
+}
+
+async function openOrFocusAstro(sourceTab, offerCurrentTab) {
+  const appUrl = await getAppUrl()
+  const tabs = await chrome.tabs.query({})
+  const appTabs = tabs.filter((tab) => matchesAstroApp(tab.url, appUrl))
+  const target = chooseAstroTab(appTabs, sourceTab?.windowId)
+  const offeredLink = offerCurrentTab && canOfferTab(sourceTab, appUrl)
+    ? { url: sourceTab.url, title: sourceTab.title || sourceTab.url }
+    : null
+
+  appUrl.searchParams.set('view', 'links')
+  if (offeredLink) {
+    appUrl.searchParams.set('offer', '1')
+    appUrl.searchParams.set('url', offeredLink.url)
+    appUrl.searchParams.set('title', offeredLink.title)
+  }
+
+  if (target) {
+    await chrome.tabs.update(target.id, { active: true })
+    await chrome.windows.update(target.windowId, { focused: true })
+
+    const targetUrl = new URL(target.url)
+    const targetPath = targetUrl.pathname.replace(/\/+$/, '') || '/'
+    if (targetPath === '/') {
+      try {
+        await chrome.tabs.sendMessage(target.id, {
+          type: 'open-links',
+          link: offeredLink,
+        })
+        return
+      } catch {
+        // Reload below when the content script is unavailable.
+      }
+    }
+
+    await chrome.tabs.update(target.id, { url: appUrl.toString() })
+    return
+  }
+
+  await chrome.tabs.create({
+    url: appUrl.toString(),
+    windowId: sourceTab?.windowId,
+    active: true,
+  })
 }
 
 chrome.action.onClicked.addListener(async (sourceTab) => {
   try {
-    const browseUrl = await getBrowseUrl()
-    const tabs = await chrome.tabs.query({})
-    const browseTabs = tabs.filter((tab) => matchesBrowse(tab.url, browseUrl))
-    const target = browseTabs.find((tab) => tab.windowId === sourceTab.windowId) || browseTabs[0]
-    const offeredLink = canOfferTab(sourceTab, browseUrl)
-      ? { url: sourceTab.url, title: sourceTab.title || sourceTab.url }
-      : null
-
-    if (offeredLink) {
-      browseUrl.searchParams.set('offer', '1')
-      browseUrl.searchParams.set('url', offeredLink.url)
-      browseUrl.searchParams.set('title', offeredLink.title)
-    }
-
-    if (target) {
-      await chrome.tabs.update(target.id, { active: true })
-      await chrome.windows.update(target.windowId, { focused: true })
-      if (offeredLink) {
-        try {
-          await chrome.tabs.sendMessage(target.id, {
-            type: 'offer-link',
-            link: offeredLink,
-          })
-        } catch {
-          // A newly loaded or custom-host Browse page may not have the bridge.
-          await chrome.tabs.update(target.id, { url: browseUrl.toString() })
-        }
-      }
-      return
-    }
-
-    await chrome.tabs.create({
-      url: browseUrl.toString(),
-      windowId: sourceTab.windowId,
-      active: true,
-    })
+    await openOrFocusAstro(sourceTab, true)
   } catch (error) {
-    console.error('Could not open Astro Browse', error)
+    console.error('Could not open Astro Links', error)
   }
 })
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.type !== 'open-urls' || !Array.isArray(message.urls)) {
-    return undefined
+  if (message?.type === 'open-astro-links') {
+    ;(async () => {
+      try {
+        const sourceTab = message.sourceTabId != null
+          ? await chrome.tabs.get(message.sourceTabId)
+          : null
+        await openOrFocusAstro(sourceTab, Boolean(message.offerCurrentTab))
+        sendResponse({ ok: true })
+      } catch (error) {
+        console.error('Could not open Astro Links', error)
+        sendResponse({ ok: false })
+      }
+    })()
+    return true
   }
 
-  let opened = 0
-  for (const url of message.urls) {
-    if (typeof url !== 'string' || !url.trim()) continue
-    chrome.tabs.create({ url, active: false })
-    opened += 1
+  if (message?.type === 'open-urls' && Array.isArray(message.urls)) {
+    let opened = 0
+    for (const url of message.urls) {
+      if (typeof url !== 'string' || !url.trim()) continue
+      chrome.tabs.create({ url, active: false })
+      opened += 1
+    }
+    sendResponse({ ok: true, opened })
+    return true
   }
-  sendResponse({ ok: true, opened })
-  return true
+
+  return undefined
 })

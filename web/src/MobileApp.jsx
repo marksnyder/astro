@@ -1020,6 +1020,8 @@ function MobileCategories({ categories, universeId, onRefresh }) {
       await fetch(`/api/categories/${payload.id}`, { method: 'DELETE' })
     } else if (action === 'move') {
       await fetch(`/api/categories/${payload.id}/move?direction=${payload.direction}`, { method: 'PUT' })
+    } else if (action === 'move-to-root') {
+      await fetch(`/api/categories/${payload.id}/move-to-root`, { method: 'PUT' })
     }
     onRefresh?.()
   }
@@ -1039,6 +1041,7 @@ function MobileCategories({ categories, universeId, onRefresh }) {
           onDelete={(id, name) => handleCategoryAction('delete', { id, name })}
           onUpdateEmoji={(id, emoji) => handleCategoryAction('emoji', { id, emoji })}
           onMoveCategory={(id, direction) => handleCategoryAction('move', { id, direction })}
+          onMoveToRoot={(id) => handleCategoryAction('move-to-root', { id })}
         />
       </div>
     </div>

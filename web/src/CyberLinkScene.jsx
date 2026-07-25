@@ -17,8 +17,8 @@ const WORLD_MIN_W = 900
 const WORLD_MIN_H = 700
 const CATEGORY_GAP_X = 96
 const CATEGORY_GAP_Y = 96
-const HEADER_CLEARANCE = 72
-const VIEW_PAD = 24
+// Floating toolbar/HUD overlays the canvas; keep insets equal so fit stays centered.
+const VIEW_INSET = 20
 const LINK_CARD_W = 280
 const LINK_CARD_H = 42
 const LINK_SLOT_H = 42
@@ -592,7 +592,7 @@ export default function CyberLinkScene({
   onMoveCategory,
 }) {
   const viewportRef = useRef(null)
-  const [pan, setPan] = useState({ x: VIEW_PAD, y: HEADER_CLEARANCE })
+  const [pan, setPan] = useState({ x: VIEW_INSET, y: VIEW_INSET })
   const [zoom, setZoom] = useState(1)
   const [draggingId, setDraggingId] = useState(null)
   const [dropTarget, setDropTarget] = useState(null)
@@ -601,7 +601,7 @@ export default function CyberLinkScene({
   const [movingCategoryId, setMovingCategoryId] = useState(null)
   const panState = useRef(null)
   const categoryDrag = useRef(null)
-  const viewRef = useRef({ pan: { x: VIEW_PAD, y: HEADER_CLEARANCE }, zoom: 1 })
+  const viewRef = useRef({ pan: { x: VIEW_INSET, y: VIEW_INSET }, zoom: 1 })
   const didFitRef = useRef(false)
   const userAdjustedViewRef = useRef(false)
   const layoutRef = useRef(null)
@@ -621,39 +621,39 @@ export default function CyberLinkScene({
     setPositionOverrides({})
     didFitRef.current = false
     userAdjustedViewRef.current = false
-    setPan({ x: VIEW_PAD, y: HEADER_CLEARANCE })
+    setPan({ x: VIEW_INSET, y: VIEW_INSET })
     setZoom(1)
   }, [universeId])
 
   const fitContentToViewport = useCallback(() => {
     const vp = viewportRef.current
     const currentLayout = layoutRef.current
-    if (!vp || !currentLayout?.categoryGroups.length) return
+    if (!vp || !currentLayout?.categoryGroups.length) return false
     const rect = vp.getBoundingClientRect()
-    if (rect.width < 40 || rect.height < 40) return
+    if (rect.width < 40 || rect.height < 40) return false
 
     const bounds = currentLayout.contentBounds
-    const availW = Math.max(rect.width - VIEW_PAD * 2, 80)
-    const availH = Math.max(rect.height - HEADER_CLEARANCE - VIEW_PAD, 80)
+    const availW = Math.max(rect.width - VIEW_INSET * 2, 80)
+    const availH = Math.max(rect.height - VIEW_INSET * 2, 80)
     // Fill the usable viewport; allow mild oversize so content isn't tiny.
     const fitZoom = clampZoomValue(Math.min(availW / bounds.width, availH / bounds.height, 1.35))
 
     const nextPan = {
-      x: VIEW_PAD - bounds.minX * fitZoom + (availW - bounds.width * fitZoom) / 2,
-      y: HEADER_CLEARANCE - bounds.minY * fitZoom + (availH - bounds.height * fitZoom) / 2,
+      x: VIEW_INSET - bounds.minX * fitZoom + (availW - bounds.width * fitZoom) / 2,
+      y: VIEW_INSET - bounds.minY * fitZoom + (availH - bounds.height * fitZoom) / 2,
     }
     lastViewportSizeRef.current = { w: rect.width, h: rect.height }
     viewRef.current = { pan: nextPan, zoom: fitZoom }
     setZoom(fitZoom)
     setPan(nextPan)
     setActiveCategory(null)
+    return true
   }, [])
 
   useEffect(() => {
     if (!links.length || didFitRef.current) return undefined
     const frame = requestAnimationFrame(() => {
-      fitContentToViewport()
-      didFitRef.current = true
+      if (fitContentToViewport()) didFitRef.current = true
     })
     return () => cancelAnimationFrame(frame)
   }, [fitContentToViewport, links.length, layout.categoryGroups.length])
@@ -662,11 +662,14 @@ export default function CyberLinkScene({
     const vp = viewportRef.current
     if (!vp) return undefined
     const observer = new ResizeObserver(() => {
-      if (!didFitRef.current || userAdjustedViewRef.current) return
+      if (userAdjustedViewRef.current) return
       const rect = vp.getBoundingClientRect()
+      if (rect.width < 40 || rect.height < 40) return
       const prev = lastViewportSizeRef.current
-      if (Math.abs(rect.width - prev.w) < 2 && Math.abs(rect.height - prev.h) < 2) return
-      fitContentToViewport()
+      const sizeChanged = Math.abs(rect.width - prev.w) >= 2 || Math.abs(rect.height - prev.h) >= 2
+      if (!didFitRef.current || sizeChanged) {
+        if (fitContentToViewport()) didFitRef.current = true
+      }
     })
     observer.observe(vp)
     return () => observer.disconnect()
@@ -717,7 +720,7 @@ export default function CyberLinkScene({
     setActiveCategory(hit.categoryId)
     setPan({
       x: rect.width / 2 - hit.x * currentZoom,
-      y: Math.max(HEADER_CLEARANCE, rect.height / 2) - hit.y * currentZoom,
+      y: rect.height / 2 - hit.y * currentZoom,
     })
   }, [layout.categoryGroups, matchIds])
 
@@ -772,7 +775,7 @@ export default function CyberLinkScene({
     setActiveCategory(category.id)
     setPan({
       x: rect.width / 2 - category.centerX * nextZoom,
-      y: Math.max(HEADER_CLEARANCE + 40, rect.height / 2) - category.centerY * nextZoom,
+      y: rect.height / 2 - category.centerY * nextZoom,
     })
   }
 

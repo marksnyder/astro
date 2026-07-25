@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Astro Browse",
-  "version": "1.5.0",
-  "description": "Save and browse your Astro links",
+  "version": "1.6.0",
+  "description": "Open Astro Links and save the current tab",
   "permissions": ["storage", "tabs"],
   "host_permissions": ["http://localhost/*", "http://127.0.0.1/*", "https://*/*"],
   "background": {
@@ -17,7 +17,7 @@
   ],
   "options_page": "options.html",
   "action": {
-    "default_title": "Open or focus Astro Browse",
+    "default_title": "Open or focus Astro Links",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",

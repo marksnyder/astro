@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 import fastapi
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
@@ -102,6 +102,7 @@ from src.markdowns import (
     markdown_image_to_dict,
     markdown_to_dict,
     move_category,
+    move_category_to_root,
     move_diagram_to_universe,
     move_link_to_universe,
     move_markdown_to_universe,
@@ -477,6 +478,14 @@ def api_move_category(cat_id: int, direction: str):
     cat = move_category(cat_id, direction)
     if not cat:
         raise HTTPException(status_code=400, detail="Cannot move category in that direction")
+    return category_to_dict(cat)
+
+
+@app.put("/api/categories/{cat_id}/move-to-root", response_model=CategoryResponse)
+def api_move_category_to_root(cat_id: int):
+    cat = move_category_to_root(cat_id)
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found")
     return category_to_dict(cat)
 
 
@@ -2279,7 +2288,17 @@ if _static.is_dir():
 
     @app.get("/browse")
     @app.get("/browse/{rest:path}")
-    def spa_browse(rest: str = ""):
-        return FileResponse(str(_index_html))
+    def spa_browse(rest: str = "", offer: str | None = None, url: str | None = None, title: str | None = None, save: str | None = None):
+        params = {"view": "links"}
+        if offer is not None:
+            params["offer"] = offer
+        if save is not None:
+            params["save"] = save
+        if url is not None:
+            params["url"] = url
+        if title is not None:
+            params["title"] = title
+        from urllib.parse import urlencode
+        return RedirectResponse(url=f"/?{urlencode(params)}", status_code=307)
 
     app.mount("/", StaticFiles(directory=str(_static), html=True), name="static")

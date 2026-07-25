@@ -186,6 +186,7 @@ function TreeNode({
   onDelete,
   onUpdateEmoji,
   onMove,
+  onMoveToRoot,
 }) {
   const [expanded, setExpanded] = useState(true)
   const [renaming, setRenaming] = useState(false)
@@ -254,6 +255,20 @@ function TreeNode({
         )}
 
         <div className="tree-actions">
+          {depth > 0 && onMoveToRoot && (
+            <button
+              type="button"
+              className="tree-action-btn"
+              onClick={(e) => { e.stopPropagation(); onMoveToRoot(node.id) }}
+              title="Move to top level"
+              aria-label={`Move ${node.name} to top level`}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 14 4 9 9 4" />
+                <path d="M4 9h10a6 6 0 0 1 6 6v5" />
+              </svg>
+            </button>
+          )}
           {onMove && (
             <>
               <button
@@ -314,6 +329,7 @@ function TreeNode({
           onDelete={onDelete}
           onUpdateEmoji={onUpdateEmoji}
           onMove={onMove}
+          onMoveToRoot={onMoveToRoot}
         />
       ))}
     </>
@@ -322,7 +338,17 @@ function TreeNode({
 
 // ── Main tree component ───────────────────────────────
 
-export default function CategoryTree({ categories, selectedId, onSelect, onAdd, onRename, onDelete, onUpdateEmoji, onMoveCategory }) {
+export default function CategoryTree({
+  categories,
+  selectedId,
+  onSelect,
+  onAdd,
+  onRename,
+  onDelete,
+  onUpdateEmoji,
+  onMoveCategory,
+  onMoveToRoot,
+}) {
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
   const tree = buildCategoryTree(categories)
@@ -368,6 +394,7 @@ export default function CategoryTree({ categories, selectedId, onSelect, onAdd, 
           onDelete={onDelete}
           onUpdateEmoji={onUpdateEmoji}
           onMove={onMoveCategory}
+          onMoveToRoot={onMoveToRoot}
         />
       ))}
 

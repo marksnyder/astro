@@ -339,6 +339,40 @@ def move_category(cat_id: int, direction: str) -> Category | None:
     return _row_to_category(row) if row else None
 
 
+def move_category_to_root(cat_id: int) -> Category | None:
+    """Move a nested category to the end of the universe's root categories."""
+    conn = _get_conn()
+    category = conn.execute(
+        "SELECT * FROM categories WHERE id = ?",
+        (cat_id,),
+    ).fetchone()
+    if not category:
+        conn.close()
+        return None
+
+    if category["parent_id"] is not None:
+        next_order_row = conn.execute(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 AS n "
+            "FROM categories WHERE universe_id = ? AND parent_id IS NULL",
+            (category["universe_id"],),
+        ).fetchone()
+        next_order = int(next_order_row["n"] if next_order_row else 0)
+        conn.execute(
+            "UPDATE categories "
+            "SET parent_id = NULL, sort_order = ?, browse_x = NULL, browse_y = NULL "
+            "WHERE id = ?",
+            (next_order, cat_id),
+        )
+        conn.commit()
+
+    row = conn.execute(
+        "SELECT * FROM categories WHERE id = ?",
+        (cat_id,),
+    ).fetchone()
+    conn.close()
+    return _row_to_category(row) if row else None
+
+
 def set_category_pinned(cat_id: int, pinned: bool) -> bool:
     conn = _get_conn()
     cur = conn.execute("UPDATE categories SET pinned = ? WHERE id = ?", (int(pinned), cat_id))

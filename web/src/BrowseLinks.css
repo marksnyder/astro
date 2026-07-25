@@ -1,197 +1,22 @@
-.browse-root {
-  position: fixed;
-  inset: 0;
+.links-canvas-tab {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
   width: 100%;
   height: 100%;
   isolation: isolate;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background: #07090f;
+  background: rgba(7, 9, 15, 0.18);
 }
 
-.browse-starfield {
+.links-canvas-toolbar {
   position: absolute;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.browse-nebula {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(ellipse 70% 55% at 12% 8%, rgba(63, 81, 181, 0.35), transparent 70%),
-    radial-gradient(ellipse 60% 50% at 88% 82%, rgba(117, 55, 180, 0.22), transparent 72%),
-    radial-gradient(ellipse 80% 60% at 55% 40%, rgba(22, 72, 130, 0.18), transparent 75%),
-    radial-gradient(ellipse 40% 35% at 70% 20%, rgba(244, 63, 94, 0.08), transparent 70%);
-}
-
-.browse-stars {
-  position: absolute;
-  inset: -30%;
-  will-change: transform, opacity;
-}
-
-.browse-stars-far {
-  background-image:
-    radial-gradient(1px 1px at 10px 20px, rgba(255,255,255,0.85), transparent),
-    radial-gradient(1px 1px at 40px 70px, rgba(180,210,255,0.7), transparent),
-    radial-gradient(1px 1px at 90px 40px, rgba(255,255,255,0.65), transparent),
-    radial-gradient(1px 1px at 130px 80px, rgba(210,190,255,0.7), transparent),
-    radial-gradient(1px 1px at 160px 30px, rgba(255,255,255,0.55), transparent);
-  background-size: 200px 120px;
-  opacity: 0.9;
-  animation: browse-stars-far 80s linear infinite;
-}
-
-.browse-stars-mid {
-  background-image:
-    radial-gradient(1.5px 1.5px at 25px 40px, rgba(255,255,255,0.95), transparent),
-    radial-gradient(1.5px 1.5px at 80px 15px, rgba(160,210,255,0.9), transparent),
-    radial-gradient(1.5px 1.5px at 140px 90px, rgba(220,200,255,0.85), transparent),
-    radial-gradient(1px 1px at 190px 55px, rgba(255,255,255,0.75), transparent),
-    radial-gradient(1.5px 1.5px at 50px 110px, rgba(170,200,255,0.8), transparent);
-  background-size: 260px 160px;
-  animation: browse-stars-mid 55s linear infinite, browse-stars-twinkle 4s ease-in-out infinite alternate;
-}
-
-.browse-stars-near {
-  background-image:
-    radial-gradient(2px 2px at 40px 60px, #fff, transparent),
-    radial-gradient(2px 2px at 120px 20px, #cde6ff, transparent),
-    radial-gradient(2.5px 2.5px at 200px 100px, #fff, transparent),
-    radial-gradient(2px 2px at 280px 45px, #e0d0ff, transparent),
-    radial-gradient(1.5px 1.5px at 60px 140px, #b8dfff, transparent),
-    radial-gradient(2px 2px at 170px 160px, #fff, transparent);
-  background-size: 340px 220px;
-  filter: drop-shadow(0 0 2px rgba(160, 200, 255, 0.9));
-  animation: browse-stars-near 40s linear infinite, browse-stars-twinkle 3.2s ease-in-out infinite alternate;
-}
-
-@keyframes browse-stars-far {
-  from { transform: translate3d(0, 0, 0); }
-  to { transform: translate3d(4%, -6%, 0); }
-}
-
-@keyframes browse-stars-mid {
-  from { transform: translate3d(0, 0, 0); }
-  to { transform: translate3d(-6%, 8%, 0); }
-}
-
-@keyframes browse-stars-near {
-  from { transform: translate3d(0, 0, 0); }
-  to { transform: translate3d(-10%, 14%, 0); }
-}
-
-@keyframes browse-stars-twinkle {
-  0% { opacity: 0.55; }
-  50% { opacity: 1; }
-  100% { opacity: 0.7; }
-}
-
-.browse-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 22px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(10, 12, 20, 0.72);
-  backdrop-filter: blur(14px);
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 5;
-  /* Let pan/zoom reach the canvas under empty header chrome */
-  pointer-events: none;
-}
-
-.browse-header > * {
-  pointer-events: auto;
-}
-
-.browse-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-.browse-logo {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  object-fit: cover;
-}
-
-.browse-title {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 0.2px;
-  color: var(--text-primary);
-}
-
-.browse-universe {
-  display: flex;
-  align-items: stretch;
-  height: 34px;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid #3949ab;
-  flex-shrink: 0;
-}
-
-.browse-universe-name {
-  display: flex;
-  align-items: center;
-  padding: 0 14px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--accent);
-  background: rgba(57, 73, 171, 0.12);
-  white-space: nowrap;
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.browse-universe-arrow {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  background: rgba(57, 73, 171, 0.18);
-  border: none;
-  color: var(--accent);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.browse-universe-arrow:hover {
-  background: #3949ab;
-  color: #fff;
-}
-
-.browse-search {
-  margin-left: auto;
-  width: min(280px, 100%);
-  padding: 8px 12px;
-  background: rgba(8, 10, 16, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  color: var(--text-primary);
-  font-size: 13px;
-  outline: none;
-}
-
-.browse-search:focus {
-  border-color: var(--accent);
-}
-
-.browse-search::placeholder {
-  color: var(--text-secondary);
+  z-index: 6;
+  top: 12px;
+  left: 12px;
 }
 
 .browse-add-button {
@@ -219,7 +44,7 @@
 .browse-link-offer {
   position: absolute;
   z-index: 7;
-  top: 76px;
+  top: 58px;
   left: 50%;
   width: min(520px, calc(100% - 32px));
   min-height: 52px;
@@ -296,7 +121,7 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
-.browse-main {
+.links-canvas-main {
   position: absolute;
   inset: 0;
   z-index: 1;
@@ -335,7 +160,7 @@
 .city-hud {
   position: absolute;
   z-index: 4;
-  top: 76px;
+  top: 12px;
   left: 12px;
   right: 12px;
   display: flex;
@@ -1010,17 +835,6 @@
 }
 
 @media (max-width: 900px) {
-  .browse-header {
-    flex-wrap: wrap;
-    padding: 12px;
-  }
-
-  .browse-search {
-    margin-left: 0;
-    width: 100%;
-    order: 5;
-  }
-
   .city-minimap {
     width: 110px;
   }
@@ -1037,7 +851,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .browse-stars,
   .city-path-core {
     animation: none;
   }
