@@ -4,547 +4,75 @@
   <meta charset="utf-8">
   <style>
     :root {
-      --bg: #13141a;
-      --bg-secondary: #1a1b23;
-      --bg-tertiary: #22232e;
-      --border: #2d2e3a;
-      --text: #e1e2e8;
-      --text-secondary: #9ca0b0;
-      --accent: #7c83f7;
-      --accent-hover: #6a72e6;
-      --success: #48bb78;
-      --error: #e53e3e;
+      --bg: #1e1e1e;
+      --hover: #2a2d2e;
+      --border: #3c3c3c;
+      --text: #cccccc;
+      --muted: #858585;
+      --accent: #3794ff;
     }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
+    * { box-sizing: border-box; }
     body {
-      width: 500px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: var(--bg);
+      width: 300px;
+      margin: 0;
+      padding: 8px;
       color: var(--text);
-      font-size: 13px;
+      background: var(--bg);
+      font: 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-
-    /* ── Header ─────────────────────────────── */
-
     .header {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 12px 16px 8px;
-    }
-
-    .header svg { color: var(--accent); flex-shrink: 0; }
-
-    .header-logo {
-      width: 22px;
-      height: 22px;
-      border-radius: 5px;
-      object-fit: cover;
-      flex-shrink: 0;
-    }
-
-    .header-title {
-      font-size: 14px;
-      font-weight: 700;
-      letter-spacing: 0.3px;
-    }
-
-    .settings-toggle {
-      background: none;
-      border: none;
-      color: var(--text-secondary);
-      cursor: pointer;
-      padding: 2px;
-      flex: none;
-      display: flex;
-      align-items: center;
-    }
-    .settings-toggle:hover { color: var(--text); }
-
-    /* ── Universe selector ────────────────────── */
-
-    .universe-bar {
-      display: flex;
-      align-items: stretch;
-      margin: 0 16px 6px;
-      border-radius: 6px;
-    }
-
-    .universe-bar-label {
-      display: flex;
-      align-items: center;
-      padding: 0 8px;
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #fff;
-      background: #3949ab;
-      border: 1px solid #3949ab;
-      border-right: none;
-      border-radius: 6px 0 0 6px;
-      white-space: nowrap;
-    }
-
-    .universe-bar-name {
-      display: flex;
-      align-items: center;
-      flex: 1;
-      padding: 5px 10px;
-      border: 1px solid #3949ab;
-      background: rgba(57, 73, 171, 0.08);
-      color: var(--text);
-      font-size: 12px;
-      font-weight: 600;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      min-width: 0;
-    }
-
-    .universe-bar-next {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0 8px;
-      border: 1px solid #3949ab;
-      border-left: none;
-      border-radius: 0 6px 6px 0;
-      background: rgba(57, 73, 171, 0.15);
-      color: var(--text-secondary);
-      cursor: pointer;
-      transition: background 0.15s, color 0.15s;
-    }
-
-    .universe-bar-next:hover {
-      background: #3949ab;
-      color: #fff;
-    }
-
-    .settings-panel {
-      display: none;
-      padding: 4px 16px 8px;
-    }
-    .settings-panel.open { display: block; }
-    .settings-panel label { margin-top: 4px; }
-    .settings-panel input { font-size: 11.5px; }
-
-    /* ── Tabs ───────────────────────────────── */
-
-    .tabs {
-      display: flex;
+      gap: 9px;
+      padding: 8px 9px 12px;
       border-bottom: 1px solid var(--border);
-      padding: 0 16px;
-    }
-
-    .tab-btn {
-      flex: none;
-      background: none;
-      border: none;
-      border-bottom: 2px solid transparent;
-      color: var(--text-secondary);
-      font-size: 12px;
-      font-weight: 600;
-      padding: 8px 14px;
-      cursor: pointer;
-      transition: color 0.15s, border-color 0.15s;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-    }
-
-    .tab-btn:hover { color: var(--text); }
-    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
-
-    .tab-panel { display: none; }
-    .tab-panel.active { display: block; }
-
-    /* ── Shared form styles ─────────────────── */
-
-    label {
-      display: block;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 5px;
-    }
-    label:not(:first-child) { margin-top: 12px; }
-
-    input, select {
-      width: 100%;
-      padding: 8px 10px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      color: var(--text);
-      font-size: 13px;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-    input:focus, select:focus { border-color: var(--accent); }
-
-    input.url-input {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 11.5px;
-      color: var(--text-secondary);
-    }
-
-    select {
-      cursor: pointer;
-      appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239ca0b0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 10px center;
-      padding-right: 28px;
-    }
-    select option { background: var(--bg-secondary); color: var(--text); }
-
-    button {
-      border-radius: 6px;
-      border: 1px solid var(--border);
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-
-    /* ── Save tab ───────────────────────────── */
-
-    .save-content { padding: 14px 16px 20px; }
-
-    .actions { margin-top: 16px; display: flex; gap: 8px; }
-
-    .btn-save {
-      flex: 1;
-      padding: 9px 14px;
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #fff;
-    }
-    .btn-save:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
-    .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
-
-    .status {
-      margin-top: 10px;
-      padding: 8px 10px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 500;
-      display: none;
-    }
-    .status.success {
-      display: block;
-      background: rgba(72, 187, 120, 0.12);
-      color: var(--success);
-      border: 1px solid rgba(72, 187, 120, 0.25);
-    }
-    .status.error {
-      display: block;
-      background: rgba(229, 62, 62, 0.12);
-      color: var(--error);
-      border: 1px solid rgba(229, 62, 62, 0.25);
-    }
-
-    /* ── Browse tab ─────────────────────────── */
-
-    .browse-content { padding: 10px 0 16px; }
-
-    .browse-search {
-      padding: 0 16px 10px;
-    }
-
-    .browse-search input {
-      font-size: 12px;
-      padding: 7px 10px;
-    }
-
-    .browse-pills {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      padding: 0 16px 10px;
-    }
-
-    .browse-pill {
-      padding: 4px 12px;
-      font-size: 11px;
-      font-weight: 600;
-      border-radius: 14px;
-      border: 1px solid var(--border);
-      background: var(--bg-secondary);
-      color: var(--text-secondary);
-      cursor: pointer;
-      transition: all 0.15s;
-      white-space: nowrap;
-    }
-
-    .browse-pill:hover {
-      color: var(--text);
-      border-color: var(--accent);
-    }
-
-    .browse-pill.active {
-      background: rgba(124, 131, 247, 0.15);
-      color: var(--accent);
-      border-color: var(--accent);
-    }
-
-    .browse-list {
-      max-height: 480px;
-      overflow-y: auto;
-      padding: 0 16px 8px;
-    }
-
-    .browse-empty {
-      padding: 24px 16px;
-      text-align: center;
-      color: var(--text-secondary);
-      font-size: 12px;
-    }
-
-    /* Link rows */
-
-    .link-row {
-      display: block;
-      padding: 8px 12px;
-      border-bottom: 1px solid var(--border);
-      cursor: pointer;
-      transition: background 0.1s;
-    }
-    .link-row:last-child { border-bottom: none; }
-    .link-row:hover { background: var(--bg-tertiary); }
-
-    .link-title {
-      font-size: 13px;
-      font-weight: 600;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .link-domain {
-      font-size: 11px;
-      color: var(--text-secondary);
-      margin-top: 2px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    /* ── Tools tab ──────────────────────────── */
-
-    .tools-content {
-      padding: 14px 16px 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-
-    .tool-card {
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: var(--bg-secondary);
-      padding: 14px;
-    }
-
-    .tool-card-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    .tool-card-icon {
-      color: var(--accent);
-      flex-shrink: 0;
-    }
-
-    .tool-card-title {
-      font-size: 13px;
+      margin-bottom: 6px;
       font-weight: 700;
     }
-
-    .tool-card-desc {
-      font-size: 11.5px;
-      color: var(--text-secondary);
-      line-height: 1.4;
-      margin-bottom: 10px;
-    }
-
-    .tool-card-url {
-      font-size: 11px;
-      color: var(--text-secondary);
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      margin-bottom: 10px;
-      padding: 5px 8px;
-      background: var(--bg-tertiary);
-      border-radius: 4px;
-    }
-
-    .tool-btn {
+    .header img { width: 22px; height: 22px; border-radius: 5px; }
+    .menu-btn {
       width: 100%;
-      padding: 8px 14px;
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #fff;
-      font-size: 12px;
-      font-weight: 600;
-    }
-    .tool-btn:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
-    .tool-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-    .tool-btn-secondary {
-      width: 100%;
-      padding: 8px 14px;
-      background: var(--bg-tertiary);
-      border-color: var(--border);
-      color: var(--text);
-      font-size: 12px;
-      font-weight: 600;
-      margin-top: 8px;
-    }
-    .tool-btn-secondary:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-    .tool-btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
-
-    .tool-status {
-      margin-top: 8px;
-      padding: 7px 10px;
-      border-radius: 6px;
-      font-size: 11.5px;
-      font-weight: 500;
-      display: none;
-    }
-    .tool-status.success {
-      display: block;
-      background: rgba(72, 187, 120, 0.12);
-      color: var(--success);
-      border: 1px solid rgba(72, 187, 120, 0.25);
-    }
-    .tool-status.error {
-      display: block;
-      background: rgba(229, 62, 62, 0.12);
-      color: var(--error);
-      border: 1px solid rgba(229, 62, 62, 0.25);
-    }
-    .tool-status.info {
-      display: block;
-      background: rgba(124, 131, 247, 0.1);
-      color: var(--accent);
-      border: 1px solid rgba(124, 131, 247, 0.2);
-    }
-
-    .summary-box {
-      display: none;
-      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      gap: 11px;
       padding: 10px;
-      background: var(--bg-tertiary);
-      border: 1px solid var(--border);
+      border: 0;
       border-radius: 6px;
-      font-size: 12px;
-      line-height: 1.5;
-      max-height: 200px;
-      overflow-y: auto;
-      white-space: pre-wrap;
+      color: var(--text);
+      background: transparent;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
     }
-    .summary-box.visible { display: block; }
-
+    .menu-btn:hover { background: var(--hover); }
+    .menu-btn svg { color: var(--muted); flex: none; }
+    .menu-btn:hover svg { color: var(--accent); }
   </style>
 </head>
 <body>
   <div class="header">
-    <img class="header-logo" src="icons/icon48.png" alt="Astro">
-    <span class="header-title">Astro Browse</span>
-    <span style="flex:1"></span>
-    <button class="settings-toggle" id="settingsBtn" title="Settings">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"/>
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-      </svg>
-    </button>
+    <img src="icons/icon48.png" alt="">
+    <span>Astro Browse</span>
   </div>
 
-  <div class="settings-panel" id="settingsPanel">
-    <label>Astro Server URL</label>
-    <input type="text" id="serverUrl" placeholder="http://localhost:8000">
-  </div>
+  <button class="menu-btn" id="save">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+      <polyline points="17 21 17 13 7 13 7 21"/>
+      <polyline points="7 3 7 8 15 8"/>
+    </svg>
+    <span>Save current tab as link</span>
+  </button>
 
-  <div class="universe-bar">
-    <span class="universe-bar-label">Universe</span>
-    <span class="universe-bar-name" id="universeName">—</span>
-    <button class="universe-bar-next" id="universeNext" title="Next universe" style="display:none">
-      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="9 18 15 12 9 6" />
-      </svg>
-    </button>
-  </div>
-
-  <div class="tabs">
-    <button class="tab-btn" data-tab="save">Save</button>
-    <button class="tab-btn active" data-tab="browse">Browse</button>
-    <button class="tab-btn" data-tab="tools">Tools</button>
-  </div>
-
-  <!-- Save tab -->
-  <div class="tab-panel" id="tab-save">
-    <div class="save-content">
-      <label>Title</label>
-      <input type="text" id="titleInput" placeholder="Page title">
-
-      <label>URL</label>
-      <input type="text" id="urlInput" class="url-input" placeholder="https://..." readonly>
-
-      <label>Category</label>
-      <select id="categorySelect">
-        <option value="">None</option>
-      </select>
-
-      <div class="actions">
-        <button class="btn-save" id="saveBtn">Save Link</button>
-      </div>
-
-      <div class="status" id="status"></div>
-    </div>
-  </div>
-
-  <!-- Browse tab -->
-  <div class="tab-panel active" id="tab-browse">
-    <div class="browse-content">
-      <div class="browse-search">
-        <input type="text" id="browseSearch" placeholder="Search links...">
-      </div>
-      <div class="browse-pills" id="browsePills"></div>
-      <div class="browse-list" id="browseList">
-        <div class="browse-empty">Loading...</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Tools tab -->
-  <div class="tab-panel" id="tab-tools">
-    <div class="tools-content">
-
-      <div class="tool-card">
-        <div class="tool-card-header">
-          <svg class="tool-card-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-          </svg>
-          <span class="tool-card-title">Read Later</span>
-        </div>
-        <div class="tool-card-desc">Save this page as a bookmark to read later.</div>
-        <div class="tool-card-url" id="readLaterUrl"></div>
-        <button class="tool-btn" id="readLaterBtn">Add to Read Later</button>
-        <div class="tool-status" id="readLaterStatus"></div>
-      </div>
-
-
-    </div>
-  </div>
+  <button class="menu-btn" id="browse">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="7" height="7"/>
+      <rect x="14" y="3" width="7" height="7"/>
+      <rect x="3" y="14" width="7" height="7"/>
+      <rect x="14" y="14" width="7" height="7"/>
+    </svg>
+    <span>Browse all</span>
+  </button>
 
   <script src="popup.js"></script>
 </body>

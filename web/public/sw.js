@@ -1,4 +1,4 @@
-const CACHE_NAME = 'astro-v2'
+const CACHE_NAME = 'astro-v4'
 const PRECACHE_URLS = [
   '/mobile',
   '/logo.png',

@@ -80,6 +80,9 @@ from src.markdowns import (
     get_document_paths_for_category,
     get_document_pinned,
     set_category_pinned,
+    set_category_browse_position,
+    get_uncategorized_browse_position,
+    set_uncategorized_browse_position,
     get_link,
     get_markdown,
     get_universe,
@@ -103,6 +106,7 @@ from src.markdowns import (
     move_link_to_universe,
     move_markdown_to_universe,
     move_table_to_universe,
+    reorder_links,
     update_category,
     rename_universe,
     set_document_category,
@@ -273,6 +277,13 @@ class CategoryResponse(BaseModel):
     universe_id: int = 1
     emoji: Optional[str] = None
     sort_order: int = 0
+    browse_x: Optional[float] = None
+    browse_y: Optional[float] = None
+
+
+class BrowsePositionRequest(BaseModel):
+    x: float
+    y: float
 
 
 class DocumentInfo(BaseModel):
@@ -305,6 +316,12 @@ class LinkResponse(BaseModel):
     created_at: str
     updated_at: str
     universe_id: int = 1
+    sort_order: int = 0
+
+
+class LinkReorderRequest(BaseModel):
+    universe_id: int = 1
+    link_ids: list[int]
 
 
 # ── Universes ─────────────────────────────────────────────────────────────
@@ -463,6 +480,30 @@ def api_move_category(cat_id: int, direction: str):
     return category_to_dict(cat)
 
 
+@app.put("/api/categories/{cat_id}/browse-position", response_model=CategoryResponse)
+def api_set_category_browse_position(cat_id: int, req: BrowsePositionRequest):
+    cat = set_category_browse_position(cat_id, req.x, req.y)
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return category_to_dict(cat)
+
+
+@app.get("/api/universes/{uid}/uncategorized-browse-position")
+def api_get_uncategorized_browse_position(uid: int):
+    if not get_universe(uid):
+        raise HTTPException(status_code=404, detail="Universe not found")
+    x, y = get_uncategorized_browse_position(uid)
+    return {"universe_id": uid, "x": x, "y": y}
+
+
+@app.put("/api/universes/{uid}/uncategorized-browse-position")
+def api_set_uncategorized_browse_position(uid: int, req: BrowsePositionRequest):
+    if not get_universe(uid):
+        raise HTTPException(status_code=404, detail="Universe not found")
+    x, y = set_uncategorized_browse_position(uid, req.x, req.y)
+    return {"universe_id": uid, "x": x, "y": y}
+
+
 @app.delete("/api/categories/{cat_id}")
 def api_delete_category(cat_id: int):
     if not delete_category(cat_id):
@@ -590,6 +631,13 @@ def api_list_pinned(universe_id: Optional[int] = None):
 @app.get("/api/links", response_model=list[LinkResponse])
 def api_list_links(q: str = "", category_id: Optional[int] = None, universe_id: Optional[int] = None):
     return [link_to_dict(l) for l in list_links(q, category_id, universe_id=universe_id)]
+
+
+@app.post("/api/links/reorder", response_model=list[LinkResponse])
+def api_reorder_links(req: LinkReorderRequest):
+    if not get_universe(req.universe_id):
+        raise HTTPException(status_code=400, detail="Universe not found")
+    return [link_to_dict(l) for l in reorder_links(req.universe_id, req.link_ids)]
 
 
 @app.get("/api/links/{link_id}", response_model=LinkResponse)
@@ -2227,6 +2275,11 @@ if _static.is_dir():
     @app.get("/mobile")
     @app.get("/mobile/{rest:path}")
     def spa_mobile(rest: str = ""):
+        return FileResponse(str(_index_html))
+
+    @app.get("/browse")
+    @app.get("/browse/{rest:path}")
+    def spa_browse(rest: str = ""):
         return FileResponse(str(_index_html))
 
     app.mount("/", StaticFiles(directory=str(_static), html=True), name="static")

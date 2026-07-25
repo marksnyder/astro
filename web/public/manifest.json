@@ -4,7 +4,7 @@
   "short_name": "Astro",
   "description": "Your Universe, Organized.",
   "start_url": "/mobile",
-  "scope": "/",
+  "scope": "/mobile",
   "display": "standalone",
   "background_color": "#1e1e1e",
   "theme_color": "#1e1e1e",

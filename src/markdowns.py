@@ -41,6 +41,8 @@ class Category:
     universe_id: int = 1
     emoji: str | None = None
     sort_order: int = 0
+    browse_x: float | None = None
+    browse_y: float | None = None
 
 
 @dataclass
@@ -53,6 +55,7 @@ class Link:
     created_at: str
     updated_at: str
     universe_id: int = 1
+    sort_order: int = 0
 
 
 @dataclass
@@ -185,6 +188,14 @@ def universe_to_dict(u: Universe) -> dict:
 # ── Categories CRUD ───────────────────────────────────────────────────────
 
 
+def _row_browse_coord(row: sqlite3.Row, key: str) -> float | None:
+    try:
+        value = row[key]
+    except (IndexError, KeyError):
+        return None
+    return float(value) if value is not None else None
+
+
 def _row_to_category(r: sqlite3.Row) -> Category:
     return Category(
         id=r["id"],
@@ -193,6 +204,8 @@ def _row_to_category(r: sqlite3.Row) -> Category:
         universe_id=r["universe_id"],
         emoji=r["emoji"],
         sort_order=int(r["sort_order"]),
+        browse_x=_row_browse_coord(r, "browse_x"),
+        browse_y=_row_browse_coord(r, "browse_y"),
     )
 
 
@@ -200,12 +213,12 @@ def list_categories(universe_id: int | None = None) -> list[Category]:
     conn = _get_conn()
     if universe_id is not None:
         rows = conn.execute(
-            "SELECT id, name, parent_id, universe_id, emoji, sort_order FROM categories WHERE universe_id = ? ORDER BY sort_order, name",
+            "SELECT * FROM categories WHERE universe_id = ? ORDER BY sort_order, name",
             (universe_id,),
         ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT id, name, parent_id, universe_id, emoji, sort_order FROM categories ORDER BY universe_id, sort_order, name"
+            "SELECT * FROM categories ORDER BY universe_id, sort_order, name"
         ).fetchall()
     conn.close()
     return [_row_to_category(r) for r in rows]
@@ -231,7 +244,7 @@ def create_category(name: str, parent_id: int | None = None, universe_id: int = 
     conn.commit()
     cat_id = cur.lastrowid
     row = conn.execute(
-        "SELECT id, name, parent_id, universe_id, emoji, sort_order FROM categories WHERE id = ?",
+        "SELECT * FROM categories WHERE id = ?",
         (cat_id,),
     ).fetchone()
     conn.close()
@@ -259,7 +272,7 @@ def update_category(cat_id: int, name: str | None = None, emoji: str | None = ..
         conn.close()
         return None
     row = conn.execute(
-        "SELECT id, name, parent_id, universe_id, emoji, sort_order FROM categories WHERE id = ?",
+        "SELECT * FROM categories WHERE id = ?",
         (cat_id,),
     ).fetchone()
     conn.close()
@@ -319,7 +332,7 @@ def move_category(cat_id: int, direction: str) -> Category | None:
     conn.execute("UPDATE categories SET sort_order = ? WHERE id = ?", (a["sort_order"], other_id))
     conn.commit()
     row = conn.execute(
-        "SELECT id, name, parent_id, universe_id, emoji, sort_order FROM categories WHERE id = ?",
+        "SELECT * FROM categories WHERE id = ?",
         (cat_id,),
     ).fetchone()
     conn.close()
@@ -334,6 +347,50 @@ def set_category_pinned(cat_id: int, pinned: bool) -> bool:
     return cur.rowcount > 0
 
 
+def set_category_browse_position(cat_id: int, x: float, y: float) -> Category | None:
+    conn = _get_conn()
+    cur = conn.execute(
+        "UPDATE categories SET browse_x = ?, browse_y = ? WHERE id = ?",
+        (float(x), float(y), cat_id),
+    )
+    conn.commit()
+    if cur.rowcount == 0:
+        conn.close()
+        return None
+    row = conn.execute("SELECT * FROM categories WHERE id = ?", (cat_id,)).fetchone()
+    conn.close()
+    return _row_to_category(row) if row else None
+
+
+def uncategorized_browse_setting_key(universe_id: int) -> str:
+    return f"browse_uncategorized_pos_{int(universe_id)}"
+
+
+def get_uncategorized_browse_position(universe_id: int) -> tuple[float | None, float | None]:
+    import json
+    raw = get_setting(uncategorized_browse_setting_key(universe_id), "")
+    if not raw:
+        return None, None
+    try:
+        data = json.loads(raw)
+        x = data.get("x")
+        y = data.get("y")
+        if x is None or y is None:
+            return None, None
+        return float(x), float(y)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None, None
+
+
+def set_uncategorized_browse_position(universe_id: int, x: float, y: float) -> tuple[float, float]:
+    import json
+    set_setting(
+        uncategorized_browse_setting_key(universe_id),
+        json.dumps({"x": float(x), "y": float(y)}),
+    )
+    return float(x), float(y)
+
+
 def set_category_sort_order(cat_id: int, sort_order: int) -> None:
     conn = _get_conn()
     conn.execute("UPDATE categories SET sort_order = ? WHERE id = ?", (sort_order, cat_id))
@@ -345,12 +402,12 @@ def list_pinned_categories(universe_id: int | None = None) -> list[Category]:
     conn = _get_conn()
     if universe_id is not None:
         rows = conn.execute(
-            "SELECT id, name, parent_id, universe_id, emoji, sort_order FROM categories WHERE pinned = 1 AND universe_id = ? ORDER BY sort_order, name",
+            "SELECT * FROM categories WHERE pinned = 1 AND universe_id = ? ORDER BY sort_order, name",
             (universe_id,),
         ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT id, name, parent_id, universe_id, emoji, sort_order FROM categories WHERE pinned = 1 ORDER BY universe_id, sort_order, name"
+            "SELECT * FROM categories WHERE pinned = 1 ORDER BY universe_id, sort_order, name"
         ).fetchall()
     conn.close()
     return [_row_to_category(r) for r in rows]
@@ -589,7 +646,16 @@ def _row_to_bookmark(row: sqlite3.Row) -> Link:
         created_at=row["created_at"],
         updated_at=row["updated_at"],
         universe_id=row["universe_id"],
+        sort_order=int(row["sort_order"]) if "sort_order" in row.keys() else 0,
     )
+
+
+def _next_link_sort_order(conn: sqlite3.Connection, universe_id: int) -> int:
+    row = conn.execute(
+        "SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM links WHERE universe_id = ?",
+        (universe_id,),
+    ).fetchone()
+    return int(row["n"])
 
 
 def list_links(query: str = "", category_id: int | None = None, universe_id: int | None = None) -> list[Link]:
@@ -608,7 +674,10 @@ def list_links(query: str = "", category_id: int | None = None, universe_id: int
         conditions.append(f"category_id IN ({placeholders})")
         params.extend(ids)
     where = f" WHERE {' AND '.join(conditions)}" if conditions else ""
-    rows = conn.execute(f"SELECT * FROM links{where} ORDER BY updated_at DESC", params).fetchall()
+    rows = conn.execute(
+        f"SELECT * FROM links{where} ORDER BY sort_order ASC, id ASC",
+        params,
+    ).fetchall()
     conn.close()
     return [_row_to_bookmark(r) for r in rows]
 
@@ -623,9 +692,10 @@ def get_link(link_id: int) -> Link | None:
 def create_link(title: str, url: str, category_id: int | None = None, universe_id: int = 1) -> Link:
     now = _now()
     conn = _get_conn()
+    sort_order = _next_link_sort_order(conn, universe_id)
     cur = conn.execute(
-        "INSERT INTO links (title, url, category_id, universe_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-        (title, url, category_id, universe_id, now, now),
+        "INSERT INTO links (title, url, category_id, universe_id, created_at, updated_at, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (title, url, category_id, universe_id, now, now, sort_order),
     )
     conn.commit()
     lid = cur.lastrowid
@@ -663,12 +733,44 @@ def set_link_pinned(link_id: int, pinned: bool) -> bool:
     return cur.rowcount > 0
 
 
+def reorder_links(universe_id: int, link_ids: list[int]) -> list[Link]:
+    """Set sort_order for links in a universe from the given id sequence."""
+    if not link_ids:
+        return list_links(universe_id=universe_id)
+
+    conn = _get_conn()
+    existing = {
+        int(row["id"])
+        for row in conn.execute(
+            "SELECT id FROM links WHERE universe_id = ?",
+            (universe_id,),
+        ).fetchall()
+    }
+    ordered_ids = [int(lid) for lid in link_ids if int(lid) in existing]
+    missing = [lid for lid in existing if lid not in set(ordered_ids)]
+    ordered_ids.extend(sorted(missing))
+
+    for index, link_id in enumerate(ordered_ids):
+        conn.execute(
+            "UPDATE links SET sort_order = ? WHERE id = ? AND universe_id = ?",
+            (index, link_id, universe_id),
+        )
+    conn.commit()
+    conn.close()
+    return list_links(universe_id=universe_id)
+
+
 def list_pinned_links(universe_id: int | None = None) -> list[Link]:
     conn = _get_conn()
     if universe_id is not None:
-        rows = conn.execute("SELECT * FROM links WHERE pinned = 1 AND universe_id = ? ORDER BY updated_at DESC", (universe_id,)).fetchall()
+        rows = conn.execute(
+            "SELECT * FROM links WHERE pinned = 1 AND universe_id = ? ORDER BY sort_order ASC, id ASC",
+            (universe_id,),
+        ).fetchall()
     else:
-        rows = conn.execute("SELECT * FROM links WHERE pinned = 1 ORDER BY updated_at DESC").fetchall()
+        rows = conn.execute(
+            "SELECT * FROM links WHERE pinned = 1 ORDER BY universe_id, sort_order ASC, id ASC"
+        ).fetchall()
     conn.close()
     return [_row_to_bookmark(r) for r in rows]
 
@@ -1085,9 +1187,10 @@ def move_link_to_universe(link_id: int, universe_id: int, category_id: int | Non
         return link
     now = _now()
     conn = _get_conn()
+    sort_order = _next_link_sort_order(conn, universe_id)
     cur = conn.execute(
-        "UPDATE links SET universe_id = ?, category_id = ?, updated_at = ? WHERE id = ?",
-        (universe_id, category_id, now, link_id),
+        "UPDATE links SET universe_id = ?, category_id = ?, sort_order = ?, updated_at = ? WHERE id = ?",
+        (universe_id, category_id, sort_order, now, link_id),
     )
     conn.commit()
     conn.close()
