@@ -2,8 +2,9 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { CategoryPicker, EmojiPopover } from './CategoryTree'
-import { SidebarCategoryTree } from './SidebarCategoryTree'
 import { MoveToUniverseButton } from './MoveToUniverseButton'
+import ContentCanvasShell from './categoryCanvas/ContentCanvasShell'
+import { ActionIconButton, CanvasItemRow } from './categoryCanvas/CanvasItemRow'
 
 // ── MCP tool templates ────────────────────────────────
 
@@ -556,27 +557,25 @@ export function MarkdownEditorView({ markdown, categories, onClose, onSaved, pre
   )
 }
 
-function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMarkdownRequestHandled, universeId, universes, onEditMarkdown, refreshKey, onLoaded }) {
+function MarkdownsPanel({ categories, onPinChange, universeId, universes, onEditMarkdown, refreshKey, onLoaded }) {
   const [markdowns, setMarkdowns] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  const fetchMarkdowns = () => {
+  const fetchMarkdowns = useCallback(() => {
     const params = new URLSearchParams()
     if (universeId) params.set('universe_id', universeId)
+    setLoading(true)
     fetch(`/api/markdowns?${params}`)
       .then(res => res.json())
       .then(data => setMarkdowns(data))
-      .catch(() => {})
-      .finally(() => onLoaded?.())
-  }
+      .catch(() => setMarkdowns([]))
+      .finally(() => {
+        setLoading(false)
+        onLoaded?.()
+      })
+  }, [onLoaded, universeId])
 
-  useEffect(() => { fetchMarkdowns() }, [universeId, refreshKey])
-
-  useEffect(() => {
-    if (editMarkdownRequest) {
-      onEditMarkdown?.(editMarkdownRequest)
-      onEditMarkdownRequestHandled?.()
-    }
-  }, [editMarkdownRequest])
+  useEffect(() => { fetchMarkdowns() }, [fetchMarkdowns, refreshKey])
 
   /** `presetCategoryId`: omit = no preset; `null` = Uncategorized */
   const startNew = (presetCategoryId) => {
@@ -585,26 +584,21 @@ function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMa
     onEditMarkdown?.(payload)
   }
 
-  const startEdit = (markdown) => {
-    onEditMarkdown?.(markdown)
-  }
-
-  const remove = async (markdownId) => {
+  const remove = useCallback(async (markdownId) => {
     if (!confirm('Are you sure you want to delete this markdown?')) return
     await fetch(`/api/markdowns/${markdownId}`, { method: 'DELETE' })
     fetchMarkdowns()
     onPinChange?.()
-  }
+  }, [fetchMarkdowns, onPinChange])
 
-  const togglePin = async (e, markdown) => {
-    e.stopPropagation()
+  const togglePin = useCallback(async (markdown) => {
     const newPinned = !markdown.pinned
     await fetch(`/api/markdowns/${markdown.id}/pin?pinned=${newPinned}`, { method: 'PUT' })
     fetchMarkdowns()
     onPinChange?.()
-  }
+  }, [fetchMarkdowns, onPinChange])
 
-  const moveToUniverse = async (markdown, targetUniverseId, categoryId) => {
+  const moveToUniverse = useCallback(async (markdown, targetUniverseId, categoryId) => {
     const res = await fetch(`/api/markdowns/${markdown.id}/move-universe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -618,94 +612,101 @@ function MarkdownsPanel({ categories, onPinChange, editMarkdownRequest, onEditMa
     }
     fetchMarkdowns()
     onPinChange?.()
-  }
+  }, [fetchMarkdowns, onPinChange])
 
-  // ── List view ────────────────────────────────────────
+  const getCategoryId = useCallback((item) => item.category_id ?? null, [])
+  const getItemId = useCallback((item) => item.id, [])
+  const getItemTitle = useCallback((item) => item.title || '', [])
+
+  const renderCategoryActions = useCallback((category) => {
+    if (category.isUncategorized) {
+      return (
+        <button
+          type="button"
+          className="city-district-open-all"
+          title="New markdown in Uncategorized"
+          onClick={(e) => { e.stopPropagation(); startNew(null) }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          + New
+        </button>
+      )
+    }
+    return (
+      <button
+        type="button"
+        className="city-district-open-all"
+        title="New markdown in this category"
+        onClick={(e) => { e.stopPropagation(); startNew(Number(category.key)) }}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        + New
+      </button>
+    )
+  }, [universeId])
+
+  const renderItem = useCallback(({ node, color, highlighted, dimmed }) => {
+    const markdown = node.item
+    return (
+      <CanvasItemRow
+        key={node.id}
+        node={node}
+        color={color}
+        highlighted={highlighted}
+        dimmed={dimmed}
+        title={markdown.title || 'Untitled'}
+        onOpen={() => onEditMarkdown?.(markdown)}
+        actions={(
+          <>
+            <ActionIconButton
+              className={markdown.pinned ? 'pinned' : ''}
+              title={markdown.pinned ? 'Unpin' : 'Pin to header'}
+              onClick={() => togglePin(markdown)}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill={markdown.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                <path d="M12 17v5" /><path d="M9 2h6l-1 7h4l-5 7H7l2-7H5l1-7z" />
+              </svg>
+            </ActionIconButton>
+            <MoveToUniverseButton
+              universes={universes}
+              currentUniverseId={universeId}
+              itemLabel={markdown.title || 'Untitled'}
+              onMove={(uid, catId) => moveToUniverse(markdown, uid, catId)}
+            />
+            <ActionIconButton title="Delete markdown" onClick={() => remove(markdown.id)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+              </svg>
+            </ActionIconButton>
+          </>
+        )}
+      />
+    )
+  }, [moveToUniverse, onEditMarkdown, remove, togglePin, universeId, universes])
 
   return (
-    <aside className="markdowns-panel sidebar-tree-panel">
-      <div className="markdowns-header">
-        <span className="markdowns-header-title">Markdowns</span>
-        <button className="markdowns-add-btn" onClick={() => startNew()} title="New markdown">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+    <ContentCanvasShell
+      contentType="markdowns"
+      universeId={universeId}
+      categories={categories}
+      items={markdowns}
+      loading={loading}
+      getCategoryId={getCategoryId}
+      getItemId={getItemId}
+      getItemTitle={getItemTitle}
+      renderItem={renderItem}
+      renderCategoryActions={renderCategoryActions}
+      emptyTitle="No markdowns yet"
+      emptyBody="Click + to create one."
+      toolbar={(
+        <button type="button" className="browse-add-button" onClick={() => startNew()} title="New markdown">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M12 5v14M5 12h14" />
           </svg>
+          Add markdown
         </button>
-      </div>
-      <div className="markdowns-list">
-        {(() => {
-          if (markdowns.length === 0) return (
-            <div className="markdowns-empty">
-              No markdowns yet. Click + to create one.
-            </div>
-          )
-          return (
-            <SidebarCategoryTree
-              universeId={universeId}
-              panelId="markdowns"
-              categories={categories}
-              items={markdowns}
-              showExpandCollapse
-              itemKind="markdowns"
-              getCategoryId={(m) => m.category_id}
-              getTitle={(m) => m.title || ''}
-              renderCategoryHeaderExtra={(categoryId) => (
-                <button
-                  type="button"
-                  className="sidebar-tree-new-in-cat-btn"
-                  title={categoryId == null ? 'New markdown in Uncategorized' : 'New markdown in this category'}
-                  aria-label={categoryId == null ? 'New markdown in Uncategorized' : 'New markdown in this category'}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    startNew(categoryId)
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                </button>
-              )}
-              renderItem={(markdown) => (
-                <div key={markdown.id} className="markdown-card sidebar-tree-file" onClick={() => startEdit(markdown)}>
-                  <div className="markdown-card-header">
-                    <div className="markdown-card-title">{markdown.title || 'Untitled'}</div>
-                    <button
-                      className={`pin-btn ${markdown.pinned ? 'pinned' : ''}`}
-                      onClick={(e) => togglePin(e, markdown)}
-                      title={markdown.pinned ? 'Unpin' : 'Pin to header'}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill={markdown.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 17v5" />
-                        <path d="M9 2h6l-1 7h4l-5 7H7l2-7H5l1-7z" />
-                      </svg>
-                    </button>
-                    <MoveToUniverseButton
-                      universes={universes}
-                      currentUniverseId={universeId}
-                      itemLabel={markdown.title || 'Untitled'}
-                      onMove={(uid, catId) => moveToUniverse(markdown, uid, catId)}
-                    />
-                    <button
-                      className="markdown-card-delete-btn"
-                      onClick={(e) => { e.stopPropagation(); remove(markdown.id) }}
-                      title="Delete markdown"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="3 6 5 6 21 6" />
-                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                        <path d="M10 11v6" /><path d="M14 11v6" />
-                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              )}
-            />
-          )
-        })()}
-      </div>
-    </aside>
+      )}
+    />
   )
 }
 

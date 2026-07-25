@@ -339,6 +339,40 @@ def move_category(cat_id: int, direction: str) -> Category | None:
     return _row_to_category(row) if row else None
 
 
+BROWSE_CONTENT_TYPES = frozenset({
+    "links",
+    "markdowns",
+    "documents",
+    "diagrams",
+    "tables",
+    "scripts",
+})
+
+
+def normalize_browse_content_type(content_type: str | None) -> str:
+    value = (content_type or "links").strip().lower()
+    if value not in BROWSE_CONTENT_TYPES:
+        raise ValueError(f"Invalid content_type: {content_type}")
+    return value
+
+
+def clear_category_browse_positions(cat_id: int, conn=None) -> None:
+    owns_conn = conn is None
+    if owns_conn:
+        conn = _get_conn()
+    conn.execute(
+        "DELETE FROM category_browse_positions WHERE category_id = ?",
+        (cat_id,),
+    )
+    conn.execute(
+        "UPDATE categories SET browse_x = NULL, browse_y = NULL WHERE id = ?",
+        (cat_id,),
+    )
+    if owns_conn:
+        conn.commit()
+        conn.close()
+
+
 def move_category_to_root(cat_id: int) -> Category | None:
     """Move a nested category to the end of the universe's root categories."""
     conn = _get_conn()
@@ -363,6 +397,7 @@ def move_category_to_root(cat_id: int) -> Category | None:
             "WHERE id = ?",
             (next_order, cat_id),
         )
+        clear_category_browse_positions(cat_id, conn=conn)
         conn.commit()
 
     row = conn.execute(
@@ -381,26 +416,104 @@ def set_category_pinned(cat_id: int, pinned: bool) -> bool:
     return cur.rowcount > 0
 
 
-def set_category_browse_position(cat_id: int, x: float, y: float) -> Category | None:
+def set_category_browse_position(
+    cat_id: int,
+    x: float,
+    y: float,
+    content_type: str = "links",
+) -> Category | None:
+    content_type = normalize_browse_content_type(content_type)
     conn = _get_conn()
-    cur = conn.execute(
-        "UPDATE categories SET browse_x = ?, browse_y = ? WHERE id = ?",
-        (float(x), float(y), cat_id),
-    )
-    conn.commit()
-    if cur.rowcount == 0:
+    row = conn.execute("SELECT * FROM categories WHERE id = ?", (cat_id,)).fetchone()
+    if not row:
         conn.close()
         return None
-    row = conn.execute("SELECT * FROM categories WHERE id = ?", (cat_id,)).fetchone()
+    if row["parent_id"] is not None:
+        conn.close()
+        raise ValueError("Only root categories can have canvas positions")
+
+    conn.execute(
+        """
+        INSERT INTO category_browse_positions (category_id, content_type, x, y)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(category_id, content_type) DO UPDATE SET x = excluded.x, y = excluded.y
+        """,
+        (cat_id, content_type, float(x), float(y)),
+    )
+    # Keep legacy columns in sync for links during transition.
+    if content_type == "links":
+        conn.execute(
+            "UPDATE categories SET browse_x = ?, browse_y = ? WHERE id = ?",
+            (float(x), float(y), cat_id),
+        )
+    conn.commit()
+    updated = conn.execute("SELECT * FROM categories WHERE id = ?", (cat_id,)).fetchone()
     conn.close()
-    return _row_to_category(row) if row else None
+    return _row_to_category(updated) if updated else None
+
+
+def list_category_browse_positions(universe_id: int, content_type: str = "links") -> dict[str, dict[str, float]]:
+    content_type = normalize_browse_content_type(content_type)
+    conn = _get_conn()
+    rows = conn.execute(
+        """
+        SELECT cbp.category_id, cbp.x, cbp.y
+        FROM category_browse_positions cbp
+        JOIN categories c ON c.id = cbp.category_id
+        WHERE c.universe_id = ?
+          AND c.parent_id IS NULL
+          AND cbp.content_type = ?
+        """,
+        (universe_id, content_type),
+    ).fetchall()
+    # Fallback to legacy columns for links when typed table is empty for a category.
+    if content_type == "links":
+        typed_ids = {int(r["category_id"]) for r in rows}
+        legacy = conn.execute(
+            """
+            SELECT id, browse_x, browse_y
+            FROM categories
+            WHERE universe_id = ?
+              AND parent_id IS NULL
+              AND browse_x IS NOT NULL
+              AND browse_y IS NOT NULL
+            """,
+            (universe_id,),
+        ).fetchall()
+        for r in legacy:
+            if int(r["id"]) not in typed_ids:
+                rows = [*rows, {"category_id": r["id"], "x": r["browse_x"], "y": r["browse_y"]}]
+    conn.close()
+    return {
+        str(int(r["category_id"])): {"x": float(r["x"]), "y": float(r["y"])}
+        for r in rows
+    }
 
 
 def uncategorized_browse_setting_key(universe_id: int) -> str:
     return f"browse_uncategorized_pos_{int(universe_id)}"
 
 
-def get_uncategorized_browse_position(universe_id: int) -> tuple[float | None, float | None]:
+def get_uncategorized_browse_position(
+    universe_id: int,
+    content_type: str = "links",
+) -> tuple[float | None, float | None]:
+    content_type = normalize_browse_content_type(content_type)
+    conn = _get_conn()
+    row = conn.execute(
+        """
+        SELECT x, y FROM universe_browse_positions
+        WHERE universe_id = ? AND content_type = ?
+        """,
+        (universe_id, content_type),
+    ).fetchone()
+    conn.close()
+    if row:
+        return float(row["x"]), float(row["y"])
+
+    if content_type != "links":
+        return None, None
+
     import json
     raw = get_setting(uncategorized_browse_setting_key(universe_id), "")
     if not raw:
@@ -416,12 +529,30 @@ def get_uncategorized_browse_position(universe_id: int) -> tuple[float | None, f
         return None, None
 
 
-def set_uncategorized_browse_position(universe_id: int, x: float, y: float) -> tuple[float, float]:
-    import json
-    set_setting(
-        uncategorized_browse_setting_key(universe_id),
-        json.dumps({"x": float(x), "y": float(y)}),
+def set_uncategorized_browse_position(
+    universe_id: int,
+    x: float,
+    y: float,
+    content_type: str = "links",
+) -> tuple[float, float]:
+    content_type = normalize_browse_content_type(content_type)
+    conn = _get_conn()
+    conn.execute(
+        """
+        INSERT INTO universe_browse_positions (universe_id, content_type, x, y)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(universe_id, content_type) DO UPDATE SET x = excluded.x, y = excluded.y
+        """,
+        (universe_id, content_type, float(x), float(y)),
     )
+    conn.commit()
+    conn.close()
+    if content_type == "links":
+        import json
+        set_setting(
+            uncategorized_browse_setting_key(universe_id),
+            json.dumps({"x": float(x), "y": float(y)}),
+        )
     return float(x), float(y)
 
 

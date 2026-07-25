@@ -8,7 +8,7 @@ import TablesPanel, { TableEditorView } from './TablesPanel'
 import AgentTasksPanel from './AgentTasksPanel'
 import PythonTasksPanel from './PythonTasksPanel'
 import ScriptsPanel, { ScriptEditorView } from './ScriptsPanel'
-import CategoryTree, { EmojiPopover } from './CategoryTree'
+import CategoryTree from './CategoryTree'
 import ChatBackground from './ChatBackground'
 import Dashboard from './Dashboard'
 import SlackManifestGenerator from './SlackManifestGenerator'
@@ -16,6 +16,17 @@ import GlobalSearch, { GlobalSearchTrigger } from './GlobalSearch'
 import { DEFAULT_AGENT_TASK_MESSAGE_TEMPLATE } from './agentTaskDefaults'
 
 const DASHBOARD_TAB = { id: 'dashboard', type: 'dashboard', title: 'Dashboard', closable: false }
+
+const BROWSER_TABS = {
+  markdowns: { id: 'browser-markdowns', type: 'browser-markdowns', title: 'Markdowns' },
+  archive: { id: 'browser-archive', type: 'browser-archive', title: 'Documents' },
+  diagrams: { id: 'browser-diagrams', type: 'browser-diagrams', title: 'Diagrams' },
+  tables: { id: 'browser-tables', type: 'browser-tables', title: 'Tables' },
+  scripts: { id: 'browser-scripts', type: 'browser-scripts', title: 'Scripts' },
+  categories: { id: 'browser-categories', type: 'browser-categories', title: 'Categories' },
+}
+
+const BROWSER_TAB_TYPES = new Set(Object.values(BROWSER_TABS).map((t) => t.type))
 
 const _originalFetch = window.fetch
 window.fetch = function(url, opts = {}) {
@@ -1634,18 +1645,9 @@ function App() {
   const [stats, setStats] = useState(null)
   const [universes, setUniverses] = useState([])
   const [currentUniverseId, setCurrentUniverseId] = useState(null)
-  const [sidebarTab, setSidebarTab] = useState('markdowns')
-  const [sidebarLoading, setSidebarLoading] = useState(false)
-  useEffect(() => { if (sidebarTab !== 'categories') setSidebarLoading(true) }, [sidebarTab])
   const [categories, setCategories] = useState([])
-  const [selectedCategoryId, setSelectedCategoryId] = useState(null) // kept for CategoryTree (unused for filtering)
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
-    const match = document.cookie.match(/(?:^|;\s*)sidebarWidth=(\d+)/)
-    return match ? Number(match[1]) : 320
-  })
   const [pinnedItems, setPinnedItems] = useState({ markdowns: [], documents: [], links: [] })
   const [quickView, setQuickView] = useState(null)
-  const [editMarkdownRequest, setEditMarkdownRequest] = useState(null)
   const [markdownRefreshKey, setMarkdownRefreshKey] = useState(0)
   const [diagramRefreshKey, setDiagramRefreshKey] = useState(0)
   const [tableRefreshKey, setTableRefreshKey] = useState(0)
@@ -1656,7 +1658,6 @@ function App() {
   const [tabs, setTabs] = useState([DASHBOARD_TAB])
   const [activeTabId, setActiveTabId] = useState('dashboard')
   const [markdownViewMode, setMarkdownViewMode] = useState('edit')
-  const resizing = useRef(false)
   const tabsBarRef = useRef(null)
   const [tabsOverflow, setTabsOverflow] = useState({ left: false, right: false })
 
@@ -1718,6 +1719,16 @@ function App() {
 
   const switchToTab = useCallback((tabId) => {
     setActiveTabId(tabId)
+  }, [])
+
+  const openBrowserTab = useCallback((kind) => {
+    const spec = BROWSER_TABS[kind]
+    if (!spec) return
+    setTabs((prev) => {
+      if (prev.find((t) => t.id === spec.id)) return prev
+      return [...prev, { ...spec, closable: true }]
+    })
+    setActiveTabId(spec.id)
   }, [])
 
   const openLinksCanvasTab = useCallback(() => {
@@ -1783,15 +1794,22 @@ function App() {
     setActiveTabId(tabId)
   }, [])
 
-  const openTableTab = useCallback((table) => {
-    const key = table._new ? 'new' : table.id
+  const openTableTab = useCallback(async (table) => {
+    let t = table
+    if (!t._new && t.id && (t.columns == null || t.title == null)) {
+      try {
+        const res = await fetch(`/api/tables/${t.id}`)
+        if (res.ok) t = await res.json()
+      } catch { /* use summary */ }
+    }
+    const key = t._new ? 'new' : t.id
     const tabId = `table-${key}`
     setTabs(prev => {
-      const existing = prev.find(t => t.id === tabId)
+      const existing = prev.find(x => x.id === tabId)
       if (existing) {
-        return prev.map(t => t.id === tabId ? { ...t, data: table, title: table.title || 'Untitled Table' } : t)
+        return prev.map(x => x.id === tabId ? { ...x, data: t, title: t.title || 'Untitled Table' } : x)
       }
-      return [...prev, { id: tabId, type: 'table', title: table.title || 'Untitled Table', closable: true, data: table }]
+      return [...prev, { id: tabId, type: 'table', title: t.title || 'Untitled Table', closable: true, data: t }]
     })
     setActiveTabId(tabId)
   }, [])
@@ -1813,7 +1831,6 @@ function App() {
     const { content_type, item_id, document_path, url, universe_id: resultUid } = result
     switch (content_type) {
       case 'markdown': {
-        setSidebarTab('markdowns')
         try {
           const res = await fetch(`/api/markdowns/${item_id}`)
           if (res.ok) openMarkdownTab(await res.json())
@@ -1821,7 +1838,6 @@ function App() {
         break
       }
       case 'script': {
-        setSidebarTab('scripts')
         try {
           const res = await fetch(`/api/scripts/${item_id}`)
           if (res.ok) openScriptTab(await res.json())
@@ -1829,12 +1845,10 @@ function App() {
         break
       }
       case 'diagram': {
-        setSidebarTab('diagrams')
         openDiagramTab({ id: item_id })
         break
       }
       case 'table': {
-        setSidebarTab('tables')
         openTableTab({ id: item_id })
         break
       }
@@ -1847,7 +1861,7 @@ function App() {
         break
       }
       case 'document': {
-        setSidebarTab('archive')
+        openBrowserTab('archive')
         try {
           const params = resultUid ? `?universe_id=${resultUid}` : ''
           const res = await fetch(`/api/documents${params}`)
@@ -1863,7 +1877,7 @@ function App() {
       default:
         break
     }
-  }, [openDiagramTab, openLinksCanvasTab, openMarkdownTab, openScriptTab, openTableTab])
+  }, [openBrowserTab, openDiagramTab, openLinksCanvasTab, openMarkdownTab, openScriptTab, openTableTab])
 
   const clearLinkDeepLinkParams = useCallback(() => {
     const params = new URLSearchParams(window.location.search)
@@ -2017,7 +2031,6 @@ function App() {
     } else if (action === 'delete') {
       if (!confirm(`Delete category "${payload.name}" and all its sub-categories?`)) return
       await fetch(`/api/categories/${payload.id}`, { method: 'DELETE' })
-      if (selectedCategoryId === payload.id) setSelectedCategoryId(null)
     } else if (action === 'move') {
       await fetch(`/api/categories/${payload.id}/move?direction=${payload.direction}`, { method: 'PUT' })
     } else if (action === 'move-to-root') {
@@ -2038,29 +2051,6 @@ function App() {
     fetchCategories()
     fetchPinned()
   }, [currentUniverseId, fetchCategories, fetchPinned])
-
-  const startResize = (e) => {
-    e.preventDefault()
-    resizing.current = true
-    document.body.style.cursor = 'col-resize'
-    document.body.style.userSelect = 'none'
-    const onMove = (ev) => {
-      if (!resizing.current) return
-      const newWidth = Math.max(240, Math.min(ev.clientX, window.innerWidth * 0.85))
-      setSidebarWidth(newWidth)
-    }
-    const onUp = (ev) => {
-      resizing.current = false
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-      const finalWidth = Math.max(240, Math.min(ev.clientX, window.innerWidth * 0.85))
-      document.cookie = `sidebarWidth=${Math.round(finalWidth)};path=/;max-age=31536000`
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-  }
 
   const [showSettings, setShowSettings] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
@@ -2212,7 +2202,7 @@ function App() {
         {(pinnedItems.markdowns.length > 0 || pinnedItems.documents.length > 0 || pinnedItems.links?.length > 0 || pinnedItems.diagrams?.length > 0 || pinnedItems.tables?.length > 0 || pinnedItems.scripts?.length > 0) && (
           <div className="pinned-bar">
             {pinnedItems.markdowns.map((n) => (
-              <button key={`n-${n.id}`} className="pinned-chip pinned-markdown" onClick={() => { setSidebarTab('markdowns'); setEditMarkdownRequest(n); }} title={n.title || 'Untitled'}>
+              <button key={`n-${n.id}`} className="pinned-chip pinned-markdown" onClick={() => openMarkdownTab(n)} title={n.title || 'Untitled'}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                   <polyline points="14 2 14 8 20 8" />
@@ -2239,7 +2229,7 @@ function App() {
               </button>
             ))}
             {(pinnedItems.diagrams || []).map((d) => (
-              <button key={`dg-${d.id}`} className="pinned-chip pinned-diagram" onClick={() => { setSidebarTab('diagrams'); openDiagramTab(d) }} title={d.title || 'Untitled Diagram'}>
+              <button key={`dg-${d.id}`} className="pinned-chip pinned-diagram" onClick={() => openDiagramTab(d)} title={d.title || 'Untitled Diagram'}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
                 </svg>
@@ -2247,7 +2237,7 @@ function App() {
               </button>
             ))}
             {(pinnedItems.tables || []).map((t) => (
-              <button key={`tb-${t.id}`} className="pinned-chip pinned-diagram" onClick={() => { setSidebarTab('tables'); openTableTab(t) }} title={t.title || 'Untitled Table'}>
+              <button key={`tb-${t.id}`} className="pinned-chip pinned-diagram" onClick={() => openTableTab(t)} title={t.title || 'Untitled Table'}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/>
                 </svg>
@@ -2255,7 +2245,7 @@ function App() {
               </button>
             ))}
             {(pinnedItems.scripts || []).map((s) => (
-              <button key={`sc-${s.id}`} className="pinned-chip pinned-diagram" onClick={() => { setSidebarTab('scripts'); openScriptTab(s) }} title={s.title || 'Untitled Script'}>
+              <button key={`sc-${s.id}`} className="pinned-chip pinned-diagram" onClick={() => openScriptTab(s)} title={s.title || 'Untitled Script'}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
                 </svg>
@@ -2308,166 +2298,110 @@ function App() {
       </header>
 
       <div className="app-body">
-        <ChatBackground hideLogo={activeTab?.type === 'links-canvas'} />
-        <div className="sidebar" style={{ width: sidebarWidth, minWidth: sidebarWidth }}>
-          <div className="sidebar-rail">
-            <button className={`rail-tab ${sidebarTab === 'markdowns' ? 'active' : ''}`} onClick={() => setSidebarTab('markdowns')} title="Markdowns">
+        <ChatBackground
+          hideLogo={
+            activeTab?.type === 'links-canvas'
+            || (BROWSER_TAB_TYPES.has(activeTab?.type) && activeTab?.type !== 'browser-categories')
+          }
+        />
+        <div className="icon-rail">
+          <button
+            className={`rail-tab ${activeTab?.type === 'browser-markdowns' || activeTab?.type === 'markdown' ? 'active' : ''}`}
+            onClick={() => openBrowserTab('markdowns')}
+            title="Markdowns"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+              <polyline points="10 9 9 9 8 9" />
+            </svg>
+          </button>
+          <button
+            className={`rail-tab ${activeTab?.type === 'browser-archive' ? 'active' : ''}`}
+            onClick={() => openBrowserTab('archive')}
+            title="Documents"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="21 8 21 21 3 21 3 8" />
+              <rect x="1" y="3" width="22" height="5" />
+              <line x1="10" y1="12" x2="14" y2="12" />
+            </svg>
+          </button>
+          <button
+            className={`rail-tab ${activeTab?.type === 'links-canvas' ? 'active' : ''}`}
+            onClick={openLinksCanvasTab}
+            title="Links"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+            </svg>
+          </button>
+          <button
+            className={`rail-tab ${activeTab?.type === 'browser-diagrams' || activeTab?.type === 'diagram' ? 'active' : ''}`}
+            onClick={() => openBrowserTab('diagrams')}
+            title="Diagrams"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+            </svg>
+          </button>
+          <button
+            className={`rail-tab ${activeTab?.type === 'browser-tables' || activeTab?.type === 'table' ? 'active' : ''}`}
+            onClick={() => openBrowserTab('tables')}
+            title="Tables"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/>
+            </svg>
+          </button>
+          <button
+            className={`rail-tab ${activeTab?.type === 'browser-scripts' || activeTab?.type === 'script' ? 'active' : ''}`}
+            onClick={() => openBrowserTab('scripts')}
+            title="Scripts"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
+            </svg>
+          </button>
+          <div className="rail-sep" />
+          <button
+            className={`rail-tab ${activeTab?.type === 'browser-categories' ? 'active' : ''}`}
+            onClick={() => openBrowserTab('categories')}
+            title="Categories"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            </svg>
+          </button>
+          <div style={{ flex: 1 }} />
+          {updateAvailable && (
+            <button className="rail-tab rail-tab-update" onClick={() => setShowUpdateModal(true)} title="Update available">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-                <polyline points="10 9 9 9 8 9" />
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
               </svg>
             </button>
-            <button className={`rail-tab ${sidebarTab === 'archive' ? 'active' : ''}`} onClick={() => setSidebarTab('archive')} title="Documents">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="21 8 21 21 3 21 3 8" />
-                <rect x="1" y="3" width="22" height="5" />
-                <line x1="10" y1="12" x2="14" y2="12" />
-              </svg>
-            </button>
-            <button
-              className={`rail-tab ${activeTab?.type === 'links-canvas' ? 'active' : ''}`}
-              onClick={openLinksCanvasTab}
-              title="Links"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-              </svg>
-            </button>
-            <button className={`rail-tab ${sidebarTab === 'diagrams' ? 'active' : ''}`} onClick={() => setSidebarTab('diagrams')} title="Diagrams">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="7" height="7" />
-                <rect x="14" y="3" width="7" height="7" />
-                <rect x="14" y="14" width="7" height="7" />
-                <rect x="3" y="14" width="7" height="7" />
-              </svg>
-            </button>
-            <button className={`rail-tab ${sidebarTab === 'tables' ? 'active' : ''}`} onClick={() => setSidebarTab('tables')} title="Tables">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/>
-              </svg>
-            </button>
-            <button className={`rail-tab ${sidebarTab === 'scripts' ? 'active' : ''}`} onClick={() => setSidebarTab('scripts')} title="Scripts">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
-              </svg>
-            </button>
-            <div className="rail-sep" />
-            <button className={`rail-tab ${sidebarTab === 'categories' ? 'active' : ''}`} onClick={() => setSidebarTab('categories')} title="Categories">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-              </svg>
-            </button>
-            <div style={{ flex: 1 }} />
-            {updateAvailable && (
-              <button className="rail-tab rail-tab-update" onClick={() => setShowUpdateModal(true)} title="Update available">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-              </button>
-            )}
-            <button className="rail-tab rail-tab-help" onClick={() => setShowHelp(true)} title="Help">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                <line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
-            </button>
-            <button className="rail-tab rail-tab-settings" onClick={() => setShowSettings(true)} title="Settings">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-            </button>
-          </div>
-          <div className="sidebar-content">
-          {sidebarLoading && (
-            <div className="sidebar-spinner-overlay">
-              <div className="sidebar-spinner" />
-            </div>
           )}
-          {sidebarTab === 'categories' && (
-            <div className="categories-panel">
-              <div className="markdowns-header">
-                <span className="markdowns-header-title">Categories</span>
-              </div>
-              <CategoryTree
-                categories={categories}
-                selectedId={null}
-                onSelect={() => {}}
-                onAdd={(parentId, name) => handleCategoryAction('add', { parentId, name })}
-                onRename={(id, name) => handleCategoryAction('rename', { id, name })}
-                onDelete={(id, name) => handleCategoryAction('delete', { id, name })}
-                onUpdateEmoji={(id, emoji) => handleCategoryAction('emoji', { id, emoji })}
-                onMoveCategory={(id, direction) => handleCategoryAction('move', { id, direction })}
-                onMoveToRoot={(id) => handleCategoryAction('move-to-root', { id })}
-              />
-            </div>
-          )}
-          {sidebarTab === 'markdowns' && (
-            <MarkdownsPanel
-              categories={categories}
-              onPinChange={fetchPinned}
-              editMarkdownRequest={editMarkdownRequest}
-              onEditMarkdownRequestHandled={() => setEditMarkdownRequest(null)}
-              universeId={currentUniverseId}
-              universes={universes}
-              onEditMarkdown={(m) => openMarkdownTab(m._new ? { ...m, _key: 'new' } : m)}
-              refreshKey={markdownRefreshKey}
-              onLoaded={() => setSidebarLoading(false)}
-            />
-          )}
-          {sidebarTab === 'archive' && (
-            <ArchivePanel
-              categories={categories}
-              onPinChange={fetchPinned}
-              universeId={currentUniverseId}
-              universes={universes}
-              onLoaded={() => setSidebarLoading(false)}
-            />
-          )}
-          {sidebarTab === 'diagrams' && (
-            <DiagramsPanel
-              categories={categories}
-              universeId={currentUniverseId}
-              universes={universes}
-              onPinChange={fetchPinned}
-              onEditDiagram={(d) => openDiagramTab(d._new ? { ...d, _key: 'new' } : d)}
-              refreshKey={diagramRefreshKey}
-              onLoaded={() => setSidebarLoading(false)}
-            />
-          )}
-          {sidebarTab === 'tables' && (
-            <TablesPanel
-              categories={categories}
-              universeId={currentUniverseId}
-              universes={universes}
-              onPinChange={fetchPinned}
-              onEditTable={(t) => openTableTab(t._new ? { ...t, _key: 'new' } : t)}
-              refreshKey={tableRefreshKey}
-              onLoaded={() => setSidebarLoading(false)}
-            />
-          )}
-          {sidebarTab === 'scripts' && (
-            <ScriptsPanel
-              categories={categories}
-              universeId={currentUniverseId}
-              universes={universes}
-              onPinChange={fetchPinned}
-              onEditScript={(s) => openScriptTab(s._new ? { ...s, _key: s._key || 'new' } : s)}
-              refreshKey={scriptRefreshKey}
-              onLoaded={() => setSidebarLoading(false)}
-            />
-          )}
-          </div>
-        </div>
-        <div className="sidebar-resize-handle">
-          <div className="resize-drag-area" onMouseDown={startResize} />
+          <button className="rail-tab rail-tab-help" onClick={() => setShowHelp(true)} title="Help">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+          </button>
+          <button className="rail-tab rail-tab-settings" onClick={() => setShowSettings(true)} title="Settings">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+          </button>
         </div>
 
         <div className="main-panel">
@@ -2515,6 +2449,80 @@ function App() {
           </div>
 
           <div className="chat-container">
+          {tabs.filter(t => BROWSER_TAB_TYPES.has(t.type)).map(tab => (
+            <div
+              key={tab.id}
+              className={`workspace-browser-panel ${tab.id !== activeTabId ? 'workspace-browser-panel-hidden' : ''}`}
+              aria-hidden={tab.id !== activeTabId}
+            >
+              {tab.type === 'browser-markdowns' && (
+                <MarkdownsPanel
+                  categories={categories}
+                  onPinChange={fetchPinned}
+                  universeId={currentUniverseId}
+                  universes={universes}
+                  onEditMarkdown={(m) => openMarkdownTab(m._new ? { ...m, _key: 'new' } : m)}
+                  refreshKey={markdownRefreshKey}
+                />
+              )}
+              {tab.type === 'browser-archive' && (
+                <ArchivePanel
+                  categories={categories}
+                  onPinChange={fetchPinned}
+                  universeId={currentUniverseId}
+                  universes={universes}
+                />
+              )}
+              {tab.type === 'browser-diagrams' && (
+                <DiagramsPanel
+                  categories={categories}
+                  universeId={currentUniverseId}
+                  universes={universes}
+                  onPinChange={fetchPinned}
+                  onEditDiagram={(d) => openDiagramTab(d._new ? { ...d, _key: 'new' } : d)}
+                  refreshKey={diagramRefreshKey}
+                />
+              )}
+              {tab.type === 'browser-tables' && (
+                <TablesPanel
+                  categories={categories}
+                  universeId={currentUniverseId}
+                  universes={universes}
+                  onPinChange={fetchPinned}
+                  onEditTable={(t) => openTableTab(t._new ? { ...t, _key: 'new' } : t)}
+                  refreshKey={tableRefreshKey}
+                />
+              )}
+              {tab.type === 'browser-scripts' && (
+                <ScriptsPanel
+                  categories={categories}
+                  universeId={currentUniverseId}
+                  universes={universes}
+                  onPinChange={fetchPinned}
+                  onEditScript={(s) => openScriptTab(s._new ? { ...s, _key: s._key || 'new' } : s)}
+                  refreshKey={scriptRefreshKey}
+                />
+              )}
+              {tab.type === 'browser-categories' && (
+                <div className="markdowns-panel workspace-browser-inner categories-panel">
+                  <div className="markdowns-header">
+                    <span className="markdowns-header-title">Categories</span>
+                  </div>
+                  <CategoryTree
+                    categories={categories}
+                    selectedId={null}
+                    onSelect={() => {}}
+                    onAdd={(parentId, name) => handleCategoryAction('add', { parentId, name })}
+                    onRename={(id, name) => handleCategoryAction('rename', { id, name })}
+                    onDelete={(id, name) => handleCategoryAction('delete', { id, name })}
+                    onUpdateEmoji={(id, emoji) => handleCategoryAction('emoji', { id, emoji })}
+                    onMoveCategory={(id, direction) => handleCategoryAction('move', { id, direction })}
+                    onMoveToRoot={(id) => handleCategoryAction('move-to-root', { id })}
+                  />
+                </div>
+              )}
+            </div>
+          ))}
           {tabs.filter(t => t.type === 'markdown' && t.data).map(tab => (
             <div
               key={tab.id}

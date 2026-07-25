@@ -81,8 +81,10 @@ from src.markdowns import (
     get_document_pinned,
     set_category_pinned,
     set_category_browse_position,
+    list_category_browse_positions,
     get_uncategorized_browse_position,
     set_uncategorized_browse_position,
+    normalize_browse_content_type,
     get_link,
     get_markdown,
     get_universe,
@@ -490,27 +492,62 @@ def api_move_category_to_root(cat_id: int):
 
 
 @app.put("/api/categories/{cat_id}/browse-position", response_model=CategoryResponse)
-def api_set_category_browse_position(cat_id: int, req: BrowsePositionRequest):
-    cat = set_category_browse_position(cat_id, req.x, req.y)
+def api_set_category_browse_position(cat_id: int, req: BrowsePositionRequest, content_type: str = "links"):
+    try:
+        content_type = normalize_browse_content_type(content_type)
+        cat = set_category_browse_position(cat_id, req.x, req.y, content_type=content_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found")
     return category_to_dict(cat)
 
 
-@app.get("/api/universes/{uid}/uncategorized-browse-position")
-def api_get_uncategorized_browse_position(uid: int):
+@app.put("/api/categories/{cat_id}/browse-position/{content_type}", response_model=CategoryResponse)
+def api_set_category_browse_position_typed(cat_id: int, content_type: str, req: BrowsePositionRequest):
+    return api_set_category_browse_position(cat_id, req, content_type=content_type)
+
+
+@app.get("/api/universes/{uid}/browse-positions/{content_type}")
+def api_list_universe_browse_positions(uid: int, content_type: str):
     if not get_universe(uid):
         raise HTTPException(status_code=404, detail="Universe not found")
-    x, y = get_uncategorized_browse_position(uid)
-    return {"universe_id": uid, "x": x, "y": y}
+    try:
+        content_type = normalize_browse_content_type(content_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    categories = list_category_browse_positions(uid, content_type)
+    x, y = get_uncategorized_browse_position(uid, content_type=content_type)
+    return {
+        "universe_id": uid,
+        "content_type": content_type,
+        "categories": categories,
+        "uncategorized": {"x": x, "y": y} if x is not None and y is not None else None,
+    }
+
+
+@app.get("/api/universes/{uid}/uncategorized-browse-position")
+def api_get_uncategorized_browse_position(uid: int, content_type: str = "links"):
+    if not get_universe(uid):
+        raise HTTPException(status_code=404, detail="Universe not found")
+    try:
+        content_type = normalize_browse_content_type(content_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    x, y = get_uncategorized_browse_position(uid, content_type=content_type)
+    return {"universe_id": uid, "content_type": content_type, "x": x, "y": y}
 
 
 @app.put("/api/universes/{uid}/uncategorized-browse-position")
-def api_set_uncategorized_browse_position(uid: int, req: BrowsePositionRequest):
+def api_set_uncategorized_browse_position(uid: int, req: BrowsePositionRequest, content_type: str = "links"):
     if not get_universe(uid):
         raise HTTPException(status_code=404, detail="Universe not found")
-    x, y = set_uncategorized_browse_position(uid, req.x, req.y)
-    return {"universe_id": uid, "x": x, "y": y}
+    try:
+        content_type = normalize_browse_content_type(content_type)
+        x, y = set_uncategorized_browse_position(uid, req.x, req.y, content_type=content_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"universe_id": uid, "content_type": content_type, "x": x, "y": y}
 
 
 @app.delete("/api/categories/{cat_id}")

@@ -2,8 +2,9 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Excalidraw } from '@excalidraw/excalidraw'
 import '@excalidraw/excalidraw/index.css'
 import { CategoryPicker } from './CategoryTree'
-import { SidebarCategoryTree } from './SidebarCategoryTree'
 import { MoveToUniverseButton } from './MoveToUniverseButton'
+import ContentCanvasShell from './categoryCanvas/ContentCanvasShell'
+import { ActionIconButton, CanvasItemRow } from './categoryCanvas/CanvasItemRow'
 import { parseDiagramData, EMPTY_DIAGRAM_JSON as EMPTY_DIAGRAM } from './diagramParse'
 
 const EXCALIDRAW_SOURCE = 'https://excalidraw.com'
@@ -286,37 +287,40 @@ export function DiagramEditorView({ diagram, categories, onClose, onSaved }) {
 
 function DiagramsPanel({ categories, onPinChange, universeId, universes, onEditDiagram, refreshKey, onLoaded }) {
   const [diagrams, setDiagrams] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  const fetchDiagrams = () => {
+  const fetchDiagrams = useCallback(() => {
     const params = new URLSearchParams()
     if (universeId) params.set('universe_id', universeId)
+    setLoading(true)
     fetch(`/api/diagrams?${params}`)
       .then(res => res.json())
       .then(data => setDiagrams(data))
-      .catch(() => {})
-      .finally(() => onLoaded?.())
-  }
+      .catch(() => setDiagrams([]))
+      .finally(() => {
+        setLoading(false)
+        onLoaded?.()
+      })
+  }, [onLoaded, universeId])
 
-  useEffect(() => { fetchDiagrams() }, [universeId, refreshKey])
+  useEffect(() => { fetchDiagrams() }, [fetchDiagrams, refreshKey])
 
   const startNew = () => { onEditDiagram?.({ _new: true, universeId }) }
-  const startEdit = (d) => { onEditDiagram?.(d) }
 
-  const remove = async (id) => {
+  const remove = useCallback(async (id) => {
     if (!confirm('Delete this diagram?')) return
     await fetch(`/api/diagrams/${id}`, { method: 'DELETE' })
     fetchDiagrams()
     onPinChange?.()
-  }
+  }, [fetchDiagrams, onPinChange])
 
-  const togglePin = async (e, d) => {
-    e.stopPropagation()
+  const togglePin = useCallback(async (d) => {
     await fetch(`/api/diagrams/${d.id}/pin?pinned=${!d.pinned}`, { method: 'PUT' })
     fetchDiagrams()
     onPinChange?.()
-  }
+  }, [fetchDiagrams, onPinChange])
 
-  const moveToUniverse = async (d, targetUniverseId, categoryId) => {
+  const moveToUniverse = useCallback(async (d, targetUniverseId, categoryId) => {
     const res = await fetch(`/api/diagrams/${d.id}/move-universe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -330,60 +334,69 @@ function DiagramsPanel({ categories, onPinChange, universeId, universes, onEditD
     }
     fetchDiagrams()
     onPinChange?.()
-  }
+  }, [fetchDiagrams, onPinChange])
+
+  const getCategoryId = useCallback((item) => item.category_id ?? null, [])
+  const getItemId = useCallback((item) => item.id, [])
+  const getItemTitle = useCallback((item) => item.title || '', [])
+
+  const renderItem = useCallback(({ node, color, highlighted, dimmed }) => {
+    const d = node.item
+    return (
+      <CanvasItemRow
+        key={node.id}
+        node={node}
+        color={color}
+        highlighted={highlighted}
+        dimmed={dimmed}
+        title={d.title || 'Untitled'}
+        onOpen={() => onEditDiagram?.(d)}
+        actions={(
+          <>
+            <ActionIconButton className={d.pinned ? 'pinned' : ''} title={d.pinned ? 'Unpin' : 'Pin'} onClick={() => togglePin(d)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill={d.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                <path d="M12 17v5" /><path d="M9 2h6l-1 7h4l-5 7H7l2-7H5l1-7z" />
+              </svg>
+            </ActionIconButton>
+            <MoveToUniverseButton
+              universes={universes}
+              currentUniverseId={universeId}
+              itemLabel={d.title || 'Diagram'}
+              onMove={(uid, catId) => moveToUniverse(d, uid, catId)}
+            />
+            <ActionIconButton title="Delete diagram" onClick={() => remove(d.id)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+              </svg>
+            </ActionIconButton>
+          </>
+        )}
+      />
+    )
+  }, [moveToUniverse, onEditDiagram, remove, togglePin, universeId, universes])
 
   return (
-    <aside className="markdowns-panel sidebar-tree-panel">
-      <div className="markdowns-header">
-        <span className="markdowns-header-title">Diagrams</span>
-        <button className="markdowns-add-btn" onClick={startNew} title="New diagram">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+    <ContentCanvasShell
+      contentType="diagrams"
+      universeId={universeId}
+      categories={categories}
+      items={diagrams}
+      loading={loading}
+      getCategoryId={getCategoryId}
+      getItemId={getItemId}
+      getItemTitle={getItemTitle}
+      renderItem={renderItem}
+      emptyTitle="No diagrams yet"
+      emptyBody="Click + to create one."
+      toolbar={(
+        <button type="button" className="browse-add-button" onClick={startNew} title="New diagram">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M12 5v14M5 12h14" />
           </svg>
+          Add diagram
         </button>
-      </div>
-      <div className="markdowns-list">
-        {diagrams.length === 0 ? (
-          <div className="markdowns-empty">
-            No diagrams yet. Click + to create one.
-          </div>
-        ) : (
-          <SidebarCategoryTree
-            universeId={universeId}
-            panelId="diagrams"
-            categories={categories}
-            items={diagrams}
-            showExpandCollapse
-            itemKind="diagrams"
-            getCategoryId={(d) => d.category_id}
-            getTitle={(d) => d.title || ''}
-            renderItem={(d) => (
-              <div key={d.id} className="markdown-card sidebar-tree-file" onClick={() => startEdit(d)}>
-                <div className="markdown-card-header">
-                  <div className="markdown-card-title">{d.title || 'Untitled'}</div>
-                  <button className={`pin-btn ${d.pinned ? 'pinned' : ''}`} onClick={(e) => togglePin(e, d)} title={d.pinned ? 'Unpin' : 'Pin'}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill={d.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 17v5" /><path d="M9 2h6l-1 7h4l-5 7H7l2-7H5l1-7z" />
-                    </svg>
-                  </button>
-                  <MoveToUniverseButton
-                    universes={universes}
-                    currentUniverseId={universeId}
-                    itemLabel={d.title || 'Diagram'}
-                    onMove={(uid, catId) => moveToUniverse(d, uid, catId)}
-                  />
-                  <button className="markdown-card-delete-btn" onClick={(e) => { e.stopPropagation(); remove(d.id) }} title="Delete diagram">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            )}
-          />
-        )}
-      </div>
-    </aside>
+      )}
+    />
   )
 }
 

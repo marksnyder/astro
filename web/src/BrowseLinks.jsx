@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import CyberLinkScene from './CyberLinkScene'
+import CategoryCanvas from './categoryCanvas/CategoryCanvas'
+import { useCanvasPositions } from './categoryCanvas/useCanvasPositions'
+import { renderLinkCategoryActions, renderLinkItem } from './categoryCanvas/LinkCanvasItems'
 import { flattenCategoriesForSelect } from './categorySidebarOrder'
 import './BrowseLinks.css'
 
@@ -20,7 +22,6 @@ export default function LinksCanvasTab({
   categories,
   offeredLink = null,
   onOfferHandled,
-  onCategoriesChange,
 }) {
   const [links, setLinks] = useState([])
   const [showSave, setShowSave] = useState(false)
@@ -31,6 +32,9 @@ export default function LinksCanvasTab({
   const [saveError, setSaveError] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [draggingId, setDraggingId] = useState(null)
+  const [dropTarget, setDropTarget] = useState(null)
+  const { positionMap, uncategorizedPos, persistCategoryPosition } = useCanvasPositions(universeId, 'links')
   const categoryOptions = useMemo(
     () => flattenCategoriesForSelect(categories),
     [categories],
@@ -66,19 +70,6 @@ export default function LinksCanvasTab({
       cancelled = true
     }
   }, [universeId])
-
-  const persistCategoryPosition = useCallback(async (categoryKey, x, y) => {
-    const categoryId = Number(categoryKey)
-    try {
-      const response = await fetch(`/api/categories/${categoryId}/browse-position`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ x, y }),
-      })
-      if (!response.ok) throw new Error()
-      onCategoriesChange?.()
-    } catch { /* Keep the local drag position for this session. */ }
-  }, [onCategoriesChange])
 
   const openSaveModal = useCallback(() => {
     setSaveTitle('')
@@ -135,13 +126,19 @@ export default function LinksCanvasTab({
     }
   }, [links, universeId])
 
-  const handleReorder = useCallback(async (draggedId, targetId, edge) => {
-    if (draggedId == null || draggedId === targetId) return
-    const next = reorderByDrop(links, draggedId, targetId, edge)
+  const handleReorderDrop = useCallback(async (targetId, edge) => {
+    if (draggingId == null || draggingId === targetId) {
+      setDraggingId(null)
+      setDropTarget(null)
+      return
+    }
+    const next = reorderByDrop(links, draggingId, targetId, edge)
     const unchanged = next.length === links.length && next.every((link, index) => link.id === links[index].id)
+    setDraggingId(null)
+    setDropTarget(null)
     if (unchanged) return
     await persistOrder(next)
-  }, [links, persistOrder])
+  }, [draggingId, links, persistOrder])
 
   const dismissOfferedLink = useCallback(() => {
     onOfferHandled?.()
@@ -156,6 +153,24 @@ export default function LinksCanvasTab({
     setShowSave(true)
     onOfferHandled?.()
   }, [offeredLink, onOfferHandled])
+
+  const getCategoryId = useCallback((item) => item.category_id ?? null, [])
+  const getItemId = useCallback((item) => item.id, [])
+  const getItemTitle = useCallback((item) => item.title || '', [])
+  const getItemSearchText = useCallback((item) => `${item.title || ''} ${item.url || ''}`, [])
+
+  const reorderExtra = useMemo(() => ({
+    canReorder: true,
+    draggingId,
+    dropTarget,
+    onReorderStart: (id) => { setDraggingId(id); setDropTarget(null) },
+    onReorderOver: (id, edge) => {
+      if (draggingId == null || draggingId === id) return
+      setDropTarget({ id, edge })
+    },
+    onReorderDrop: handleReorderDrop,
+    onReorderEnd: () => { setDraggingId(null); setDropTarget(null) },
+  }), [draggingId, dropTarget, handleReorderDrop])
 
   return (
     <div className="links-canvas-tab">
@@ -192,15 +207,23 @@ export default function LinksCanvasTab({
         {error && <div className="browse-empty">{error}</div>}
         {!error && loading && <div className="browse-empty">Initializing city grid…</div>}
         {!error && !loading && (
-          <CyberLinkScene
+          <CategoryCanvas
             categories={categories}
-            links={links}
-            query=""
-            canReorder
-            onReorder={handleReorder}
+            items={links}
+            getCategoryId={getCategoryId}
+            getItemId={getItemId}
+            getItemTitle={getItemTitle}
+            getItemSearchText={getItemSearchText}
+            positionMap={positionMap}
+            uncategorizedPos={uncategorizedPos}
+            includeUncategorized
             universeId={universeId}
-            uncategorizedPos={null}
             onMoveCategory={persistCategoryPosition}
+            renderItem={renderLinkItem}
+            renderCategoryActions={renderLinkCategoryActions}
+            emptyTitle="No links yet"
+            emptyBody="Save a link to add it to a category."
+            extra={reorderExtra}
           />
         )}
       </main>

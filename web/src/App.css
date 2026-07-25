@@ -29,6 +29,7 @@
 .chat-container:has(> .diagram-editor-view),
 .chat-container:has(> .workspace-markdown-panel),
 .chat-container:has(> .workspace-links-canvas-panel),
+.chat-container:has(> .workspace-browser-panel),
 .chat-container:has(> .dashboard-panel) {
   max-width: none;
 }
@@ -2227,88 +2228,9 @@
   cursor: not-allowed;
 }
 
-/* ── Sidebar ───────────────────────────────────────── */
+/* ── Icon rail (content browsers live in workspace tabs) ─ */
 
-.sidebar {
-  width: 320px;
-  min-width: 240px;
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: row;
-  background: var(--bg-secondary);
-  flex-shrink: 0;
-  position: relative;
-  z-index: 3;
-}
-
-.sidebar-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  position: relative;
-}
-
-.sidebar-spinner-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(24, 24, 27, .65);
-  backdrop-filter: blur(2px);
-}
-
-.sidebar-spinner {
-  width: 28px;
-  height: 28px;
-  border: 3px solid rgba(255, 255, 255, .15);
-  border-top-color: #3794ff;
-  border-radius: 50%;
-  animation: sidebar-spin .7s linear infinite;
-}
-
-@keyframes sidebar-spin {
-  to { transform: rotate(360deg); }
-}
-
-.sidebar-resize-handle {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex-shrink: 0;
-  position: relative;
-  width: 16px;
-  z-index: 3;
-}
-
-.resize-drag-area {
-  flex: 1;
-  width: 100%;
-  cursor: col-resize;
-  position: relative;
-}
-
-.resize-drag-area::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 6px;
-  width: 3px;
-  border-radius: 2px;
-  background: transparent;
-  transition: background 0.15s;
-}
-
-.resize-drag-area:hover::after {
-  background: var(--accent);
-}
-
-
-.sidebar-rail {
+.icon-rail {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2318,9 +2240,61 @@
   background: var(--bg-primary);
   flex-shrink: 0;
   overflow-y: auto;
+  position: relative;
+  z-index: 3;
 }
 
-.sidebar-rail::-webkit-scrollbar { width: 0; }
+.icon-rail::-webkit-scrollbar { width: 0; }
+
+.workspace-browser-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  width: 100%;
+  background: transparent;
+}
+
+.workspace-browser-panel-hidden {
+  display: none !important;
+}
+
+/* Full-bleed typed content canvases (markdowns/docs/diagrams/tables/scripts) */
+.workspace-browser-panel > .links-canvas-tab,
+.workspace-browser-panel > .content-canvas-tab {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+/* Categories admin remains a constrained hierarchy CRUD panel */
+.workspace-browser-panel > .markdowns-panel.categories-panel,
+.workspace-browser-panel > .workspace-browser-inner.categories-panel {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  background: rgba(24, 24, 27, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.workspace-browser-panel .categories-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.workspace-browser-panel .categories-panel .markdowns-header {
+  padding: 16px 20px;
+}
+
+.workspace-browser-panel .categories-panel .category-tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 20px 24px;
+}
 
 .rail-sep {
   width: 20px;
