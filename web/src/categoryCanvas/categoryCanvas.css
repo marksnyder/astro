@@ -406,6 +406,45 @@
   pointer-events: none;
 }
 
+.city-district-items {
+  position: absolute;
+  left: 0;
+  right: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  pointer-events: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--district-accent) 58%, transparent) transparent;
+}
+
+.city-district-items:not(.has-overflow) {
+  overflow-y: hidden;
+}
+
+.city-district-items::-webkit-scrollbar {
+  width: 5px;
+}
+
+.city-district-items::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.city-district-items::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--district-accent) 58%, transparent);
+}
+
+.city-district-items::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--district-accent) 82%, transparent);
+}
+
+.city-district-items-inner {
+  position: relative;
+  width: 100%;
+  min-height: 100%;
+}
+
 .city-district-landmark {
   position: relative;
   z-index: 4;

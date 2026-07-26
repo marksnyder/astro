@@ -107,18 +107,33 @@ function CategorySection({
         {renderCategoryActions?.(category, extra)}
       </div>
 
-      {category.itemNodes.map((node) => {
-        const highlighted = matchIds ? matchIds.has(node.id) : false
-        const dimmed = matchIds ? !highlighted : false
-        return renderItem({
-          node,
-          category,
-          highlighted,
-          dimmed,
-          color: category.color,
-          extra,
-        })
-      })}
+      {category.itemNodes.length > 0 && (
+        <div
+          className={`city-district-items ${category.hasItemOverflow ? 'has-overflow' : ''}`}
+          style={{
+            top: category.itemsTop,
+            height: category.itemViewportHeight,
+          }}
+        >
+          <div
+            className="city-district-items-inner"
+            style={{ height: category.itemContentHeight }}
+          >
+            {category.itemNodes.map((node) => {
+              const highlighted = matchIds ? matchIds.has(node.id) : false
+              const dimmed = matchIds ? !highlighted : false
+              return renderItem({
+                node: { ...node, y: node.y - category.itemsTop },
+                category,
+                highlighted,
+                dimmed,
+                color: category.color,
+                extra,
+              })
+            })}
+          </div>
+        </div>
+      )}
 
       {category.children.map((child) => {
         const childExpanded = expandedCategoryIds.has(child.id)
@@ -335,6 +350,7 @@ export default function CategoryCanvas({
     const node = viewportRef.current
     if (!node) return undefined
     const onWheel = (event) => {
+      if (event.target.closest('.city-district-items')) return
       event.preventDefault()
       const rect = node.getBoundingClientRect()
       const mx = event.clientX - rect.left

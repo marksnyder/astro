@@ -17,6 +17,7 @@ export const CATEGORY_GAP_Y = 96
 export const ITEM_CARD_W = 280
 export const ITEM_CARD_H = 42
 export const ITEM_SLOT_H = 42
+export const MAX_VISIBLE_ITEMS = 10
 export const ITEM_PAD_X = 20
 export const ITEM_PAD_Y = 8
 export const LANDMARK_H = 46
@@ -62,7 +63,7 @@ export function buildItemNodes(items, getItemId) {
   return {
     itemNodes,
     itemAreaW: ITEM_PAD_X * 2 + ITEM_CARD_W,
-    itemAreaH: ITEM_PAD_Y + n * ITEM_SLOT_H + CONTENT_BOTTOM,
+    itemAreaH: ITEM_PAD_Y + Math.min(n, MAX_VISIBLE_ITEMS) * ITEM_SLOT_H + CONTENT_BOTTOM,
   }
 }
 
@@ -144,8 +145,9 @@ export function buildCategoryLayout({
     const childLayouts = childCategories.map((child) => layoutCategoryNode(child.id, depth + 1))
     const { itemNodes, itemAreaW } = buildItemNodes(ownItems, getItemId)
     const width = Math.max(MIN_CATEGORY_W, itemAreaW)
+    const visibleItemCount = Math.min(ownItems.length, MAX_VISIBLE_ITEMS)
     const itemBottom = ownItems.length
-      ? LANDMARK_H + ITEM_PAD_Y + ownItems.length * ITEM_SLOT_H
+      ? LANDMARK_H + ITEM_PAD_Y + visibleItemCount * ITEM_SLOT_H
       : LANDMARK_H
     const triggerStart = itemBottom + ITEM_PAD_Y
     const children = childLayouts.map((child, index) => ({
@@ -175,6 +177,10 @@ export function buildCategoryLayout({
       width,
       height,
       itemNodes,
+      itemsTop: LANDMARK_H + ITEM_PAD_Y,
+      itemViewportHeight: visibleItemCount * ITEM_SLOT_H,
+      itemContentHeight: ownItems.length * ITEM_SLOT_H,
+      hasItemOverflow: ownItems.length > MAX_VISIBLE_ITEMS,
       // Back-compat alias used by Links open-all helpers.
       linkNodes: itemNodes.map((node) => ({
         ...node,
