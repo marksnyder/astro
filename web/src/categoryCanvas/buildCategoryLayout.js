@@ -26,6 +26,23 @@ export const FLYOUT_GAP = 48
 export const CONTENT_BOTTOM = 16
 export const MIN_CATEGORY_W = 280
 export const MIN_CATEGORY_H = 120
+/** Approx. characters per title line (accounts for action buttons shrinking the text area). */
+export const TITLE_CHARS_PER_LINE = 18
+export const TITLE_LINE_H = 14
+export const META_LINE_H = 12
+export const ITEM_CARD_PAD_Y = 14
+export const MAX_TITLE_LINES = 8
+
+/** Row height so wrapped titles stay fully visible (meta/subtitle still fits). */
+export function estimateItemCardHeight(title) {
+  const titleText = String(title || 'Untitled').trim() || 'Untitled'
+  const titleLines = Math.min(
+    MAX_TITLE_LINES,
+    Math.max(1, Math.ceil(titleText.length / TITLE_CHARS_PER_LINE)),
+  )
+  if (titleLines <= 1) return ITEM_CARD_H
+  return ITEM_CARD_PAD_Y + titleLines * TITLE_LINE_H + META_LINE_H
+}
 
 function applyAbsolutePositions(node, absX, absY) {
   node.absX = absX
@@ -46,24 +63,43 @@ export function findCategoryInTree(nodes, id) {
   return null
 }
 
-export function buildItemNodes(items, getItemId) {
+export function buildItemNodes(items, getItemId, getItemTitle) {
   const n = items.length
   if (n === 0) {
-    return { itemNodes: [], itemAreaW: 0, itemAreaH: 0 }
+    return {
+      itemNodes: [],
+      itemAreaW: 0,
+      itemAreaH: 0,
+      visibleItemHeight: 0,
+      itemContentHeight: 0,
+    }
   }
 
-  const itemNodes = items.map((item, index) => ({
-    item,
-    id: getItemId(item),
-    x: ITEM_PAD_X,
-    y: LANDMARK_H + ITEM_PAD_Y + index * ITEM_SLOT_H,
-    height: ITEM_CARD_H,
-  }))
+  let y = LANDMARK_H + ITEM_PAD_Y
+  const itemNodes = items.map((item) => {
+    const height = estimateItemCardHeight(getItemTitle?.(item))
+    const node = {
+      item,
+      id: getItemId(item),
+      x: ITEM_PAD_X,
+      y,
+      height,
+    }
+    y += height
+    return node
+  })
+
+  const visibleItemHeight = itemNodes
+    .slice(0, Math.min(n, MAX_VISIBLE_ITEMS))
+    .reduce((sum, node) => sum + node.height, 0)
+  const itemContentHeight = itemNodes.reduce((sum, node) => sum + node.height, 0)
 
   return {
     itemNodes,
     itemAreaW: ITEM_PAD_X * 2 + ITEM_CARD_W,
-    itemAreaH: ITEM_PAD_Y + Math.min(n, MAX_VISIBLE_ITEMS) * ITEM_SLOT_H + CONTENT_BOTTOM,
+    itemAreaH: ITEM_PAD_Y + visibleItemHeight + CONTENT_BOTTOM,
+    visibleItemHeight,
+    itemContentHeight,
   }
 }
 
@@ -74,6 +110,7 @@ export function buildItemNodes(items, getItemId) {
  * @param {Array} options.items
  * @param {(item) => number|null} options.getCategoryId
  * @param {(item) => string|number} options.getItemId
+ * @param {(item) => string} [options.getItemTitle]
  * @param {Record<string,{x:number,y:number}>} [options.positionOverrides]
  * @param {Record<string,{x:number,y:number}>} [options.positionMap] saved root positions by category id
  * @param {{x:number,y:number}|null} [options.uncategorizedPos]
@@ -85,6 +122,7 @@ export function buildCategoryLayout({
   items,
   getCategoryId,
   getItemId,
+  getItemTitle,
   positionOverrides = {},
   positionMap = {},
   uncategorizedPos = null,
@@ -143,11 +181,15 @@ export function buildCategoryLayout({
       : (childrenByParent.get(key) || []).filter((child) => computeSubtreeCount(child.id) > 0)
 
     const childLayouts = childCategories.map((child) => layoutCategoryNode(child.id, depth + 1))
-    const { itemNodes, itemAreaW } = buildItemNodes(ownItems, getItemId)
+    const {
+      itemNodes,
+      itemAreaW,
+      visibleItemHeight,
+      itemContentHeight,
+    } = buildItemNodes(ownItems, getItemId, getItemTitle)
     const width = Math.max(MIN_CATEGORY_W, itemAreaW)
-    const visibleItemCount = Math.min(ownItems.length, MAX_VISIBLE_ITEMS)
     const itemBottom = ownItems.length
-      ? LANDMARK_H + ITEM_PAD_Y + visibleItemCount * ITEM_SLOT_H
+      ? LANDMARK_H + ITEM_PAD_Y + visibleItemHeight
       : LANDMARK_H
     const triggerStart = itemBottom + ITEM_PAD_Y
     const children = childLayouts.map((child, index) => ({
@@ -178,8 +220,8 @@ export function buildCategoryLayout({
       height,
       itemNodes,
       itemsTop: LANDMARK_H + ITEM_PAD_Y,
-      itemViewportHeight: visibleItemCount * ITEM_SLOT_H,
-      itemContentHeight: ownItems.length * ITEM_SLOT_H,
+      itemViewportHeight: visibleItemHeight,
+      itemContentHeight,
       hasItemOverflow: ownItems.length > MAX_VISIBLE_ITEMS,
       // Back-compat alias used by Links open-all helpers.
       linkNodes: itemNodes.map((node) => ({

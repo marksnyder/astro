@@ -1022,8 +1022,20 @@ function MobileCategories({ categories, universeId, onRefresh }) {
       await fetch(`/api/categories/${payload.id}/move?direction=${payload.direction}`, { method: 'PUT' })
     } else if (action === 'move-to-root') {
       await fetch(`/api/categories/${payload.id}/move-to-root`, { method: 'PUT' })
+    } else if (action === 'move-to-parent') {
+      const response = await fetch(`/api/categories/${payload.id}/move-to-parent`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parent_id: payload.parentId }),
+      })
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        window.alert(error.detail || 'Could not move category')
+        return false
+      }
     }
     onRefresh?.()
+    return true
   }
 
   return (
@@ -1042,6 +1054,7 @@ function MobileCategories({ categories, universeId, onRefresh }) {
           onUpdateEmoji={(id, emoji) => handleCategoryAction('emoji', { id, emoji })}
           onMoveCategory={(id, direction) => handleCategoryAction('move', { id, direction })}
           onMoveToRoot={(id) => handleCategoryAction('move-to-root', { id })}
+          onMoveToParent={(id, parentId) => handleCategoryAction('move-to-parent', { id, parentId })}
         />
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import data from '@emoji-mart/data'
 import { Picker } from 'emoji-mart'
 import { buildCategoryTree, flattenCategoriesForSelect } from './categorySidebarOrder'
@@ -60,28 +61,44 @@ export function EmojiPopover({
   const ref = useRef(null)
   const triggerRef = useRef(null)
   const pickerRef = useRef(null)
+  const popoverElRef = useRef(null)
   const onSelectRef = useRef(onSelect)
   const onClearRef = useRef(onClear)
-  onSelectRef.current = onSelect
-  onClearRef.current = onClear
 
-  const computePos = () => {
+  useEffect(() => {
+    onSelectRef.current = onSelect
+    onClearRef.current = onClear
+  }, [onSelect, onClear])
+
+  const computePos = (popoverEl = null) => {
     if (!triggerRef.current) return null
     const r = triggerRef.current.getBoundingClientRect()
-    const pickerH = 420
-    const pickerW = 352
-    const spaceBelow = window.innerHeight - r.bottom - 8
-    const top = spaceBelow >= Math.min(pickerH, 280)
-      ? r.bottom + 4
-      : Math.max(8, r.top - pickerH - 4)
-    const left = Math.min(Math.max(8, r.left), window.innerWidth - pickerW - 8)
+    const pad = 8
+    const gap = 4
+    const measured = popoverEl?.getBoundingClientRect()
+    const pickerH = Math.max(measured?.height || 0, 360)
+    const pickerW = Math.max(measured?.width || 0, 352)
+    const spaceBelow = window.innerHeight - r.bottom - pad
+    const spaceAbove = r.top - pad
+    let top
+    if (spaceBelow >= Math.min(pickerH, 280) || spaceBelow >= spaceAbove) {
+      top = r.bottom + gap
+      if (top + pickerH > window.innerHeight - pad) {
+        top = Math.max(pad, window.innerHeight - pickerH - pad)
+      }
+    } else {
+      top = Math.max(pad, r.top - pickerH - gap)
+    }
+    const left = Math.min(Math.max(pad, r.left), window.innerWidth - pickerW - pad)
     return { top, left }
   }
 
   useEffect(() => {
     if (!open) return
     const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+      const inTrigger = ref.current?.contains(e.target)
+      const inPopover = popoverElRef.current?.contains(e.target)
+      if (!inTrigger && !inPopover) setOpen(false)
     }
     const timer = window.setTimeout(() => {
       document.addEventListener('mousedown', handler)
@@ -93,27 +110,25 @@ export function EmojiPopover({
   }, [open])
 
   useEffect(() => {
-    if (!open) {
-      setPos(null)
-      return
-    }
+    if (!open) return
     const place = () => {
-      const next = computePos()
+      const next = computePos(popoverElRef.current)
       if (next) setPos(next)
     }
-    place()
+    // Measure after paint so height-based flip/clamp uses the real picker size.
+    const raf = window.requestAnimationFrame(place)
     window.addEventListener('resize', place)
     window.addEventListener('scroll', place, true)
     return () => {
+      window.cancelAnimationFrame(raf)
       window.removeEventListener('resize', place)
       window.removeEventListener('scroll', place, true)
     }
   }, [open])
 
   useEffect(() => {
-    if (!open || !pos || !pickerRef.current) return
+    if (!open || !pickerRef.current) return
     const el = pickerRef.current
-    if (el.childElementCount > 0) return
     const picker = new Picker({
       data,
       onEmojiSelect: (e) => { onSelectRef.current?.(e.native); setOpen(false) },
@@ -123,9 +138,11 @@ export function EmojiPopover({
       perLine: 8,
       maxFrequentRows: 1,
     })
-    el.appendChild(picker)
+    el.replaceChildren(picker)
+    const next = computePos(popoverElRef.current)
+    if (next) setPos(next)
     return () => { el.replaceChildren() }
-  }, [open, pos])
+  }, [open])
 
   const display = emoji || triggerEmoji || '🏷️'
   const tip = title || (emoji ? 'Change emoji' : 'Set emoji')
@@ -155,10 +172,11 @@ export function EmojiPopover({
       >
         {display}
       </button>
-      {open && pos && (
+      {open && typeof document !== 'undefined' && createPortal(
         <div
+          ref={popoverElRef}
           className="emoji-popover emoji-popover--fixed"
-          style={{ top: pos.top, left: pos.left }}
+          style={{ top: pos?.top ?? 0, left: pos?.left ?? 0, visibility: pos ? 'visible' : 'hidden' }}
           onClick={(e) => e.stopPropagation()}
         >
           <div ref={pickerRef} />
@@ -167,7 +185,8 @@ export function EmojiPopover({
               Remove emoji
             </button>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
@@ -187,6 +206,7 @@ function TreeNode({
   onUpdateEmoji,
   onMove,
   onMoveToRoot,
+  onChooseParent,
 }) {
   const [expanded, setExpanded] = useState(true)
   const [renaming, setRenaming] = useState(false)
@@ -255,6 +275,20 @@ function TreeNode({
         )}
 
         <div className="tree-actions">
+          {onChooseParent && (
+            <button
+              type="button"
+              className="tree-action-btn"
+              onClick={(e) => { e.stopPropagation(); onChooseParent(node.id) }}
+              title="Move under another category"
+              aria-label={`Move ${node.name} under another category`}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 5v6a4 4 0 0 0 4 4h10" />
+                <polyline points="14 11 18 15 14 19" />
+              </svg>
+            </button>
+          )}
           {depth > 0 && onMoveToRoot && (
             <button
               type="button"
@@ -330,6 +364,7 @@ function TreeNode({
           onUpdateEmoji={onUpdateEmoji}
           onMove={onMove}
           onMoveToRoot={onMoveToRoot}
+          onChooseParent={onChooseParent}
         />
       ))}
     </>
@@ -337,6 +372,21 @@ function TreeNode({
 }
 
 // ── Main tree component ───────────────────────────────
+
+function descendantCategoryIds(categories, categoryId) {
+  const descendants = new Set()
+  const pending = [categoryId]
+  while (pending.length > 0) {
+    const parentId = pending.pop()
+    for (const category of categories) {
+      if (category.parent_id === parentId && !descendants.has(category.id)) {
+        descendants.add(category.id)
+        pending.push(category.id)
+      }
+    }
+  }
+  return descendants
+}
 
 export default function CategoryTree({
   categories,
@@ -348,10 +398,38 @@ export default function CategoryTree({
   onUpdateEmoji,
   onMoveCategory,
   onMoveToRoot,
+  onMoveToParent,
 }) {
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
+  const [movingCategoryId, setMovingCategoryId] = useState(null)
+  const [targetParentId, setTargetParentId] = useState('')
   const tree = buildCategoryTree(categories)
+  const movingCategory = categories.find((category) => category.id === movingCategoryId)
+  const excludedParentIds = movingCategoryId == null
+    ? new Set()
+    : new Set([...descendantCategoryIds(categories, movingCategoryId), movingCategoryId])
+  const parentOptions = flattenCategoriesForSelect(categories)
+    .filter((category) => !excludedParentIds.has(category.id))
+
+  const openMoveToParent = (categoryId) => {
+    const category = categories.find((entry) => entry.id === categoryId)
+    const excluded = descendantCategoryIds(categories, categoryId)
+    excluded.add(categoryId)
+    const firstAlternative = flattenCategoriesForSelect(categories)
+      .find((entry) => !excluded.has(entry.id) && entry.id !== category?.parent_id)
+    setMovingCategoryId(categoryId)
+    setTargetParentId(firstAlternative ? String(firstAlternative.id) : '')
+  }
+
+  const confirmMoveToParent = async () => {
+    if (movingCategoryId == null || !targetParentId) return
+    const moved = await onMoveToParent?.(movingCategoryId, Number(targetParentId))
+    if (moved !== false) {
+      setMovingCategoryId(null)
+      setTargetParentId('')
+    }
+  }
 
   const commitAdd = () => {
     if (newName.trim()) {
@@ -395,6 +473,7 @@ export default function CategoryTree({
           onUpdateEmoji={onUpdateEmoji}
           onMove={onMoveCategory}
           onMoveToRoot={onMoveToRoot}
+          onChooseParent={onMoveToParent ? openMoveToParent : null}
         />
       ))}
 
@@ -413,6 +492,73 @@ export default function CategoryTree({
             autoFocus
           />
         </div>
+      )}
+      {movingCategory && typeof document !== 'undefined' && createPortal(
+        <div
+          className="markdown-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="move-category-dialog-title"
+          onClick={() => setMovingCategoryId(null)}
+        >
+          <div className="move-universe-dialog" onClick={(event) => event.stopPropagation()}>
+            <div className="move-universe-dialog-header">
+              <h3 id="move-category-dialog-title" className="move-universe-dialog-title">
+                Move category
+              </h3>
+              <button
+                type="button"
+                className="quickview-close"
+                onClick={() => setMovingCategoryId(null)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="move-universe-dialog-body">
+              <p className="move-universe-item-label">{movingCategory.name}</p>
+              <label className="move-universe-field-label" htmlFor="move-category-parent">
+                New parent category
+              </label>
+              <select
+                id="move-category-parent"
+                className="move-universe-universe-select"
+                value={targetParentId}
+                onChange={(event) => setTargetParentId(event.target.value)}
+              >
+                <option value="" disabled>Choose a category…</option>
+                {parentOptions.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {'\u00A0\u00A0'.repeat(category.depth)}
+                    {category.emoji ? `${category.emoji} ` : ''}
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+              {parentOptions.length === 0 && (
+                <p className="move-universe-hint">There are no valid parent categories.</p>
+              )}
+            </div>
+            <div className="move-universe-dialog-actions">
+              <button
+                type="button"
+                className="markdown-delete-btn"
+                onClick={() => setMovingCategoryId(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="markdown-save-btn"
+                onClick={confirmMoveToParent}
+                disabled={!targetParentId || Number(targetParentId) === movingCategory.parent_id}
+              >
+                Move
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

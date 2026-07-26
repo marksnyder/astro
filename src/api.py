@@ -104,6 +104,7 @@ from src.markdowns import (
     markdown_image_to_dict,
     markdown_to_dict,
     move_category,
+    move_category_to_parent,
     move_category_to_root,
     move_diagram_to_universe,
     move_link_to_universe,
@@ -271,6 +272,10 @@ class CategoryRequest(BaseModel):
 class CategoryUpdateRequest(BaseModel):
     name: str
     emoji: Optional[str] = None
+
+
+class CategoryMoveParentRequest(BaseModel):
+    parent_id: Optional[int] = None
 
 
 class CategoryResponse(BaseModel):
@@ -486,6 +491,17 @@ def api_move_category(cat_id: int, direction: str):
 @app.put("/api/categories/{cat_id}/move-to-root", response_model=CategoryResponse)
 def api_move_category_to_root(cat_id: int):
     cat = move_category_to_root(cat_id)
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return category_to_dict(cat)
+
+
+@app.put("/api/categories/{cat_id}/move-to-parent", response_model=CategoryResponse)
+def api_move_category_to_parent(cat_id: int, req: CategoryMoveParentRequest):
+    try:
+        cat = move_category_to_parent(cat_id, req.parent_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found")
     return category_to_dict(cat)

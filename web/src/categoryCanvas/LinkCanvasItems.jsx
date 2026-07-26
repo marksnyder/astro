@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { MoveToUniverseButton } from '../MoveToUniverseButton'
 
 function faviconUrl(rawUrl) {
   try {
@@ -103,7 +104,10 @@ export function renderLinkItem({
       isDragging={extra?.draggingId === node.id}
       dropEdge={extra?.dropTarget?.id === node.id ? extra.dropTarget.edge : null}
       onEdit={extra?.onEdit}
+      onMove={extra?.onMove}
       onDelete={extra?.onDelete}
+      universes={extra?.universes}
+      currentUniverseId={extra?.currentUniverseId}
     />
   )
 }
@@ -121,7 +125,10 @@ function LinkItemRow({
   isDragging,
   dropEdge,
   onEdit,
+  onMove,
   onDelete,
+  universes,
+  currentUniverseId,
 }) {
   const [imgFailed, setImgFailed] = useState(false)
   const icon = faviconUrl(node.item.url)
@@ -220,6 +227,12 @@ function LinkItemRow({
               <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z" />
             </svg>
           </button>
+          <MoveToUniverseButton
+            universes={universes}
+            currentUniverseId={currentUniverseId}
+            itemLabel={node.item.title || node.item.url || 'Link'}
+            onMove={(universeId, categoryId) => onMove?.(node.item, universeId, categoryId)}
+          />
           <button
             type="button"
             className="city-item-action city-item-action-delete"

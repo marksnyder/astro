@@ -19,6 +19,7 @@ function reorderByDrop(list, draggedId, targetId, edge) {
 
 export default function LinksCanvasTab({
   universeId,
+  universes,
   categories,
   offeredLink = null,
   onOfferHandled,
@@ -133,6 +134,24 @@ export default function LinksCanvasTab({
     }
   }, [])
 
+  const moveToUniverse = useCallback(async (link, targetUniverseId, categoryId) => {
+    const response = await fetch(`/api/links/${link.id}/move-universe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        universe_id: targetUniverseId,
+        category_id: categoryId,
+      }),
+    })
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}))
+      window.alert(error.detail || 'Move failed')
+      return false
+    }
+    setLinks((current) => current.filter((item) => item.id !== link.id))
+    return true
+  }, [])
+
   const persistOrder = useCallback(async (nextLinks) => {
     if (universeId == null) return
     const previous = links
@@ -200,8 +219,20 @@ export default function LinksCanvasTab({
     onReorderDrop: handleReorderDrop,
     onReorderEnd: () => { setDraggingId(null); setDropTarget(null) },
     onEdit: openEditModal,
+    onMove: moveToUniverse,
     onDelete: removeLink,
-  }), [draggingId, dropTarget, handleReorderDrop, openEditModal, removeLink])
+    universes,
+    currentUniverseId: universeId,
+  }), [
+    draggingId,
+    dropTarget,
+    handleReorderDrop,
+    moveToUniverse,
+    openEditModal,
+    removeLink,
+    universeId,
+    universes,
+  ])
 
   return (
     <div className="links-canvas-tab">

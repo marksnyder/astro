@@ -2035,8 +2035,20 @@ function App() {
       await fetch(`/api/categories/${payload.id}/move?direction=${payload.direction}`, { method: 'PUT' })
     } else if (action === 'move-to-root') {
       await fetch(`/api/categories/${payload.id}/move-to-root`, { method: 'PUT' })
+    } else if (action === 'move-to-parent') {
+      const response = await fetch(`/api/categories/${payload.id}/move-to-parent`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parent_id: payload.parentId }),
+      })
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        window.alert(error.detail || 'Could not move category')
+        return false
+      }
     }
     fetchCategories()
+    return true
   }
 
   useEffect(() => {
@@ -2518,6 +2530,7 @@ function App() {
                     onUpdateEmoji={(id, emoji) => handleCategoryAction('emoji', { id, emoji })}
                     onMoveCategory={(id, direction) => handleCategoryAction('move', { id, direction })}
                     onMoveToRoot={(id) => handleCategoryAction('move-to-root', { id })}
+                    onMoveToParent={(id, parentId) => handleCategoryAction('move-to-parent', { id, parentId })}
                   />
                 </div>
               )}
@@ -2616,6 +2629,7 @@ function App() {
             >
               <LinksCanvasTab
                 universeId={currentUniverseId}
+                universes={universes}
                 categories={categories}
                 offeredLink={pendingLinkOffer}
                 onOfferHandled={() => setPendingLinkOffer(null)}

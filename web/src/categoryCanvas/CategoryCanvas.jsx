@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   buildCategoryLayout,
   findCategoryInTree,
-  ITEM_CARD_H,
   ITEM_CARD_W,
 } from './buildCategoryLayout'
 import './categoryCanvas.css'
@@ -38,7 +37,7 @@ function findItemHitInTree(nodes, matchIds) {
       return {
         categoryId: node.id,
         x: node.absX + hit.x + ITEM_CARD_W / 2,
-        y: node.absY + hit.y + ITEM_CARD_H / 2,
+        y: node.absY + hit.y + hit.height / 2,
       }
     }
     const nested = findItemHitInTree(node.children, matchIds)
@@ -224,6 +223,7 @@ export default function CategoryCanvas({
       items,
       getCategoryId,
       getItemId,
+      getItemTitle,
       positionOverrides,
       positionMap,
       uncategorizedPos,
@@ -235,6 +235,7 @@ export default function CategoryCanvas({
       items,
       getCategoryId,
       getItemId,
+      getItemTitle,
       positionOverrides,
       positionMap,
       uncategorizedPos,

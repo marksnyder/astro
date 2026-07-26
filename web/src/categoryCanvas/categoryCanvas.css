@@ -652,9 +652,9 @@
   font-weight: 700;
   text-align: left;
   line-height: 1.25;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  overflow: hidden;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .city-tower-domain {
@@ -700,20 +700,24 @@
   opacity: 1;
 }
 
-.city-item-action {
+.city-item-action,
+.city-item-actions .move-universe-icon-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 26px;
   height: 26px;
+  padding: 0;
   border: none;
   border-radius: 6px;
   background: transparent;
   color: var(--text-secondary, #9eb0d5);
   cursor: pointer;
+  opacity: 1;
 }
 
-.city-item-action:hover {
+.city-item-action:hover,
+.city-item-actions .move-universe-icon-btn:hover {
   color: var(--accent, #3794ff);
   background: rgba(255, 255, 255, 0.08);
 }

@@ -47,8 +47,8 @@ export function MoveToUniverseButton({ universes, currentUniverseId, onMove, ite
     if (selectedUniverseId == null) return
     setMoving(true)
     try {
-      await onMove(selectedUniverseId, categoryId)
-      setOpen(false)
+      const moved = await onMove(selectedUniverseId, categoryId)
+      if (moved !== false) setOpen(false)
     } finally {
       setMoving(false)
     }

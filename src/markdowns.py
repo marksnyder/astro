@@ -408,6 +408,77 @@ def move_category_to_root(cat_id: int) -> Category | None:
     return _row_to_category(row) if row else None
 
 
+def move_category_to_parent(cat_id: int, parent_id: int | None) -> Category | None:
+    """Move a category under another category, rejecting cross-universe moves and cycles."""
+    conn = _get_conn()
+    category = conn.execute(
+        "SELECT * FROM categories WHERE id = ?",
+        (cat_id,),
+    ).fetchone()
+    if not category:
+        conn.close()
+        return None
+
+    if parent_id == cat_id:
+        conn.close()
+        raise ValueError("A category cannot be its own parent")
+
+    if parent_id is not None:
+        parent = conn.execute(
+            "SELECT id, parent_id, universe_id FROM categories WHERE id = ?",
+            (parent_id,),
+        ).fetchone()
+        if not parent:
+            conn.close()
+            raise ValueError("Parent category not found")
+        if parent["universe_id"] != category["universe_id"]:
+            conn.close()
+            raise ValueError("Parent category must be in the same universe")
+
+        ancestor = parent
+        while ancestor is not None:
+            if ancestor["id"] == cat_id:
+                conn.close()
+                raise ValueError("Cannot move a category under one of its descendants")
+            ancestor_parent_id = ancestor["parent_id"]
+            if ancestor_parent_id is None:
+                break
+            ancestor = conn.execute(
+                "SELECT id, parent_id, universe_id FROM categories WHERE id = ?",
+                (ancestor_parent_id,),
+            ).fetchone()
+
+    if category["parent_id"] == parent_id:
+        conn.close()
+        return _row_to_category(category)
+
+    if parent_id is None:
+        next_order_row = conn.execute(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 AS n "
+            "FROM categories WHERE universe_id = ? AND parent_id IS NULL",
+            (category["universe_id"],),
+        ).fetchone()
+    else:
+        next_order_row = conn.execute(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 AS n "
+            "FROM categories WHERE universe_id = ? AND parent_id = ?",
+            (category["universe_id"], parent_id),
+        ).fetchone()
+    next_order = int(next_order_row["n"] if next_order_row else 0)
+
+    conn.execute(
+        "UPDATE categories "
+        "SET parent_id = ?, sort_order = ?, browse_x = NULL, browse_y = NULL "
+        "WHERE id = ?",
+        (parent_id, next_order, cat_id),
+    )
+    clear_category_browse_positions(cat_id, conn=conn)
+    conn.commit()
+    row = conn.execute("SELECT * FROM categories WHERE id = ?", (cat_id,)).fetchone()
+    conn.close()
+    return _row_to_category(row) if row else None
+
+
 def set_category_pinned(cat_id: int, pinned: bool) -> bool:
     conn = _get_conn()
     cur = conn.execute("UPDATE categories SET pinned = ? WHERE id = ?", (int(pinned), cat_id))
