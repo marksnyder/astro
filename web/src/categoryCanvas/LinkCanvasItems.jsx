@@ -102,6 +102,8 @@ export function renderLinkItem({
       onReorderEnd={extra?.onReorderEnd}
       isDragging={extra?.draggingId === node.id}
       dropEdge={extra?.dropTarget?.id === node.id ? extra.dropTarget.edge : null}
+      onEdit={extra?.onEdit}
+      onDelete={extra?.onDelete}
     />
   )
 }
@@ -118,6 +120,8 @@ function LinkItemRow({
   onReorderEnd,
   isDragging,
   dropEdge,
+  onEdit,
+  onDelete,
 }) {
   const [imgFailed, setImgFailed] = useState(false)
   const icon = faviconUrl(node.item.url)
@@ -159,7 +163,7 @@ function LinkItemRow({
       }}
     >
       <div className="city-tower-stem" aria-hidden="true" />
-      <div className="city-tower-body">
+      <div className="city-tower-body has-actions">
         {canReorder && (
           <button
             type="button"
@@ -199,6 +203,39 @@ function LinkItemRow({
             <span className="city-tower-domain">{domain}</span>
           </span>
         </a>
+        <div className="city-item-actions" onPointerDown={(event) => event.stopPropagation()}>
+          <button
+            type="button"
+            className="city-item-action"
+            title="Edit link or change category"
+            aria-label={`Edit ${node.item.title || 'link'}`}
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              onEdit?.(node.item)
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="city-item-action city-item-action-delete"
+            title="Remove link"
+            aria-label={`Remove ${node.item.title || 'link'}`}
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              onDelete?.(node.item)
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   )

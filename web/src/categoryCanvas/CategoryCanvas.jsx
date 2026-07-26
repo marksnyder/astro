@@ -9,10 +9,26 @@ import './categoryCanvas.css'
 
 const MIN_ZOOM = 0.2
 const MAX_ZOOM = 2.2
-const VIEW_INSET = 20
 
 function clampZoomValue(value) {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value))
+}
+
+function loadCanvasView(storageKey) {
+  if (!storageKey) return { pan: { x: 0, y: 0 }, zoom: 1 }
+  try {
+    const saved = JSON.parse(localStorage.getItem(storageKey))
+    const x = Number(saved?.pan?.x)
+    const y = Number(saved?.pan?.y)
+    const zoom = Number(saved?.zoom)
+    if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(zoom)) {
+      return {
+        pan: { x: Math.min(0, x), y: Math.min(0, y) },
+        zoom: clampZoomValue(zoom),
+      }
+    }
+  } catch { /* Start from the canvas origin when saved state is invalid. */ }
+  return { pan: { x: 0, y: 0 }, zoom: 1 }
 }
 
 function findItemHitInTree(nodes, matchIds) {
@@ -39,17 +55,22 @@ function CategorySection({
   renderItem,
   renderCategoryActions,
   onCategoryPointerDown,
+  expandedCategoryIds,
+  onToggleCategory,
   onPointerMove,
   endPointer,
   extra,
 }) {
   const canDrag = category.isRoot
+  const isExpanded = canDrag || expandedCategoryIds.has(category.id)
 
   return (
     <section
       className={[
         'city-district',
         category.depth > 0 ? 'is-nested' : '',
+        category.depth > 0 && isExpanded ? 'is-expanded' : '',
+        category.depth > 0 && !isExpanded ? 'is-collapsed' : '',
         activeCategory === category.id ? 'is-active' : '',
         category.isUncategorized ? 'is-frontier' : '',
         movingCategoryId === category.id ? 'is-dragging-category' : '',
@@ -69,12 +90,14 @@ function CategorySection({
         <button
           type="button"
           className="city-district-landmark"
-          title={canDrag ? 'Drag to move category' : category.name}
+          title={canDrag ? 'Drag to move category' : `Close ${category.name}`}
           onPointerDown={canDrag ? ((event) => onCategoryPointerDown(event, category)) : undefined}
           onPointerMove={canDrag ? onPointerMove : undefined}
           onPointerUp={canDrag ? endPointer : undefined}
           onPointerCancel={canDrag ? endPointer : undefined}
-          style={canDrag ? undefined : { cursor: 'default' }}
+          onClick={canDrag ? undefined : (() => onToggleCategory(category.id))}
+          aria-expanded={canDrag ? undefined : isExpanded}
+          style={canDrag ? undefined : { cursor: 'pointer' }}
         >
           <span className="city-district-glyph">{category.emoji}</span>
           <div>
@@ -97,21 +120,45 @@ function CategorySection({
         })
       })}
 
-      {category.children.map((child) => (
-        <CategorySection
-          key={child.id}
-          category={child}
-          activeCategory={activeCategory}
-          movingCategoryId={movingCategoryId}
-          matchIds={matchIds}
-          renderItem={renderItem}
-          renderCategoryActions={renderCategoryActions}
-          onCategoryPointerDown={onCategoryPointerDown}
-          onPointerMove={onPointerMove}
-          endPointer={endPointer}
-          extra={extra}
-        />
-      ))}
+      {category.children.map((child) => {
+        const childExpanded = expandedCategoryIds.has(child.id)
+        return (
+          <div className="city-child-branch" key={child.id}>
+            <button
+              type="button"
+              className={`city-subcategory-trigger ${childExpanded ? 'is-expanded' : ''}`}
+              style={{
+                left: 20,
+                top: child.triggerY,
+                width: Math.max(0, category.width - 40),
+                '--child-accent': child.color.accent,
+                '--child-soft': child.color.soft,
+              }}
+              onClick={() => onToggleCategory(child.id)}
+              onPointerDown={(event) => event.stopPropagation()}
+              aria-expanded={childExpanded}
+            >
+              <span className="city-subcategory-trigger-glyph">{child.emoji}</span>
+              <span className="city-subcategory-trigger-name">{child.name}</span>
+              <span className="city-subcategory-trigger-arrow" aria-hidden="true">›</span>
+            </button>
+            <CategorySection
+              category={child}
+              activeCategory={activeCategory}
+              movingCategoryId={movingCategoryId}
+              matchIds={matchIds}
+              renderItem={renderItem}
+              renderCategoryActions={renderCategoryActions}
+              onCategoryPointerDown={onCategoryPointerDown}
+              expandedCategoryIds={expandedCategoryIds}
+              onToggleCategory={onToggleCategory}
+              onPointerMove={onPointerMove}
+              endPointer={endPointer}
+              extra={extra}
+            />
+          </div>
+        )
+      })}
     </section>
   )
 }
@@ -128,6 +175,7 @@ export default function CategoryCanvas({
   uncategorizedPos = null,
   includeUncategorized = true,
   universeId,
+  contentType,
   onMoveCategory,
   renderItem,
   renderCategoryActions,
@@ -137,18 +185,23 @@ export default function CategoryCanvas({
   extra = null,
 }) {
   const viewportRef = useRef(null)
-  const [pan, setPan] = useState({ x: VIEW_INSET, y: VIEW_INSET })
-  const [zoom, setZoom] = useState(1)
+  const viewStorageKey = universeId == null || !contentType
+    ? null
+    : `astro-category-canvas-view:${universeId}:${contentType}`
+  const [view, setView] = useState(() => loadCanvasView(viewStorageKey))
+  const { pan, zoom } = view
   const [activeCategory, setActiveCategory] = useState(null)
+  const [expandedCategoryIds, setExpandedCategoryIds] = useState(() => new Set())
   const [positionOverrides, setPositionOverrides] = useState({})
   const [movingCategoryId, setMovingCategoryId] = useState(null)
   const panState = useRef(null)
   const categoryDrag = useRef(null)
-  const viewRef = useRef({ pan: { x: VIEW_INSET, y: VIEW_INSET }, zoom: 1 })
-  const didFitRef = useRef(false)
-  const userAdjustedViewRef = useRef(false)
-  const layoutRef = useRef(null)
-  const lastViewportSizeRef = useRef({ w: 0, h: 0 })
+  const viewRef = useRef(view)
+
+  const applyView = useCallback((nextView) => {
+    viewRef.current = nextView
+    setView(nextView)
+  }, [])
 
   const layout = useMemo(
     () => buildCategoryLayout({
@@ -160,6 +213,7 @@ export default function CategoryCanvas({
       positionMap,
       uncategorizedPos,
       includeUncategorized,
+      expandedCategoryIds,
     }),
     [
       categories,
@@ -170,88 +224,70 @@ export default function CategoryCanvas({
       positionMap,
       uncategorizedPos,
       includeUncategorized,
+      expandedCategoryIds,
     ],
   )
 
-  useEffect(() => {
-    layoutRef.current = layout
-  }, [layout])
-
-  useEffect(() => {
-    viewRef.current = { pan, zoom }
-  }, [pan, zoom])
-
-  useEffect(() => {
-    setPositionOverrides({})
-    didFitRef.current = false
-    userAdjustedViewRef.current = false
-    setPan({ x: VIEW_INSET, y: VIEW_INSET })
-    setZoom(1)
-  }, [universeId])
-
-  const fitContentToViewport = useCallback(() => {
-    const vp = viewportRef.current
-    const currentLayout = layoutRef.current
-    if (!vp || !currentLayout?.categoryGroups.length) return false
-    const rect = vp.getBoundingClientRect()
-    if (rect.width < 40 || rect.height < 40) return false
-
-    const bounds = currentLayout.contentBounds
-    const availW = Math.max(rect.width - VIEW_INSET * 2, 80)
-    const availH = Math.max(rect.height - VIEW_INSET * 2, 80)
-    const fitZoom = clampZoomValue(Math.min(availW / bounds.width, availH / bounds.height, 1.35))
-
-    const nextPan = {
-      x: VIEW_INSET - bounds.minX * fitZoom + (availW - bounds.width * fitZoom) / 2,
-      y: VIEW_INSET - bounds.minY * fitZoom + (availH - bounds.height * fitZoom) / 2,
-    }
-    lastViewportSizeRef.current = { w: rect.width, h: rect.height }
-    viewRef.current = { pan: nextPan, zoom: fitZoom }
-    setZoom(fitZoom)
-    setPan(nextPan)
-    setActiveCategory(null)
-    return true
+  const toggleCategory = useCallback((categoryId) => {
+    setExpandedCategoryIds((current) => {
+      const next = new Set(current)
+      if (next.has(categoryId)) next.delete(categoryId)
+      else next.add(categoryId)
+      return next
+    })
   }, [])
 
   useEffect(() => {
-    if (!items.length || didFitRef.current) return undefined
-    const frame = requestAnimationFrame(() => {
-      if (fitContentToViewport()) didFitRef.current = true
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [fitContentToViewport, items.length, layout.categoryGroups.length])
+    if (!viewStorageKey) return undefined
+    const timeout = window.setTimeout(() => {
+      localStorage.setItem(viewStorageKey, JSON.stringify(view))
+    }, 120)
+    return () => window.clearTimeout(timeout)
+  }, [view, viewStorageKey])
+
+  const constrainPan = useCallback((candidate, targetZoom) => {
+    const vp = viewportRef.current
+    if (!vp) {
+      return {
+        x: Math.min(0, candidate.x),
+        y: Math.min(0, candidate.y),
+      }
+    }
+    const rect = vp.getBoundingClientRect()
+    const minX = Math.min(0, rect.width - layout.worldW * targetZoom)
+    const minY = Math.min(0, rect.height - layout.worldH * targetZoom)
+    return {
+      x: Math.max(minX, Math.min(0, candidate.x)),
+      y: Math.max(minY, Math.min(0, candidate.y)),
+    }
+  }, [layout.worldH, layout.worldW])
 
   useEffect(() => {
     const vp = viewportRef.current
     if (!vp) return undefined
     const observer = new ResizeObserver(() => {
-      if (userAdjustedViewRef.current) return
       const rect = vp.getBoundingClientRect()
       if (rect.width < 40 || rect.height < 40) return
-      const prev = lastViewportSizeRef.current
-      const sizeChanged = Math.abs(rect.width - prev.w) >= 2 || Math.abs(rect.height - prev.h) >= 2
-      if (!didFitRef.current || sizeChanged) {
-        if (fitContentToViewport()) didFitRef.current = true
-      }
+      const current = viewRef.current
+      const nextPan = constrainPan(current.pan, current.zoom)
+      if (nextPan.x === current.pan.x && nextPan.y === current.pan.y) return
+      applyView({ ...current, pan: nextPan })
     })
     observer.observe(vp)
     return () => observer.disconnect()
-  }, [fitContentToViewport])
+  }, [applyView, constrainPan])
 
   const zoomAtPoint = useCallback((nextZoom, mx, my) => {
     const { pan: currentPan, zoom: currentZoom } = viewRef.current
     const clamped = clampZoomValue(nextZoom)
     if (clamped === currentZoom) return
     const ratio = clamped / currentZoom
-    const nextPan = {
+    const nextPan = constrainPan({
       x: mx - (mx - currentPan.x) * ratio,
       y: my - (my - currentPan.y) * ratio,
-    }
-    userAdjustedViewRef.current = true
-    viewRef.current = { pan: nextPan, zoom: clamped }
-    setZoom(clamped)
-    setPan(nextPan)
-  }, [])
+    }, clamped)
+    applyView({ pan: nextPan, zoom: clamped })
+  }, [applyView, constrainPan])
 
   const zoomBy = useCallback((delta) => {
     const vp = viewportRef.current
@@ -281,12 +317,13 @@ export default function CategoryCanvas({
     if (!vp) return
     const rect = vp.getBoundingClientRect()
     const { zoom: currentZoom } = viewRef.current
-    setActiveCategory(hit.categoryId)
-    setPan({
+    const nextPan = constrainPan({
       x: rect.width / 2 - hit.x * currentZoom,
       y: rect.height / 2 - hit.y * currentZoom,
-    })
-  }, [layout.categoryGroups, matchIds])
+    }, currentZoom)
+    setActiveCategory(hit.categoryId)
+    applyView({ pan: nextPan, zoom: currentZoom })
+  }, [applyView, constrainPan, layout.categoryGroups, matchIds])
 
   useEffect(() => {
     if (!q) return undefined
@@ -335,12 +372,12 @@ export default function CategoryCanvas({
     if (!vp) return
     const rect = vp.getBoundingClientRect()
     const nextZoom = clampZoomValue(Math.max(viewRef.current.zoom, 0.9))
-    setZoom(nextZoom)
-    setActiveCategory(category.id)
-    setPan({
+    const nextPan = constrainPan({
       x: rect.width / 2 - category.centerX * nextZoom,
       y: rect.height / 2 - category.centerY * nextZoom,
-    })
+    }, nextZoom)
+    applyView({ pan: nextPan, zoom: nextZoom })
+    setActiveCategory(category.id)
   }
 
   const onCategoryPointerDown = (event, category) => {
@@ -379,11 +416,11 @@ export default function CategoryCanvas({
     if (!panState.current) return
     const dx = event.clientX - panState.current.startX
     const dy = event.clientY - panState.current.startY
-    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) userAdjustedViewRef.current = true
-    setPan({
+    const nextPan = constrainPan({
       x: panState.current.originX + dx,
       y: panState.current.originY + dy,
-    })
+    }, viewRef.current.zoom)
+    applyView({ pan: nextPan, zoom: viewRef.current.zoom })
   }
 
   const endPointer = async (event) => {
@@ -408,8 +445,8 @@ export default function CategoryCanvas({
   }
 
   const resetView = () => {
-    userAdjustedViewRef.current = false
-    fitContentToViewport()
+    applyView({ pan: { x: 0, y: 0 }, zoom: 1 })
+    setActiveCategory(null)
   }
 
   if (!items.length) {
@@ -466,6 +503,8 @@ export default function CategoryCanvas({
               renderItem={renderItem}
               renderCategoryActions={renderCategoryActions}
               onCategoryPointerDown={onCategoryPointerDown}
+              expandedCategoryIds={expandedCategoryIds}
+              onToggleCategory={toggleCategory}
               onPointerMove={onPointerMove}
               endPointer={endPointer}
               extra={extra}

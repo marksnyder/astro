@@ -513,7 +513,7 @@
   padding: 10px;
   border-radius: 12px;
   border: 1px dashed rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.28);
   transition: border-color 0.15s, background 0.15s;
   overflow-y: auto;
   overflow-x: hidden;
@@ -1796,7 +1796,7 @@
 .astro-space-stars {
   position: absolute;
   inset: -30%;
-  will-change: transform, opacity;
+  will-change: background-position, opacity;
 }
 
 .astro-space-stars-far {
@@ -1836,18 +1836,18 @@
 }
 
 @keyframes astro-stars-far {
-  from { transform: translate3d(0, 0, 0); }
-  to { transform: translate3d(4%, -6%, 0); }
+  from { background-position: 0 0; }
+  to { background-position: 200px -120px; }
 }
 
 @keyframes astro-stars-mid {
-  from { transform: translate3d(0, 0, 0); }
-  to { transform: translate3d(-6%, 8%, 0); }
+  from { background-position: 0 0; }
+  to { background-position: -260px 160px; }
 }
 
 @keyframes astro-stars-near {
-  from { transform: translate3d(0, 0, 0); }
-  to { transform: translate3d(-10%, 14%, 0); }
+  from { background-position: 0 0; }
+  to { background-position: -340px 220px; }
 }
 
 @keyframes astro-stars-twinkle {
@@ -2268,32 +2268,97 @@
   width: 100%;
 }
 
-/* Categories admin remains a constrained hierarchy CRUD panel */
+/* Categories admin uses the same full-bleed canvas treatment as content browsers */
 .workspace-browser-panel > .markdowns-panel.categories-panel,
 .workspace-browser-panel > .workspace-browser-inner.categories-panel {
   flex: 1;
   min-height: 0;
   width: 100%;
-  max-width: 1100px;
-  margin: 0 auto;
-  background: rgba(24, 24, 27, 0.72);
-  backdrop-filter: blur(8px);
+  max-width: none;
+  margin: 0;
+  background: transparent;
+  backdrop-filter: none;
 }
 
 .workspace-browser-panel .categories-panel {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
 }
 
 .workspace-browser-panel .categories-panel .markdowns-header {
-  padding: 16px 20px;
+  position: absolute;
+  z-index: 5;
+  top: 12px;
+  left: 12px;
+  width: auto;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(8, 10, 16, 0.72);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
 }
 
 .workspace-browser-panel .categories-panel .category-tree {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 20px 24px;
+  padding: 58px 20px 24px;
+  background: transparent;
+}
+
+.workspace-browser-panel .categories-panel .tree-header {
+  width: min(720px, 100%);
+  min-height: 38px;
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border: 1px solid rgba(55, 148, 255, 0.25);
+  border-left: 2px solid var(--accent);
+  border-radius: 0;
+  background: rgba(8, 12, 22, 0.62);
+  backdrop-filter: blur(6px);
+}
+
+.workspace-browser-panel .categories-panel .tree-row {
+  width: min(720px, 100%);
+  min-height: 38px;
+  margin: 5px 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 2px solid rgba(55, 148, 255, 0.62);
+  border-radius: 0;
+  background: rgba(8, 12, 22, 0.58);
+  backdrop-filter: blur(5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.workspace-browser-panel .categories-panel .tree-row:hover,
+.workspace-browser-panel .categories-panel .tree-row.active {
+  border-color: rgba(55, 148, 255, 0.55);
+  border-left-color: var(--accent);
+  background: rgba(12, 24, 42, 0.74);
+  box-shadow:
+    inset 3px 0 0 rgba(55, 148, 255, 0.3),
+    0 0 20px rgba(55, 148, 255, 0.1);
+}
+
+.workspace-browser-panel .categories-panel .tree-name {
+  color: #e8eefc;
+}
+
+.workspace-browser-panel .categories-panel .tree-action-btn,
+.workspace-browser-panel .categories-panel .tree-header-add {
+  background: rgba(8, 10, 18, 0.54);
+}
+
+.workspace-browser-panel .categories-panel .tree-add-input-row {
+  width: min(720px, 100%);
+  padding: 4px 0;
 }
 
 .rail-sep {
@@ -2627,7 +2692,8 @@
   padding: 16px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--bg-primary);
+  background: rgba(18, 18, 22, 0.74);
+  backdrop-filter: blur(5px);
   min-height: 200px;
 }
 
@@ -2693,7 +2759,8 @@
   flex-direction: column;
   border-radius: 8px;
   border: 1px solid var(--border);
-  background: var(--bg-primary);
+  background: rgba(18, 18, 22, 0.74);
+  backdrop-filter: blur(5px);
   overflow: hidden;
   transition: border-color 0.2s;
   min-height: 0;
@@ -2709,7 +2776,7 @@
   gap: 4px;
   padding: 6px 10px;
   border-bottom: 1px solid var(--border);
-  background: var(--bg-secondary);
+  background: rgba(30, 30, 34, 0.78);
   flex-shrink: 0;
   flex-wrap: wrap;
 }

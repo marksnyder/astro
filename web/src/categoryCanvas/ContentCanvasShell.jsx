@@ -34,6 +34,7 @@ export default function ContentCanvasShell({
         {!error && loading && <div className="browse-empty">Initializing city grid…</div>}
         {!error && !loading && (
           <CategoryCanvas
+            key={`${universeId}:${contentType}`}
             categories={categories}
             items={items}
             getCategoryId={getCategoryId}
@@ -44,6 +45,7 @@ export default function ContentCanvasShell({
             uncategorizedPos={uncategorizedPos}
             includeUncategorized={includeUncategorized}
             universeId={universeId}
+            contentType={contentType}
             onMoveCategory={persistCategoryPosition}
             renderItem={renderItem}
             renderCategoryActions={renderCategoryActions}

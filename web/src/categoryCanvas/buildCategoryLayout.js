@@ -20,49 +20,11 @@ export const ITEM_SLOT_H = 42
 export const ITEM_PAD_X = 20
 export const ITEM_PAD_Y = 8
 export const LANDMARK_H = 46
-export const NEST_PAD = 16
-export const CHILD_GAP = 24
+export const SUBCATEGORY_TRIGGER_H = 34
+export const FLYOUT_GAP = 48
 export const CONTENT_BOTTOM = 16
 export const MIN_CATEGORY_W = 280
 export const MIN_CATEGORY_H = 120
-
-function packChildren(childLayouts, contentTop, minInnerWidth) {
-  if (!childLayouts.length) {
-    return { children: [], width: minInnerWidth, height: contentTop }
-  }
-
-  const maxRowWidth = Math.max(
-    minInnerWidth,
-    ...childLayouts.map((child) => child.width),
-  )
-  let cursorX = NEST_PAD
-  let cursorY = contentTop
-  let rowH = 0
-  let usedW = NEST_PAD
-
-  const placed = childLayouts.map((child) => {
-    if (cursorX > NEST_PAD && cursorX + child.width + NEST_PAD > maxRowWidth + NEST_PAD * 2) {
-      cursorX = NEST_PAD
-      cursorY += rowH + CHILD_GAP
-      rowH = 0
-    }
-    const next = {
-      ...child,
-      x: cursorX,
-      y: cursorY,
-    }
-    cursorX += child.width + CHILD_GAP
-    usedW = Math.max(usedW, cursorX)
-    rowH = Math.max(rowH, child.height)
-    return next
-  })
-
-  return {
-    children: placed,
-    width: Math.max(minInnerWidth, usedW + NEST_PAD - CHILD_GAP),
-    height: cursorY + rowH + NEST_PAD,
-  }
-}
 
 function applyAbsolutePositions(node, absX, absY) {
   node.absX = absX
@@ -115,6 +77,7 @@ export function buildItemNodes(items, getItemId) {
  * @param {Record<string,{x:number,y:number}>} [options.positionMap] saved root positions by category id
  * @param {{x:number,y:number}|null} [options.uncategorizedPos]
  * @param {boolean} [options.includeUncategorized]
+ * @param {Set<string>} [options.expandedCategoryIds]
  */
 export function buildCategoryLayout({
   categories,
@@ -125,6 +88,7 @@ export function buildCategoryLayout({
   positionMap = {},
   uncategorizedPos = null,
   includeUncategorized = true,
+  expandedCategoryIds = new Set(),
 }) {
   const itemsByCategory = new Map()
   const categoryById = new Map()
@@ -178,12 +142,22 @@ export function buildCategoryLayout({
       : (childrenByParent.get(key) || []).filter((child) => computeSubtreeCount(child.id) > 0)
 
     const childLayouts = childCategories.map((child) => layoutCategoryNode(child.id, depth + 1))
-    const { itemNodes, itemAreaW, itemAreaH } = buildItemNodes(ownItems, getItemId)
-    const contentTop = LANDMARK_H + (ownItems.length ? itemAreaH : ITEM_PAD_Y + CONTENT_BOTTOM)
-    const packed = packChildren(childLayouts, contentTop, Math.max(MIN_CATEGORY_W, itemAreaW))
-
-    const width = Math.max(MIN_CATEGORY_W, itemAreaW, packed.width)
-    const height = Math.max(MIN_CATEGORY_H, packed.height)
+    const { itemNodes, itemAreaW } = buildItemNodes(ownItems, getItemId)
+    const width = Math.max(MIN_CATEGORY_W, itemAreaW)
+    const itemBottom = ownItems.length
+      ? LANDMARK_H + ITEM_PAD_Y + ownItems.length * ITEM_SLOT_H
+      : LANDMARK_H
+    const triggerStart = itemBottom + ITEM_PAD_Y
+    const children = childLayouts.map((child, index) => ({
+      ...child,
+      x: width + FLYOUT_GAP,
+      y: triggerStart + index * SUBCATEGORY_TRIGGER_H,
+      triggerY: triggerStart + index * SUBCATEGORY_TRIGGER_H,
+    }))
+    const height = Math.max(
+      MIN_CATEGORY_H,
+      triggerStart + children.length * SUBCATEGORY_TRIGGER_H + CONTENT_BOTTOM,
+    )
     const color = DISTRICT_COLORS[colorCursor % DISTRICT_COLORS.length]
     colorCursor += 1
 
@@ -206,7 +180,7 @@ export function buildCategoryLayout({
         ...node,
         link: node.item,
       })),
-      children: packed.children,
+      children,
       itemCount: ownItems.length,
       totalItemCount: computeSubtreeCount(key),
       totalLinkCount: computeSubtreeCount(key),
@@ -267,17 +241,26 @@ export function buildCategoryLayout({
     return placed
   })
 
-  const contentMaxX = categoryGroups.length
-    ? Math.max(...categoryGroups.map((category) => category.absX + category.width))
+  const visibleNodes = []
+  const collectVisibleNodes = (node) => {
+    visibleNodes.push(node)
+    for (const child of node.children) {
+      if (expandedCategoryIds.has(child.id)) collectVisibleNodes(child)
+    }
+  }
+  categoryGroups.forEach(collectVisibleNodes)
+
+  const contentMaxX = visibleNodes.length
+    ? Math.max(...visibleNodes.map((category) => category.absX + category.width))
     : 800
-  const contentMaxY = categoryGroups.length
-    ? Math.max(...categoryGroups.map((category) => category.absY + category.height))
+  const contentMaxY = visibleNodes.length
+    ? Math.max(...visibleNodes.map((category) => category.absY + category.height))
     : 600
-  const contentMinX = categoryGroups.length
-    ? Math.min(...categoryGroups.map((category) => category.absX))
+  const contentMinX = visibleNodes.length
+    ? Math.min(...visibleNodes.map((category) => category.absX))
     : 0
-  const contentMinY = categoryGroups.length
-    ? Math.min(...categoryGroups.map((category) => category.absY))
+  const contentMinY = visibleNodes.length
+    ? Math.min(...visibleNodes.map((category) => category.absY))
     : 0
 
   return {

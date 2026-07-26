@@ -25,6 +25,7 @@ export default function LinksCanvasTab({
 }) {
   const [links, setLinks] = useState([])
   const [showSave, setShowSave] = useState(false)
+  const [editingLink, setEditingLink] = useState(null)
   const [saveTitle, setSaveTitle] = useState('')
   const [saveUrl, setSaveUrl] = useState('')
   const [saveCategoryId, setSaveCategoryId] = useState(null)
@@ -72,9 +73,19 @@ export default function LinksCanvasTab({
   }, [universeId])
 
   const openSaveModal = useCallback(() => {
+    setEditingLink(null)
     setSaveTitle('')
     setSaveUrl('')
     setSaveCategoryId(null)
+    setSaveError('')
+    setShowSave(true)
+  }, [])
+
+  const openEditModal = useCallback((link) => {
+    setEditingLink(link)
+    setSaveTitle(link.title || '')
+    setSaveUrl(link.url || '')
+    setSaveCategoryId(link.category_id ?? null)
     setSaveError('')
     setShowSave(true)
   }, [])
@@ -85,25 +96,42 @@ export default function LinksCanvasTab({
     setSaving(true)
     setSaveError('')
     try {
-      const response = await fetch(`/api/links?universe_id=${universeId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: saveTitle.trim() || saveUrl.trim(),
-          url: saveUrl.trim(),
-          category_id: saveCategoryId,
-        }),
-      })
+      const response = await fetch(
+        editingLink ? `/api/links/${editingLink.id}` : `/api/links?universe_id=${universeId}`,
+        {
+          method: editingLink ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: saveTitle.trim() || saveUrl.trim(),
+            url: saveUrl.trim(),
+            category_id: saveCategoryId,
+          }),
+        },
+      )
       if (!response.ok) throw new Error()
-      const created = await response.json()
-      setLinks((current) => [...current, created])
+      const saved = await response.json()
+      setLinks((current) => editingLink
+        ? current.map((link) => (link.id === saved.id ? saved : link))
+        : [...current, saved])
       setShowSave(false)
+      setEditingLink(null)
     } catch {
-      setSaveError('Could not save this link.')
+      setSaveError(editingLink ? 'Could not update this link.' : 'Could not save this link.')
     } finally {
       setSaving(false)
     }
-  }, [saveCategoryId, saveTitle, saveUrl, universeId])
+  }, [editingLink, saveCategoryId, saveTitle, saveUrl, universeId])
+
+  const removeLink = useCallback(async (link) => {
+    if (!window.confirm(`Remove "${link.title || link.url}"?`)) return
+    try {
+      const response = await fetch(`/api/links/${link.id}`, { method: 'DELETE' })
+      if (!response.ok) throw new Error()
+      setLinks((current) => current.filter((item) => item.id !== link.id))
+    } catch {
+      window.alert('Could not remove this link.')
+    }
+  }, [])
 
   const persistOrder = useCallback(async (nextLinks) => {
     if (universeId == null) return
@@ -146,6 +174,7 @@ export default function LinksCanvasTab({
 
   const addOfferedLink = useCallback(() => {
     if (!offeredLink) return
+    setEditingLink(null)
     setSaveTitle(offeredLink.title || offeredLink.url)
     setSaveUrl(offeredLink.url)
     setSaveCategoryId(null)
@@ -170,7 +199,9 @@ export default function LinksCanvasTab({
     },
     onReorderDrop: handleReorderDrop,
     onReorderEnd: () => { setDraggingId(null); setDropTarget(null) },
-  }), [draggingId, dropTarget, handleReorderDrop])
+    onEdit: openEditModal,
+    onDelete: removeLink,
+  }), [draggingId, dropTarget, handleReorderDrop, openEditModal, removeLink])
 
   return (
     <div className="links-canvas-tab">
@@ -208,6 +239,7 @@ export default function LinksCanvasTab({
         {!error && loading && <div className="browse-empty">Initializing city grid…</div>}
         {!error && !loading && (
           <CategoryCanvas
+            key={`${universeId}:links`}
             categories={categories}
             items={links}
             getCategoryId={getCategoryId}
@@ -218,6 +250,7 @@ export default function LinksCanvasTab({
             uncategorizedPos={uncategorizedPos}
             includeUncategorized
             universeId={universeId}
+            contentType="links"
             onMoveCategory={persistCategoryPosition}
             renderItem={renderLinkItem}
             renderCategoryActions={renderLinkCategoryActions}
@@ -229,11 +262,11 @@ export default function LinksCanvasTab({
       </main>
 
       {showSave && (
-        <div className="browse-modal-backdrop" onMouseDown={() => setShowSave(false)}>
+        <div className="browse-modal-backdrop" onMouseDown={() => { setShowSave(false); setEditingLink(null) }}>
           <form className="browse-modal" onSubmit={saveLink} onMouseDown={(event) => event.stopPropagation()}>
             <div className="browse-modal-header">
-              <h2>Save link</h2>
-              <button type="button" className="browse-modal-close" onClick={() => setShowSave(false)} aria-label="Close">
+              <h2>{editingLink ? 'Edit link' : 'Save link'}</h2>
+              <button type="button" className="browse-modal-close" onClick={() => { setShowSave(false); setEditingLink(null) }} aria-label="Close">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                   <path d="M18 6 6 18M6 6l12 12" />
                 </svg>
@@ -266,13 +299,13 @@ export default function LinksCanvasTab({
             </label>
             {saveError && <div className="browse-save-error">{saveError}</div>}
             <div className="browse-modal-actions">
-              <button type="button" className="browse-cancel-button" onClick={() => setShowSave(false)}>Cancel</button>
+              <button type="button" className="browse-cancel-button" onClick={() => { setShowSave(false); setEditingLink(null) }}>Cancel</button>
               <button
                 type="submit"
                 className="browse-save-button"
                 disabled={saving || !saveUrl.trim() || universeId == null || saveCategoryId == null}
               >
-                {saving ? 'Saving…' : 'Save link'}
+                {saving ? 'Saving…' : (editingLink ? 'Update link' : 'Save link')}
               </button>
             </div>
           </form>
