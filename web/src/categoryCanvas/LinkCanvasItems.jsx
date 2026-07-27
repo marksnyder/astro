@@ -103,6 +103,7 @@ export function renderLinkItem({
       onReorderEnd={extra?.onReorderEnd}
       isDragging={extra?.draggingId === node.id}
       dropEdge={extra?.dropTarget?.id === node.id ? extra.dropTarget.edge : null}
+      onPin={extra?.onPin}
       onEdit={extra?.onEdit}
       onMove={extra?.onMove}
       onDelete={extra?.onDelete}
@@ -124,6 +125,7 @@ function LinkItemRow({
   onReorderEnd,
   isDragging,
   dropEdge,
+  onPin,
   onEdit,
   onMove,
   onDelete,
@@ -211,6 +213,22 @@ function LinkItemRow({
           </span>
         </a>
         <div className="city-item-actions" onPointerDown={(event) => event.stopPropagation()}>
+          <button
+            type="button"
+            className={`city-item-action${node.item.pinned ? ' pinned' : ''}`}
+            title={node.item.pinned ? 'Unpin' : 'Pin'}
+            aria-label={`${node.item.pinned ? 'Unpin' : 'Pin'} ${node.item.title || 'link'}`}
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              onPin?.(node.item)
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill={node.item.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+              <path d="M12 17v5" />
+              <path d="M9 2h6l-1 7h4l-5 7H7l2-7H5l1-7z" />
+            </svg>
+          </button>
           <button
             type="button"
             className="city-item-action"

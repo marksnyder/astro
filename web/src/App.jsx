@@ -2629,6 +2629,7 @@ function App() {
                 offeredLink={pendingLinkOffer}
                 onOfferHandled={() => setPendingLinkOffer(null)}
                 onCategoriesChange={fetchCategories}
+                onPinChange={fetchPinned}
               />
             </div>
           ))}

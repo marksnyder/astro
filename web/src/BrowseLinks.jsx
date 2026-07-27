@@ -23,6 +23,7 @@ export default function LinksCanvasTab({
   categories,
   offeredLink = null,
   onOfferHandled,
+  onPinChange,
 }) {
   const [links, setLinks] = useState([])
   const [showSave, setShowSave] = useState(false)
@@ -123,16 +124,31 @@ export default function LinksCanvasTab({
     }
   }, [editingLink, saveCategoryId, saveTitle, saveUrl, universeId])
 
+  const togglePin = useCallback(async (link) => {
+    const newPinned = !link.pinned
+    try {
+      const response = await fetch(`/api/links/${link.id}/pin?pinned=${newPinned}`, { method: 'PUT' })
+      if (!response.ok) throw new Error()
+      setLinks((current) => current.map((item) => (
+        item.id === link.id ? { ...item, pinned: newPinned } : item
+      )))
+      onPinChange?.()
+    } catch {
+      window.alert('Could not update pin.')
+    }
+  }, [onPinChange])
+
   const removeLink = useCallback(async (link) => {
     if (!window.confirm(`Remove "${link.title || link.url}"?`)) return
     try {
       const response = await fetch(`/api/links/${link.id}`, { method: 'DELETE' })
       if (!response.ok) throw new Error()
       setLinks((current) => current.filter((item) => item.id !== link.id))
+      onPinChange?.()
     } catch {
       window.alert('Could not remove this link.')
     }
-  }, [])
+  }, [onPinChange])
 
   const moveToUniverse = useCallback(async (link, targetUniverseId, categoryId) => {
     const response = await fetch(`/api/links/${link.id}/move-universe`, {
@@ -149,8 +165,9 @@ export default function LinksCanvasTab({
       return false
     }
     setLinks((current) => current.filter((item) => item.id !== link.id))
+    onPinChange?.()
     return true
-  }, [])
+  }, [onPinChange])
 
   const persistOrder = useCallback(async (nextLinks) => {
     if (universeId == null) return
@@ -218,6 +235,7 @@ export default function LinksCanvasTab({
     },
     onReorderDrop: handleReorderDrop,
     onReorderEnd: () => { setDraggingId(null); setDropTarget(null) },
+    onPin: togglePin,
     onEdit: openEditModal,
     onMove: moveToUniverse,
     onDelete: removeLink,
@@ -230,6 +248,7 @@ export default function LinksCanvasTab({
     moveToUniverse,
     openEditModal,
     removeLink,
+    togglePin,
     universeId,
     universes,
   ])
