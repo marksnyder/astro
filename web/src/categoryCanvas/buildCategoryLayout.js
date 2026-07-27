@@ -26,8 +26,10 @@ export const FLYOUT_GAP = 48
 export const CONTENT_BOTTOM = 16
 export const MIN_CATEGORY_W = 280
 export const MIN_CATEGORY_H = 120
-/** Approx. characters per title line (accounts for action buttons shrinking the text area). */
-export const TITLE_CHARS_PER_LINE = 18
+/** Space below the last item so hover action icons are not clipped. */
+export const ITEM_ACTIONS_RESERVE = 36
+/** Approx. characters per title line when the title uses the full item width. */
+export const TITLE_CHARS_PER_LINE = 32
 export const TITLE_LINE_H = 14
 export const META_LINE_H = 12
 export const ITEM_CARD_PAD_Y = 14
@@ -97,9 +99,9 @@ export function buildItemNodes(items, getItemId, getItemTitle) {
   return {
     itemNodes,
     itemAreaW: ITEM_PAD_X * 2 + ITEM_CARD_W,
-    itemAreaH: ITEM_PAD_Y + visibleItemHeight + CONTENT_BOTTOM,
-    visibleItemHeight,
-    itemContentHeight,
+    itemAreaH: ITEM_PAD_Y + visibleItemHeight + ITEM_ACTIONS_RESERVE + CONTENT_BOTTOM,
+    visibleItemHeight: visibleItemHeight + ITEM_ACTIONS_RESERVE,
+    itemContentHeight: itemContentHeight + ITEM_ACTIONS_RESERVE,
   }
 }
 

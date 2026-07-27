@@ -197,10 +197,10 @@
   object-fit: contain;
   pointer-events: none;
   transform: translate(-50%, -50%);
-  opacity: 0.48;
+  opacity: 0.18;
   filter:
-    drop-shadow(0 0 18px rgba(55, 148, 255, 0.45))
-    drop-shadow(0 0 48px rgba(120, 80, 255, 0.28));
+    drop-shadow(0 0 14px rgba(55, 148, 255, 0.22))
+    drop-shadow(0 0 36px rgba(120, 80, 255, 0.14));
 }
 
 .city-paths {
@@ -545,6 +545,11 @@
   transition: opacity 0.2s, filter 0.2s, background 0.2s;
 }
 
+.city-tower:hover,
+.city-tower:focus-within {
+  z-index: 8;
+}
+
 .city-tower.is-dimmed {
   opacity: 0.18;
   filter: grayscale(0.4);
@@ -599,12 +604,13 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  flex: 1;
-  width: auto;
+  flex: 1 1 100%;
+  width: 100%;
   min-width: 0;
   gap: 8px;
   height: 100%;
-  padding: 0 10px 0 24px;
+  padding: 0 10px;
+  box-sizing: border-box;
   border: 0;
   background: transparent;
   text-decoration: none;
@@ -612,6 +618,10 @@
   color: #edf3ff;
   font: inherit;
   cursor: pointer;
+}
+
+.city-tower-body:has(.city-tower-drag) .city-tower-link {
+  padding-left: 24px;
 }
 
 .city-tower-icon {
@@ -687,17 +697,30 @@
 }
 
 .city-item-actions {
+  position: absolute;
+  top: calc(100% - 1px);
+  right: 4px;
+  z-index: 3;
   display: flex;
   align-items: center;
   gap: 2px;
   flex-shrink: 0;
+  padding: 3px 4px;
+  border: 1px solid color-mix(in srgb, var(--district-accent) 42%, rgba(255, 255, 255, 0.1));
+  background: color-mix(in srgb, var(--district-accent) 10%, rgba(10, 14, 24, 0.98));
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.38);
   opacity: 0;
-  transition: opacity 0.12s;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.12s, visibility 0s linear 0.12s;
 }
 
 .city-tower:hover .city-item-actions,
 .city-tower:focus-within .city-item-actions {
   opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition-delay: 0s;
 }
 
 .city-item-action,
@@ -732,7 +755,7 @@
 }
 
 .city-tower-body.has-actions {
-  padding-right: 6px;
+  padding-right: 4px;
 }
 
 .city-tower-meta {
