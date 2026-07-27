@@ -1881,6 +1881,93 @@ img { max-width: 100%; height: auto; }
   line-height: 1.7;
 }
 
+.home-workflow {
+  border-top: 1px solid rgba(255, 255, 255, .06);
+  background:
+    radial-gradient(circle at 50% 40%, rgba(110, 231, 199, .05), transparent 42%),
+    #0c1118;
+}
+
+.workflow-diagram {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 1.25rem;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 14px;
+  background:
+    linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px),
+    #0b1017;
+  background-size: 36px 36px, 36px 36px, auto;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, .28);
+}
+
+.workflow-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.wf-node-kicker {
+  fill: #8092a6;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 11px;
+  letter-spacing: .12em;
+}
+
+.wf-node-title {
+  fill: #e8eef4;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.wf-node-body {
+  fill: #7d8b9a;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+}
+
+.wf-hub-title {
+  fill: #6ee7c7;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+.wf-hub-sub {
+  fill: #d7e0e8;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.wf-hub-body {
+  fill: #7f8d9c;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 12px;
+}
+
+.wf-edge-label {
+  fill: #667685;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 11px;
+  letter-spacing: .02em;
+}
+
+.wf-edge-accent { fill: #6ee7c7; }
+
+.workflow-caption {
+  margin-top: 1.1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, .08);
+  color: #8090a0;
+  font-size: .88rem;
+  line-height: 1.65;
+  text-align: center;
+}
+
 .home-capabilities {
   border-top: 1px solid rgba(255, 255, 255, .06);
   background: #0c1118;
@@ -2181,6 +2268,8 @@ img { max-width: 100%; height: auto; }
   .connect-card { grid-template-columns: 1fr; gap: 3rem; padding: 3rem; }
   .connect-copy { text-align: center; }
   .connect-copy .eyebrow, .connect-clients { justify-content: center; }
+  .workflow-diagram { padding: 1rem .75rem .9rem; }
+  .workflow-caption { font-size: .8rem; text-align: left; }
 }
 
 @media (max-width: 700px) {

@@ -160,7 +160,7 @@ layout: default
         <span class="loop-number">03</span>
         <div class="loop-icon">⌁</div>
         <h3>Let agents act</h3>
-        <p>Any MCP-compatible client can search, read, write, organize, and run workflows against your Astro instance.</p>
+        <p>Any MCP-compatible client—Cursor, Claude Desktop, OpenAI Codex, Hermes, or your own agent—can search, read, write, organize, and run workflows against your Astro instance.</p>
       </article>
       <article class="loop-step">
         <span class="loop-number">04</span>
@@ -169,6 +169,95 @@ layout: default
         <p>Results land in dashboards, tables, diagrams, notes, or captured task logs—not buried in a disposable conversation.</p>
       </article>
     </div>
+  </section>
+
+  <section class="home-section home-workflow">
+    <div class="section-heading">
+      <p class="eyebrow"><span></span>How it fits together</p>
+      <h2>Slack, agents, and Astro in one loop.</h2>
+      <p>Astro sits in the middle: humans author and inspect work there, Slack coordinates delivery, and MCP clients act on the same shared corpus.</p>
+    </div>
+    <figure class="workflow-diagram" aria-labelledby="workflow-diagram-caption">
+      <svg class="workflow-svg" viewBox="0 0 980 520" role="img" aria-label="Workflow diagram: humans and Slack connect to Astro, while MCP clients such as Cursor, Claude Desktop, OpenAI Codex, and Hermes use MCP tools against the same Astro workspace.">
+        <defs>
+          <linearGradient id="wfAstroGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#6ee7c7" stop-opacity=".22"/>
+            <stop offset="100%" stop-color="#78a8ff" stop-opacity=".12"/>
+          </linearGradient>
+          <marker id="wfArrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="#6ee7c7"/>
+          </marker>
+          <marker id="wfArrowMuted" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="#718092"/>
+          </marker>
+        </defs>
+
+        <!-- Connection paths -->
+        <path class="wf-path" d="M250 150 C320 150, 340 250, 400 260" fill="none" stroke="#718092" stroke-width="1.5" marker-end="url(#wfArrowMuted)"/>
+        <path class="wf-path wf-path-accent" d="M250 370 C320 370, 340 290, 400 280" fill="none" stroke="#6ee7c7" stroke-width="1.75" marker-end="url(#wfArrow)"/>
+        <path class="wf-path wf-path-accent" d="M580 260 C640 250, 660 150, 730 150" fill="none" stroke="#6ee7c7" stroke-width="1.75" marker-end="url(#wfArrow)"/>
+        <path class="wf-path" d="M580 280 C640 290, 660 370, 730 370" fill="none" stroke="#718092" stroke-width="1.5" marker-end="url(#wfArrowMuted)"/>
+
+        <!-- Edge labels -->
+        <text x="300" y="132" class="wf-edge-label">instructions · status</text>
+        <text x="285" y="410" class="wf-edge-label wf-edge-accent">Agent Tasks</text>
+        <text x="640" y="132" class="wf-edge-label wf-edge-accent">MCP tools</text>
+        <text x="655" y="410" class="wf-edge-label">shared corpus</text>
+
+        <!-- Humans card -->
+        <g class="wf-node">
+          <rect x="48" y="88" width="200" height="124" rx="12" fill="#111720" stroke="rgba(246,186,102,.35)" stroke-width="1.5"/>
+          <circle cx="78" cy="118" r="8" fill="#f6ba66"/>
+          <text x="96" y="123" class="wf-node-kicker">HUMANS</text>
+          <text x="68" y="156" class="wf-node-title">Author &amp; inspect</text>
+          <text x="68" y="180" class="wf-node-body">Markdown · dashboards</text>
+          <text x="68" y="198" class="wf-node-body">tables · diagrams</text>
+        </g>
+
+        <!-- Slack card -->
+        <g class="wf-node">
+          <rect x="48" y="308" width="200" height="124" rx="12" fill="#111720" stroke="rgba(167,139,250,.4)" stroke-width="1.5"/>
+          <circle cx="78" cy="338" r="8" fill="#a78bfa"/>
+          <text x="96" y="343" class="wf-node-kicker">SLACK</text>
+          <text x="68" y="376" class="wf-node-title">Coordinate work</text>
+          <text x="68" y="400" class="wf-node-body">Scheduled delivery</text>
+          <text x="68" y="418" class="wf-node-body">mentions · channels</text>
+        </g>
+
+        <!-- Astro hub -->
+        <g class="wf-hub">
+          <rect x="400" y="190" width="180" height="160" rx="16" fill="url(#wfAstroGlow)" stroke="#6ee7c7" stroke-width="2"/>
+          <rect x="412" y="202" width="156" height="136" rx="12" fill="#0b1017" stroke="rgba(110,231,199,.25)"/>
+          <text x="490" y="248" text-anchor="middle" class="wf-hub-title">ASTRO</text>
+          <text x="490" y="278" text-anchor="middle" class="wf-hub-sub">Shared workspace</text>
+          <text x="490" y="304" text-anchor="middle" class="wf-hub-body">UI · REST · MCP</text>
+          <text x="490" y="324" text-anchor="middle" class="wf-hub-body">one corpus</text>
+        </g>
+
+        <!-- MCP clients card -->
+        <g class="wf-node">
+          <rect x="732" y="88" width="200" height="124" rx="12" fill="#111720" stroke="rgba(120,168,255,.4)" stroke-width="1.5"/>
+          <circle cx="762" cy="118" r="8" fill="#78a8ff"/>
+          <text x="780" y="123" class="wf-node-kicker">MCP CLIENTS</text>
+          <text x="752" y="156" class="wf-node-title">Agents act</text>
+          <text x="752" y="180" class="wf-node-body">Cursor · Claude</text>
+          <text x="752" y="198" class="wf-node-body">Codex · Hermes</text>
+        </g>
+
+        <!-- Outputs card -->
+        <g class="wf-node">
+          <rect x="732" y="308" width="200" height="124" rx="12" fill="#111720" stroke="rgba(110,231,199,.35)" stroke-width="1.5"/>
+          <circle cx="762" cy="338" r="8" fill="#6ee7c7"/>
+          <text x="780" y="343" class="wf-node-kicker">OUTPUTS</text>
+          <text x="752" y="376" class="wf-node-title">Inspectable results</text>
+          <text x="752" y="400" class="wf-node-body">Notes · tables · boards</text>
+          <text x="752" y="418" class="wf-node-body">scripts · task logs</text>
+        </g>
+      </svg>
+      <figcaption id="workflow-diagram-caption" class="workflow-caption">
+        Humans author in Astro. Agent Tasks reach Slack. MCP clients like Cursor, Claude Desktop, OpenAI Codex, and Hermes read and write the same Astro objects.
+      </figcaption>
+    </figure>
   </section>
 
   <section class="home-section home-capabilities">
@@ -181,7 +270,7 @@ layout: default
       <article class="capability-card capability-featured">
         <div class="capability-top"><span class="capability-icon">⌘</span><span class="capability-tag">CORE</span></div>
         <h3>60+ MCP tools</h3>
-        <p>Read, write, search, organize, schedule, and execute across Astro from Cursor, Claude Desktop, or your own agent.</p>
+        <p>Read, write, search, organize, schedule, and execute across Astro from Cursor, Claude Desktop, OpenAI Codex, Hermes, or your own agent.</p>
         <div class="tool-cloud"><span>search</span><span>read_markdown</span><span>write_table_row</span><span>run_script</span><span>upsert_dashboard</span></div>
       </article>
       <article class="capability-card">
@@ -243,7 +332,7 @@ layout: default
         <p class="eyebrow"><span></span>Connect your agent</p>
         <h2>One endpoint.<br>A shared world of context.</h2>
         <p>Point any MCP-compatible client at Astro. Your agent gets tools for the same workspace you see and edit.</p>
-        <div class="connect-clients"><span>Cursor</span><span>Claude Desktop</span><span>Custom agents</span></div>
+        <div class="connect-clients"><span>Cursor</span><span>Claude Desktop</span><span>OpenAI Codex</span><span>Hermes</span><span>Custom agents</span></div>
         <a href="{{ '/docs/' | relative_url }}" class="btn btn-outline">Read the MCP docs</a>
       </div>
       <div class="connect-terminal" aria-label="MCP connection example">
