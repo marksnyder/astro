@@ -1,6 +1,6 @@
 title: Run Astro
-tagline: "Your Universe, Organized."
-description: "A self-hosted workspace that brings agent orchestration, markdowns, documents, and tables into one platform."
+tagline: "The human interface for AI."
+description: "Astro is the self-hosted workspace where humans and AI agents share instructions, context, tools, and outputs through Markdown, Slack, and MCP."
 url: ""
 baseurl: ""
 

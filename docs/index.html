@@ -2,402 +2,309 @@
 layout: default
 ---
 
-<section class="hero">
-  <div class="hero-inner">
-    <img src="{{ '/assets/img/logo.png' | relative_url }}" alt="Astro" class="hero-logo">
-    <p class="hero-tagline">Build apps on top of AI—not chat wrappers.</p>
-    <div class="hero-actions">
-      <a href="{{ '/install/' | relative_url }}" class="btn btn-primary">Get Started</a>
-      <a href="{{ '/docs/' | relative_url }}" class="btn btn-outline">Explore Docs</a>
-      <a href="https://chromewebstore.google.com/detail/astro-browse/djbiamicfibnldnmhfnmndpdmghilmmi" class="btn btn-outline btn-chrome">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -2px; margin-right: 6px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3a4.5 4.5 0 0 1 4.24 3H12a4.5 4.5 0 0 0-3.9 2.25L5.76 6.34A7.96 7.96 0 0 1 12 5zm-8 7c0-1.34.33-2.6.91-3.71L8.84 15A4.5 4.5 0 0 0 12 16.5c.42 0 .82-.06 1.21-.16l-2.34 4.05A8.01 8.01 0 0 1 4 12zm8 8c.34 0 .68-.02 1.01-.07L15.35 16A4.49 4.49 0 0 0 16.5 12c0-.6-.12-1.17-.33-1.7l4.05-2.07c.5 1.15.78 2.42.78 3.77 0 4.42-3.58 8-8 8zM12 15a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/></svg>Chrome and Edge extension
-      </a>
-    </div>
-    <div class="install-banner">
-      <span class="label">Install</span>
-      <code id="installCmd">curl -fsSL https://runastro.sh/install.sh | bash</code>
-      <button class="copy-btn" onclick="copyInstall()" title="Copy to clipboard">
-        <svg class="copy-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        <svg class="check-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-      </button>
-    </div>
-    <script>
-    function copyInstall() {
-      var text = document.getElementById('installCmd').textContent;
-      navigator.clipboard.writeText(text);
-      var btn = document.querySelector('.copy-btn');
-      btn.classList.add('copied');
-      setTimeout(function() { btn.classList.remove('copied'); }, 2000);
-    }
-    </script>
-  </div>
-</section>
+<main class="home">
+  <section class="home-hero">
+    <div class="home-hero-glow home-hero-glow-one" aria-hidden="true"></div>
+    <div class="home-hero-glow home-hero-glow-two" aria-hidden="true"></div>
+    <div class="home-hero-grid">
+      <div class="home-hero-copy">
+        <p class="eyebrow"><span></span>The human interface for AI</p>
+        <h1>Give your agents a workspace <em>humans understand.</em></h1>
+        <p class="home-hero-lead">
+          Astro brings instructions, context, tools, and outputs into one self-hosted interface.
+          You work in Markdown, Slack, tables, and dashboards. Your agents work through MCP.
+          Both work on the same things.
+        </p>
+        <div class="home-hero-actions">
+          <a href="{{ '/install/' | relative_url }}" class="btn btn-primary">Install Astro</a>
+          <a href="{{ '/docs/' | relative_url }}" class="btn btn-outline">Explore the docs</a>
+        </div>
+        <div class="home-install">
+          <span class="home-install-prompt" aria-hidden="true">$</span>
+          <code id="installCmd">curl -fsSL https://runastro.sh/install.sh | bash</code>
+          <button class="copy-btn" id="copyInstallButton" type="button" onclick="copyInstall()" title="Copy install command" aria-label="Copy install command">
+            <svg class="copy-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <svg class="check-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <span class="sr-only" id="copyStatus" aria-live="polite"></span>
+        </div>
+        <p class="home-hero-note">Open source · Runs in Docker · Your data stays yours</p>
+      </div>
 
-<section class="what-is-astro">
-  <div class="what-is-inner">
-    <h2>What Is Astro?</h2>
-    <p class="what-is-lead">
-      Astro is a self-hosted <strong>application layer for AI</strong>. It gives you structured memory (markdown, documents, tables, diagrams),
-      <strong>automation</strong> (Python scripts and schedules, Slack agent tasks), and a full <strong>MCP + REST</strong> surface so models and humans operate on the same data—not parallel silos.
-      <strong>Universes</strong> split projects cleanly; each one gets its own dashboard, categories, and agent context.
-    </p>
-    <div class="what-is-points">
-      <div class="what-is-point">
-        <span class="what-is-icon wia-amber">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.87-3.13-7-7-7zM9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9v1z"/></svg>
-        </span>
-        Compose apps from blocks
-      </div>
-      <div class="what-is-point">
-        <span class="what-is-icon wia-purple">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 0 1 7.93 7H12V4.07A7.96 7.96 0 0 1 12 4z"/></svg>
-        </span>
-        Local embeddings, your data
-      </div>
-      <div class="what-is-point">
-        <span class="what-is-icon wia-green">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M13 3v2.05A7.002 7.002 0 0 1 19 12c0 1.48-.46 2.85-1.24 3.99l1.45 1.45A8.96 8.96 0 0 0 21 12c0-4.63-3.5-8.44-8-8.95zM3 12c0-4.63 3.5-8.44 8-8.95V1l4 3-4 3V4.05A7.002 7.002 0 0 0 5 12c0 1.48.46 2.85 1.24 3.99L4.79 17.44A8.96 8.96 0 0 1 3 12zm9 9c-1.48 0-2.85-.46-3.99-1.24l-1.45 1.45A8.96 8.96 0 0 0 12 23c4.63 0 8.44-3.5 8.95-8H23l-3-4-3 4h2.05A7.002 7.002 0 0 1 12 21z"/></svg>
-        </span>
-        Agents and people, one corpus
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="pillars">
-  <div class="pillars-inner">
-    <div class="pillars-heading">
-      <h2>Core Features</h2>
-      <p>Memory, automation, and coordination in one Docker install—so you spend time on product logic, not gluing vector DBs, cron runners, and Slack bots together.</p>
-    </div>
-    <div class="carousel-wrapper">
-      <button class="carousel-btn carousel-prev" onclick="carouselMove(-1)" aria-label="Previous feature">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-      </button>
-      <div class="carousel-track-container">
-        <div class="carousel-track" id="featureTrack">
-          <div class="pillar">
-            <div class="pillar-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <div class="interface-demo" aria-label="A human and agents working through Astro">
+        <div class="interface-demo-bar">
+          <span class="interface-demo-dot"></span>
+          <span class="interface-demo-dot"></span>
+          <span class="interface-demo-dot"></span>
+          <span class="interface-demo-title">Product launch · Astro</span>
+        </div>
+        <div class="interface-demo-body">
+          <div class="interface-human">
+            <div class="interface-label">
+              <span class="status-dot status-human"></span>
+              Human-readable instruction
             </div>
-            <h3>Vector Store</h3>
-            <p>
-              Markdowns and documents embed into local ChromaDB with CPU-based vectors—no cloud embedding keys.
-              Semantic search spans the full corpus so retrieval stays private, fast, and grounded in your content.
-            </p>
+            <div class="instruction-card">
+              <div class="instruction-type">MARKDOWN</div>
+              <strong>Prepare the launch brief</strong>
+              <p>Review our research, compare the alternatives, and update the launch dashboard.</p>
+              <div class="instruction-tool"><span>MCP</span> search documents</div>
+              <div class="instruction-tool"><span>MCP</span> update dashboard</div>
+            </div>
           </div>
-          <div class="pillar">
-            <div class="pillar-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </div>
-            <h3>Markdowns</h3>
-            <p>
-              Rich notes with formatting, images, categories, and full-text search.
-              Each note feeds retrieval automatically so agents draw from the same material you see in the UI.
-            </p>
+          <div class="interface-bridge" aria-hidden="true">
+            <span class="bridge-line"></span>
+            <span class="bridge-pill">MCP</span>
+            <span class="bridge-line"></span>
           </div>
-          <div class="pillar">
-            <div class="pillar-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+          <div class="interface-agent">
+            <div class="interface-label">
+              <span class="status-dot status-agent"></span>
+              Agent-readable tools
             </div>
-            <h3>Documents</h3>
-            <p>
-              Upload PDF, DOCX, XLSX, PPTX, TXT, MD, or CSV; Astro ingests and embeds each file.
-              Uploads become searchable memory instead of passive attachments on disk.
-            </p>
-          </div>
-          <div class="pillar">
-            <div class="pillar-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="10" y1="6.5" x2="14" y2="6.5"/><line x1="17.5" y1="10" x2="17.5" y2="14"/><line x1="6.5" y1="10" x2="6.5" y2="14"/></svg>
+            <div class="agent-activity">
+              <div class="activity-row"><span class="activity-icon">01</span><span><strong>read_markdown</strong><small>Instructions loaded</small></span><i>done</i></div>
+              <div class="activity-row"><span class="activity-icon">02</span><span><strong>search</strong><small>12 sources found</small></span><i>done</i></div>
+              <div class="activity-row activity-live"><span class="activity-icon">03</span><span><strong>upsert_dashboard</strong><small>Writing inspectable output</small></span><i>live</i></div>
             </div>
-            <h3>Diagrams</h3>
-            <p>
-              Create and edit diagrams with
-              <a href="https://excalidraw.com" style="color: inherit; text-decoration: underline;">Excalidraw</a>:
-              shapes, arrows, and sketches in a full embedded editor.
-              Import and export <code>.excalidraw</code> files and keep visuals next to your specs.
-            </p>
-          </div>
-          <div class="pillar">
-            <div class="pillar-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
-            </div>
-            <h3>Tables</h3>
-            <p>
-              Spreadsheet-style grids with typed columns, inline row editing, and CSV import or export.
-              Model structured datasets that both people and automation can read and update reliably.
-            </p>
-          </div>
-          <div class="pillar">
-            <div class="pillar-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-            </div>
-            <h3>Bookmarks</h3>
-            <p>
-              Save URLs with titles and categories beside notes and documents.
-              Links stay discoverable in search so references surface without digging through browser history.
-            </p>
-          </div>
-          <div class="pillar">
-            <div class="pillar-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            </div>
-            <h3>Slack Integration</h3>
-            <p>
-              Connect a Slack bot so Agent Tasks post instructions to your workspace channels.
-              Coordinate people and AI agents in Slack while Astro handles scheduling and delivery.
-            </p>
-          </div>
-          <div class="pillar">
-            <div class="pillar-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/><circle cx="12" cy="12" r="3"/></svg>
-            </div>
-            <h3>Agent Tasks</h3>
-            <p>
-              Bind a task to a markdown note and Slack channel: run now, on a cron schedule, or once later.
-              Astro sends instructions through a configurable template with API context and note IDs.
-            </p>
-          </div>
-          <div class="pillar">
-            <div class="pillar-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-            </div>
-            <h3>Universe Dashboard</h3>
-            <p>
-              Each universe opens to a four-column markdown widget board: status, links, images, runbooks.
-              Drag to reorder; agents upsert widgets by tag over MCP. Live refresh keeps the board current.
-            </p>
-          </div>
-          <div class="pillar">
-            <div class="pillar-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-            </div>
-            <h3>Scripts</h3>
-            <p>
-              Python as first-class content: syntax-highlighted editor, autosave, run on the server with captured output.
-              Call APIs, scrape pages, or glue Astro data without leaving the app.
-            </p>
-          </div>
-          <div class="pillar">
-            <div class="pillar-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            </div>
-            <h3>Python Tasks</h3>
-            <p>
-              Schedule scripts like cron jobs: manual run, recurring UTC cron, or one-shot future time.
-              Last status and stdout/stderr stay on the task—automation you can inspect.
-            </p>
-          </div>
-          <div class="pillar">
-            <div class="pillar-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6"/><path d="M6 8h12"/><path d="M8 8v4a4 4 0 0 0 8 0V8"/><path d="M12 16v6"/></svg>
-            </div>
-            <h3>MCP Server</h3>
-            <p>
-              A built-in <a href="https://modelcontextprotocol.io" style="color: inherit; text-decoration: underline;">Model Context Protocol</a>
-              server exposes tools for search, notes, tables, diagrams, scripts, Python tasks, dashboard widgets, Slack agent tasks, and more.
-              Point any MCP-compatible client at your instance so agents read and write the same corpus you see in the UI.
-            </p>
           </div>
         </div>
+        <div class="interface-output">
+          <span>Output visible to everyone</span>
+          <div><b>▦</b> Dashboard updated</div>
+          <div><b>▤</b> Comparison table created</div>
+        </div>
       </div>
-      <button class="carousel-btn carousel-next" onclick="carouselMove(1)" aria-label="Next feature">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </button>
     </div>
-    <div class="carousel-dots" id="carouselDots"></div>
-  </div>
-</section>
+  </section>
 
-<script>
-(function() {
-  var track = document.getElementById('featureTrack');
-  var dots = document.getElementById('carouselDots');
-  var slides = track.querySelectorAll('.pillar');
-  var idx = 0;
-  var perView = 2;
-  var maxIdx = 0;
-  var autoTimer = null;
-
-  function calcPerView() {
-    perView = window.innerWidth <= 768 ? 1 : 2;
-    maxIdx = Math.max(0, slides.length - perView);
-    if (idx > maxIdx) idx = maxIdx;
-  }
-
-  function buildDots() {
-    dots.innerHTML = '';
-    var pages = maxIdx + 1;
-    for (var i = 0; i < pages; i++) {
-      var d = document.createElement('button');
-      d.className = 'carousel-dot' + (i === idx ? ' active' : '');
-      d.setAttribute('aria-label', 'Go to slide ' + (i + 1));
-      d.onclick = (function(n) { return function() { idx = n; update(); resetAuto(); }; })(i);
-      dots.appendChild(d);
-    }
-  }
-
-  function update() {
-    var gap = 24;
-    var containerW = track.parentElement.offsetWidth;
-    var slideW = (containerW - gap * (perView - 1)) / perView;
-    slides.forEach(function(s) { s.style.minWidth = slideW + 'px'; s.style.maxWidth = slideW + 'px'; });
-    track.style.transform = 'translateX(-' + (idx * (slideW + gap)) + 'px)';
-    var prevBtn = document.querySelector('.carousel-prev');
-    var nextBtn = document.querySelector('.carousel-next');
-    if (prevBtn) prevBtn.style.opacity = idx === 0 ? '.3' : '1';
-    if (nextBtn) nextBtn.style.opacity = idx >= maxIdx ? '.3' : '1';
-    buildDots();
-  }
-
-  function resetAuto() {
-    clearInterval(autoTimer);
-    autoTimer = setInterval(function() { idx = idx >= maxIdx ? 0 : idx + 1; update(); }, 6000);
-  }
-
-  window.carouselMove = function(dir) {
-    idx = Math.max(0, Math.min(maxIdx, idx + dir));
-    update();
-    resetAuto();
-  };
-
-  calcPerView(); update(); resetAuto();
-  window.addEventListener('resize', function() { calcPerView(); update(); });
-
-  var startX = 0;
-  track.addEventListener('touchstart', function(e) { startX = e.touches[0].clientX; }, { passive: true });
-  track.addEventListener('touchend', function(e) {
-    var dx = e.changedTouches[0].clientX - startX;
-    if (Math.abs(dx) > 40) { carouselMove(dx < 0 ? 1 : -1); }
-  }, { passive: true });
-})();
-</script>
-
-{% if site.data.videos.size > 0 %}
-<section class="videos-section">
-  <div class="videos-inner">
-    <div class="videos-heading">
-      <h2>See It in Action</h2>
-      <p>Watch videos to see what Astro can do.</p>
+  <section class="home-strip" aria-label="Astro interfaces">
+    <div class="home-strip-inner">
+      <span>One shared workspace across</span>
+      <div class="home-strip-items">
+        <strong>Markdown</strong><i></i><strong>Slack</strong><i></i><strong>MCP</strong><i></i><strong>REST</strong><i></i><strong>Local search</strong>
+      </div>
     </div>
-    <div class="videos-layout">
+  </section>
+
+  <section class="home-section home-problem">
+    <div class="section-heading">
+      <p class="eyebrow"><span></span>Stop rebuilding the glue</p>
+      <h2>Your AI workflow already has an interface.<br>It is just scattered everywhere.</h2>
+      <p>Prompts live in Markdown. Tasks happen in Slack. Context sits in folders and vector databases. Outputs disappear into chat transcripts. Astro turns those pieces into a coherent system without asking you to abandon the tools you already use.</p>
+    </div>
+    <div class="before-after">
+      <article class="workflow-card workflow-before">
+        <div class="workflow-kicker">WITHOUT ASTRO</div>
+        <h3>A fragile pile of integrations</h3>
+        <ul>
+          <li><span>01</span>Copy prompts between files and chat</li>
+          <li><span>02</span>Build another one-off retrieval layer</li>
+          <li><span>03</span>Wire cron, Slack, and scripts together</li>
+          <li><span>04</span>Dig through agent logs for the result</li>
+        </ul>
+      </article>
+      <div class="workflow-arrow" aria-hidden="true">→</div>
+      <article class="workflow-card workflow-after">
+        <div class="workflow-kicker">WITH ASTRO</div>
+        <h3>One legible operating layer</h3>
+        <ul>
+          <li><span>01</span>Author durable instructions in Markdown</li>
+          <li><span>02</span>Give agents context and actions through MCP</li>
+          <li><span>03</span>Coordinate recurring work in Slack</li>
+          <li><span>04</span>Inspect results in shared, structured views</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <section class="home-section home-corpus">
+    <div class="corpus-layout">
+      <div class="corpus-copy">
+        <p class="eyebrow"><span></span>One corpus, two interfaces</p>
+        <h2>Designed for people.<br>Native to agents.</h2>
+        <p>Astro gives humans a visual workspace and agents a broad MCP surface over the exact same objects. There is no shadow memory to reconcile and no special agent-only version of your project.</p>
+        <a href="{{ '/docs/' | relative_url }}" class="text-link">See everything agents can use <span>→</span></a>
+      </div>
+      <div class="corpus-grid">
+        <a href="{{ '/docs/markdowns/' | relative_url }}" class="corpus-card"><span class="corpus-icon">M↓</span><strong>Markdowns</strong><small>Instructions and durable context</small></a>
+        <a href="{{ '/docs/documents/' | relative_url }}" class="corpus-card"><span class="corpus-icon">D</span><strong>Documents</strong><small>Searchable source material</small></a>
+        <a href="{{ '/docs/tables/' | relative_url }}" class="corpus-card"><span class="corpus-icon">▦</span><strong>Tables</strong><small>Typed, structured outputs</small></a>
+        <a href="{{ '/docs/diagrams/' | relative_url }}" class="corpus-card"><span class="corpus-icon">◇</span><strong>Diagrams</strong><small>Agent-editable Excalidraw</small></a>
+        <a href="{{ '/docs/scripts/' | relative_url }}" class="corpus-card"><span class="corpus-icon">&gt;_</span><strong>Scripts</strong><small>Runnable Python workflows</small></a>
+        <a href="{{ '/docs/dashboard/' | relative_url }}" class="corpus-card"><span class="corpus-icon">▥</span><strong>Dashboards</strong><small>Inspectable shared status</small></a>
+      </div>
+    </div>
+  </section>
+
+  <section class="home-section home-loop">
+    <div class="section-heading section-heading-left">
+      <p class="eyebrow"><span></span>The collaboration loop</p>
+      <h2>From human intent to inspectable output.</h2>
+      <p>Astro makes the handoff between people and agents explicit, repeatable, and easy to understand.</p>
+    </div>
+    <div class="loop-steps">
+      <article class="loop-step">
+        <span class="loop-number">01</span>
+        <div class="loop-icon">✎</div>
+        <h3>Write the intent</h3>
+        <p>Create reusable instructions in Markdown. Insert concrete MCP tool calls and object IDs without memorizing syntax.</p>
+      </article>
+      <article class="loop-step">
+        <span class="loop-number">02</span>
+        <div class="loop-icon">↗</div>
+        <h3>Send the work</h3>
+        <p>Run now, schedule once, or use cron. Agent Tasks deliver the instruction into the Slack channel where collaboration happens.</p>
+      </article>
+      <article class="loop-step">
+        <span class="loop-number">03</span>
+        <div class="loop-icon">⌁</div>
+        <h3>Let agents act</h3>
+        <p>Any MCP-compatible client can search, read, write, organize, and run workflows against your Astro instance.</p>
+      </article>
+      <article class="loop-step">
+        <span class="loop-number">04</span>
+        <div class="loop-icon">✓</div>
+        <h3>See what changed</h3>
+        <p>Results land in dashboards, tables, diagrams, notes, or captured task logs—not buried in a disposable conversation.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="home-section home-capabilities">
+    <div class="section-heading">
+      <p class="eyebrow"><span></span>Built for real experiments</p>
+      <h2>The pieces your agent stack keeps needing.</h2>
+      <p>Useful primitives for building serious workflows, packaged in one self-hosted application.</p>
+    </div>
+    <div class="capability-grid">
+      <article class="capability-card capability-featured">
+        <div class="capability-top"><span class="capability-icon">⌘</span><span class="capability-tag">CORE</span></div>
+        <h3>60+ MCP tools</h3>
+        <p>Read, write, search, organize, schedule, and execute across Astro from Cursor, Claude Desktop, or your own agent.</p>
+        <div class="tool-cloud"><span>search</span><span>read_markdown</span><span>write_table_row</span><span>run_script</span><span>upsert_dashboard</span></div>
+      </article>
+      <article class="capability-card">
+        <div class="capability-top"><span class="capability-icon">◎</span></div>
+        <h3>Category canvases</h3>
+        <p>Pan, zoom, and organize notes, documents, diagrams, tables, scripts, and links in a spatial workspace.</p>
+      </article>
+      <article class="capability-card">
+        <div class="capability-top"><span class="capability-icon">#</span></div>
+        <h3>Slack Agent Tasks</h3>
+        <p>Turn Markdown into scheduled instructions with channel delivery, mentions, run history, and configurable templates.</p>
+      </article>
+      <article class="capability-card">
+        <div class="capability-top"><span class="capability-icon">&gt;_</span></div>
+        <h3>Python automation</h3>
+        <p>Save, run, and schedule Python with captured stdout, stderr, status, and execution history.</p>
+      </article>
+      <article class="capability-card">
+        <div class="capability-top"><span class="capability-icon">◫</span></div>
+        <h3>Browser capture</h3>
+        <p>Send research from Chrome or Edge into Astro, categorize it, and make it immediately available to agents.</p>
+      </article>
+      <article class="capability-card">
+        <div class="capability-top"><span class="capability-icon">◌</span></div>
+        <h3>Portable Universes</h3>
+        <p>Separate experiments by project, keep their context clean, and export or restore your work when needed.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="home-section home-connect">
+    <div class="connect-card">
+      <div class="connect-copy">
+        <p class="eyebrow"><span></span>Connect your agent</p>
+        <h2>One endpoint.<br>A shared world of context.</h2>
+        <p>Point any MCP-compatible client at Astro. Your agent gets tools for the same workspace you see and edit.</p>
+        <div class="connect-clients"><span>Cursor</span><span>Claude Desktop</span><span>Custom agents</span></div>
+        <a href="{{ '/docs/' | relative_url }}" class="btn btn-outline">Read the MCP docs</a>
+      </div>
+      <div class="connect-terminal" aria-label="MCP connection example">
+        <div class="terminal-bar"><span></span><span></span><span></span><small>mcp.json</small></div>
+        <pre><code><span class="code-muted">{</span>
+  <span class="code-key">"mcpServers"</span>: <span class="code-muted">{</span>
+    <span class="code-key">"astro"</span>: <span class="code-muted">{</span>
+      <span class="code-key">"url"</span>: <span class="code-string">"https://your-host/mcp/"</span>
+    <span class="code-muted">}</span>
+  <span class="code-muted">}</span>
+<span class="code-muted">}</span></code></pre>
+        <div class="terminal-status"><span></span>Connected · tools available</div>
+      </div>
+    </div>
+  </section>
+
+  {% if site.data.videos.size > 0 %}
+  <section class="home-section home-video">
+    <div class="section-heading">
+      <p class="eyebrow"><span></span>See it in action</p>
+      <h2>Go from zero to a shared agent workspace.</h2>
+    </div>
+    <div class="videos-layout home-videos-layout">
       <div class="video-player-wrap">
         <div class="video-player" id="videoPlayer">
-          <iframe id="videoIframe" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+          <iframe id="videoIframe" src="" title="Astro product video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
         </div>
         <p class="video-description" id="videoDescription"></p>
       </div>
       <div class="video-list" id="videoList">
         {% for video in site.data.videos %}
-        <button class="video-item{% if forloop.first %} active{% endif %}" data-url="{{ video.url }}" data-description="{{ video.description }}" onclick="selectVideo(this, {{ forloop.index0 }})">
+        <button class="video-item{% if forloop.first %} active{% endif %}" data-url="{{ video.url }}" data-description="{{ video.description }}" onclick="selectVideo(this)">
           <span class="video-item-index">{{ forloop.index }}</span>
           <span class="video-item-text">{{ video.description }}</span>
         </button>
         {% endfor %}
       </div>
     </div>
-  </div>
-</section>
+  </section>
+  {% endif %}
+
+  <section class="home-final">
+    <div class="home-final-inner">
+      <p class="eyebrow"><span></span>Human intent. Agent execution.</p>
+      <h2>Build the interface between them.</h2>
+      <p>Bring your instructions, context, automations, and outputs together in a workspace both sides can use.</p>
+      <div class="home-hero-actions">
+        <a href="{{ '/install/' | relative_url }}" class="btn btn-primary">Install Astro</a>
+        <a href="https://github.com/marksnyder/astro" class="btn btn-outline">View on GitHub</a>
+        <a href="https://chromewebstore.google.com/detail/astro-browse/djbiamicfibnldnmhfnmndpdmghilmmi" class="btn btn-outline">Get the extension</a>
+      </div>
+    </div>
+  </section>
+</main>
 
 <script>
+function copyInstall() {
+  var command = document.getElementById('installCmd').textContent;
+  var button = document.getElementById('copyInstallButton');
+  var status = document.getElementById('copyStatus');
+  navigator.clipboard.writeText(command).then(function() {
+    button.classList.add('copied');
+    status.textContent = 'Install command copied';
+    setTimeout(function() {
+      button.classList.remove('copied');
+      status.textContent = '';
+    }, 2000);
+  });
+}
+
 (function() {
   var items = document.querySelectorAll('.video-item');
   if (!items.length) return;
 
   function youtubeEmbedUrl(url) {
-    var m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{11})/);
-    return m ? 'https://www.youtube-nocookie.com/embed/' + m[1] : url;
+    var match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{11})/);
+    return match ? 'https://www.youtube-nocookie.com/embed/' + match[1] : url;
   }
 
-  window.selectVideo = function(el, idx) {
-    items.forEach(function(b) { b.classList.remove('active'); });
-    el.classList.add('active');
-    document.getElementById('videoIframe').src = youtubeEmbedUrl(el.getAttribute('data-url'));
-    document.getElementById('videoDescription').textContent = el.getAttribute('data-description');
-    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  window.selectVideo = function(element) {
+    items.forEach(function(item) { item.classList.remove('active'); });
+    element.classList.add('active');
+    document.getElementById('videoIframe').src = youtubeEmbedUrl(element.getAttribute('data-url'));
+    document.getElementById('videoDescription').textContent = element.getAttribute('data-description');
   };
 
-  selectVideo(items[0], 0);
+  selectVideo(items[0]);
 })();
 </script>
-{% endif %}
-
-<section class="highlight-section">
-  <div class="highlight-inner">
-    <div class="highlight-text">
-      <h2>Two kinds of “do something”</h2>
-      <p>
-        Astro separates <strong>coordination</strong> from <strong>execution</strong>. Agent Tasks push markdown instructions to Slack so people and external agents pick up work in the channel where decisions happen.
-        Python Tasks run saved scripts on the server—scraping, API calls, transforms—on a schedule you control.
-        The universe dashboard shows what matters now. Same database, same MCP tools, different rhythms.
-      </p>
-      <p>
-        Categories, pins, and hierarchical folders keep the corpus navigable for humans while agents use search and IDs.
-        You are not filing notes <em>for</em> AI—you are building a substrate AI apps can assume.
-      </p>
-      <a href="{{ '/docs/' | relative_url }}" class="btn btn-primary" style="margin-top: .5rem;">Browse Docs</a>
-    </div>
-    <div class="org-features">
-      <div class="org-feature">
-        <div class="org-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-        </div>
-        <div>
-          <strong>Hierarchical categories</strong>
-          <p>Parent and child tree across content types.</p>
-        </div>
-      </div>
-      <div class="org-feature">
-        <div class="org-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-        </div>
-        <div>
-          <strong>Pinned items bar</strong>
-          <p>Markdowns, scripts, documents, diagrams, tables, and links one click away.</p>
-        </div>
-      </div>
-      <div class="org-feature">
-        <div class="org-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
-        </div>
-        <div>
-          <strong>Agent tasks</strong>
-          <p>Scheduled prompts to Slack from markdown notes.</p>
-        </div>
-      </div>
-      <div class="org-feature">
-        <div class="org-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-        </div>
-        <div>
-          <strong>Python tasks</strong>
-          <p>Cron and one-shot runs of server-side scripts.</p>
-        </div>
-      </div>
-      <div class="org-feature">
-        <div class="org-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-        </div>
-        <div>
-          <strong>Dashboard widgets</strong>
-          <p>Per-universe markdown boards agents can update by tag.</p>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="cta-section">
-  <h2>Get it Now</h2>
-  <p>
-    An AI application stack: memory, automation, Slack coordination, and MCP—in one self-hosted install.<br>
-    One workspace. Many universes. Build on top of AI, not around it.
-  </p>
-  <div class="hero-actions">
-    <a href="{{ '/install/' | relative_url }}" class="btn btn-primary">Install Astro</a>
-    <a href="https://github.com/marksnyder/astro" class="btn btn-outline">View on GitHub</a>
-    <a href="https://chromewebstore.google.com/detail/astro-browse/djbiamicfibnldnmhfnmndpdmghilmmi" class="btn btn-outline btn-chrome">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -2px; margin-right: 6px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3a4.5 4.5 0 0 1 4.24 3H12a4.5 4.5 0 0 0-3.9 2.25L5.76 6.34A7.96 7.96 0 0 1 12 5zm-8 7c0-1.34.33-2.6.91-3.71L8.84 15A4.5 4.5 0 0 0 12 16.5c.42 0 .82-.06 1.21-.16l-2.34 4.05A8.01 8.01 0 0 1 4 12zm8 8c.34 0 .68-.02 1.01-.07L15.35 16A4.49 4.49 0 0 0 16.5 12c0-.6-.12-1.17-.33-1.7l4.05-2.07c.5 1.15.78 2.42.78 3.77 0 4.42-3.58 8-8 8zM12 15a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/></svg>Chrome and Edge extension
-    </a>
-  </div>
-</section>
