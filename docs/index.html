@@ -12,7 +12,7 @@ layout: default
         <h1>Give your agents a workspace <em>humans understand.</em></h1>
         <p class="home-hero-lead">
           Astro brings instructions, context, tools, and outputs into one self-hosted interface.
-          You work in Markdown, Slack, tables, and dashboards. Your agents work through MCP.
+          You work in Markdown, team chat, tables, and dashboards. Your agents work through MCP.
           Both work on the same things.
         </p>
         <div class="home-hero-actions">
@@ -82,7 +82,7 @@ layout: default
     <div class="home-strip-inner">
       <span>One shared workspace across</span>
       <div class="home-strip-items">
-        <strong>Markdown</strong><i></i><strong>Slack</strong><i></i><strong>MCP</strong><i></i><strong>REST</strong><i></i><strong>Local search</strong>
+        <strong>Markdown</strong><i></i><strong>Team chat</strong><i></i><strong>MCP</strong><i></i><strong>REST</strong><i></i><strong>Local search</strong>
       </div>
     </div>
   </section>
@@ -91,7 +91,7 @@ layout: default
     <div class="section-heading">
       <p class="eyebrow"><span></span>Stop rebuilding the glue</p>
       <h2>Your AI workflow already has an interface.<br>It is just scattered everywhere.</h2>
-      <p>Prompts live in Markdown. Tasks happen in Slack. Context sits in folders and vector databases. Outputs disappear into chat transcripts. Astro turns those pieces into a coherent system without asking you to abandon the tools you already use.</p>
+      <p>Prompts live in Markdown. Tasks happen in team chat. Context sits in folders and vector databases. Outputs disappear into chat transcripts. Astro turns those pieces into a coherent system without asking you to abandon the tools you already use.</p>
     </div>
     <div class="before-after">
       <article class="workflow-card workflow-before">
@@ -100,7 +100,7 @@ layout: default
         <ul>
           <li><span>01</span>Copy prompts between files and chat</li>
           <li><span>02</span>Build another one-off retrieval layer</li>
-          <li><span>03</span>Wire cron, Slack, and scripts together</li>
+          <li><span>03</span>Wire cron, chat clients, and scripts together</li>
           <li><span>04</span>Dig through agent logs for the result</li>
         </ul>
       </article>
@@ -111,7 +111,7 @@ layout: default
         <ul>
           <li><span>01</span>Author durable instructions in Markdown</li>
           <li><span>02</span>Give agents context and actions through MCP</li>
-          <li><span>03</span>Coordinate recurring work in Slack</li>
+          <li><span>03</span>Coordinate recurring work in team chat</li>
           <li><span>04</span>Inspect results in shared, structured views</li>
         </ul>
       </article>
@@ -154,7 +154,7 @@ layout: default
         <span class="loop-number">02</span>
         <div class="loop-icon">↗</div>
         <h3>Send the work</h3>
-        <p>Run now, schedule once, or use cron. Agent Tasks deliver the instruction into the Slack channel where collaboration happens.</p>
+        <p>Run now, schedule once, or use cron. Agent Tasks deliver the instruction into the team channel where collaboration happens.</p>
       </article>
       <article class="loop-step">
         <span class="loop-number">03</span>
@@ -174,11 +174,11 @@ layout: default
   <section class="home-section home-workflow">
     <div class="section-heading">
       <p class="eyebrow"><span></span>How it fits together</p>
-      <h2>Slack, agents, and Astro in one loop.</h2>
-      <p>Astro sits in the middle: humans author and inspect work there, Slack coordinates delivery, and MCP clients act on the same shared corpus.</p>
+      <h2>Team chat, agents, and Astro in one loop.</h2>
+      <p>Astro sits in the middle: humans author and inspect work there, chat clients coordinate delivery, and MCP clients act on the same shared corpus.</p>
     </div>
     <figure class="workflow-diagram" aria-labelledby="workflow-diagram-caption">
-      <svg class="workflow-svg" viewBox="0 0 980 520" role="img" aria-label="Workflow diagram: humans and Slack connect to Astro, while MCP clients such as Cursor, Claude Desktop, OpenAI Codex, and Hermes use MCP tools against the same Astro workspace.">
+      <svg class="workflow-svg" viewBox="0 0 980 520" role="img" aria-label="Workflow diagram: humans and team chat clients connect to Astro, while MCP clients such as Cursor, Claude Desktop, OpenAI Codex, and Hermes use tools against the same Astro workspace.">
         <defs>
           <linearGradient id="wfAstroGlow" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stop-color="#6ee7c7" stop-opacity=".22"/>
@@ -198,12 +198,6 @@ layout: default
         <path class="wf-path wf-path-accent" d="M580 260 C640 250, 660 150, 730 150" fill="none" stroke="#6ee7c7" stroke-width="1.75" marker-end="url(#wfArrow)"/>
         <path class="wf-path" d="M580 280 C640 290, 660 370, 730 370" fill="none" stroke="#718092" stroke-width="1.5" marker-end="url(#wfArrowMuted)"/>
 
-        <!-- Edge labels -->
-        <text x="300" y="132" class="wf-edge-label">instructions · status</text>
-        <text x="285" y="410" class="wf-edge-label wf-edge-accent">Agent Tasks</text>
-        <text x="640" y="132" class="wf-edge-label wf-edge-accent">MCP tools</text>
-        <text x="655" y="410" class="wf-edge-label">shared corpus</text>
-
         <!-- Humans card -->
         <g class="wf-node">
           <rect x="48" y="88" width="200" height="124" rx="12" fill="#111720" stroke="rgba(246,186,102,.35)" stroke-width="1.5"/>
@@ -214,24 +208,23 @@ layout: default
           <text x="68" y="198" class="wf-node-body">tables · diagrams</text>
         </g>
 
-        <!-- Slack card -->
+        <!-- Team chat card -->
         <g class="wf-node">
           <rect x="48" y="308" width="200" height="124" rx="12" fill="#111720" stroke="rgba(167,139,250,.4)" stroke-width="1.5"/>
           <circle cx="78" cy="338" r="8" fill="#a78bfa"/>
-          <text x="96" y="343" class="wf-node-kicker">SLACK</text>
+          <text x="96" y="343" class="wf-node-kicker">TEAM CHAT</text>
           <text x="68" y="376" class="wf-node-title">Coordinate work</text>
-          <text x="68" y="400" class="wf-node-body">Scheduled delivery</text>
-          <text x="68" y="418" class="wf-node-body">mentions · channels</text>
+          <text x="68" y="400" class="wf-node-body">Slack · Discord · more</text>
+          <text x="68" y="418" class="wf-node-body">delivery · mentions · channels</text>
         </g>
 
         <!-- Astro hub -->
         <g class="wf-hub">
           <rect x="400" y="190" width="180" height="160" rx="16" fill="url(#wfAstroGlow)" stroke="#6ee7c7" stroke-width="2"/>
           <rect x="412" y="202" width="156" height="136" rx="12" fill="#0b1017" stroke="rgba(110,231,199,.25)"/>
-          <text x="490" y="248" text-anchor="middle" class="wf-hub-title">ASTRO</text>
-          <text x="490" y="278" text-anchor="middle" class="wf-hub-sub">Shared workspace</text>
-          <text x="490" y="304" text-anchor="middle" class="wf-hub-body">UI · REST · MCP</text>
-          <text x="490" y="324" text-anchor="middle" class="wf-hub-body">one corpus</text>
+          <image href="{{ '/assets/img/logo.png' | relative_url }}" x="443" y="210" width="94" height="94" preserveAspectRatio="xMidYMid meet"/>
+          <text x="490" y="315" text-anchor="middle" class="wf-hub-sub">Shared workspace</text>
+          <text x="490" y="333" text-anchor="middle" class="wf-hub-body">UI · REST · MCP</text>
         </g>
 
         <!-- MCP clients card -->
@@ -255,7 +248,7 @@ layout: default
         </g>
       </svg>
       <figcaption id="workflow-diagram-caption" class="workflow-caption">
-        Humans author in Astro. Agent Tasks reach Slack. MCP clients like Cursor, Claude Desktop, OpenAI Codex, and Hermes read and write the same Astro objects.
+        Humans author in Astro. Agent Tasks reach team chat clients such as Slack and Discord. MCP clients like Cursor, Claude Desktop, OpenAI Codex, and Hermes read and write the same Astro objects.
       </figcaption>
     </figure>
   </section>
@@ -280,8 +273,8 @@ layout: default
       </article>
       <article class="capability-card">
         <div class="capability-top"><span class="capability-icon">#</span></div>
-        <h3>Slack Agent Tasks</h3>
-        <p>Turn Markdown into scheduled instructions with channel delivery, mentions, run history, and configurable templates.</p>
+        <h3>Chat Agent Tasks</h3>
+        <p>Turn Markdown into scheduled instructions for supported team chat clients, with channel delivery, mentions, run history, and configurable templates.</p>
       </article>
       <article class="capability-card">
         <div class="capability-top"><span class="capability-icon">&gt;_</span></div>

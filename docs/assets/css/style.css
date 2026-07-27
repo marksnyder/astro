@@ -1928,14 +1928,6 @@ img { max-width: 100%; height: auto; }
   font-size: 13px;
 }
 
-.wf-hub-title {
-  fill: #6ee7c7;
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-  font-size: 28px;
-  font-weight: 800;
-  letter-spacing: .08em;
-}
-
 .wf-hub-sub {
   fill: #d7e0e8;
   font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -1948,15 +1940,6 @@ img { max-width: 100%; height: auto; }
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 12px;
 }
-
-.wf-edge-label {
-  fill: #667685;
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-  font-size: 11px;
-  letter-spacing: .02em;
-}
-
-.wf-edge-accent { fill: #6ee7c7; }
 
 .workflow-caption {
   margin-top: 1.1rem;
