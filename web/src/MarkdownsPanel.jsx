@@ -1,6 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import CodeMirror from '@uiw/react-codemirror'
+import { markdown as markdownLang } from '@codemirror/lang-markdown'
+import { EditorView } from '@codemirror/view'
+import { vscodeDark } from '@uiw/codemirror-theme-vscode'
 import { CategoryPicker, EmojiPopover } from './CategoryTree'
 import { MoveToUniverseButton } from './MoveToUniverseButton'
 import ContentCanvasShell from './categoryCanvas/ContentCanvasShell'
@@ -128,91 +132,85 @@ function MdMcpLookup({ tool, onInsert, onClose }) {
 // ── Markdown Editor ───────────────────────────────────
 
 function MarkdownEditor({ value, onChange, placeholder }) {
-  const ref = useRef(null)
+  const viewRef = useRef(null)
   const mcpBtnRef = useRef(null)
-  const selectionRef = useRef({ start: 0, end: 0 })
+  const selectionRef = useRef({ from: 0, to: 0 })
   const [showInsertMenu, setShowInsertMenu] = useState(false)
   const [insertMenuPos, setInsertMenuPos] = useState(null)
   const [mcpLookup, setMcpLookup] = useState(null)
   const [universePicker, setUniversePicker] = useState(null)
 
+  const extensions = useMemo(
+    () => [markdownLang(), EditorView.lineWrapping],
+    [],
+  )
+
   const rememberSelection = () => {
-    const ta = ref.current
-    if (!ta) return
-    selectionRef.current = { start: ta.selectionStart, end: ta.selectionEnd }
+    const view = viewRef.current
+    if (!view) return
+    const { from, to } = view.state.selection.main
+    selectionRef.current = { from, to }
   }
 
   const insert = (before, after = '') => {
-    const ta = ref.current
-    if (!ta) return
-    const start = ta.selectionStart
-    const end = ta.selectionEnd
-    const selected = value.slice(start, end)
+    const view = viewRef.current
+    if (!view) return
+    const { from, to } = view.state.selection.main
+    const selected = view.state.sliceDoc(from, to)
     const replacement = before + (selected || 'text') + after
-    const newVal = value.slice(0, start) + replacement + value.slice(end)
-    onChange(newVal)
-    setTimeout(() => {
-      ta.focus()
-      const cursorPos = selected
-        ? start + replacement.length
-        : start + before.length
-      ta.setSelectionRange(cursorPos, cursorPos + (selected ? 0 : 4))
-    }, 0)
+    const cursorFrom = selected ? from + replacement.length : from + before.length
+    const cursorTo = selected ? cursorFrom : cursorFrom + 4
+    view.dispatch({
+      changes: { from, to, insert: replacement },
+      selection: { anchor: cursorFrom, head: cursorTo },
+    })
+    view.focus()
+    selectionRef.current = { from: cursorFrom, to: cursorTo }
   }
 
   const insertLine = (prefix) => {
-    const ta = ref.current
-    if (!ta) return
-    const start = ta.selectionStart
-    const lineStart = value.lastIndexOf('\n', start - 1) + 1
-    const newVal = value.slice(0, lineStart) + prefix + value.slice(lineStart)
-    onChange(newVal)
-    setTimeout(() => {
-      ta.focus()
-      ta.setSelectionRange(lineStart + prefix.length, lineStart + prefix.length)
-    }, 0)
+    const view = viewRef.current
+    if (!view) return
+    const { from } = view.state.selection.main
+    const line = view.state.doc.lineAt(from)
+    const pos = line.from + prefix.length
+    view.dispatch({
+      changes: { from: line.from, insert: prefix },
+      selection: { anchor: pos },
+    })
+    view.focus()
+    selectionRef.current = { from: pos, to: pos }
   }
 
   const insertBlock = (block) => {
-    const ta = ref.current
-    if (!ta) return
-    const start = ta.selectionStart
-    const needsNewline = start > 0 && value[start - 1] !== '\n' ? '\n' : ''
-    const newVal = value.slice(0, start) + needsNewline + block + '\n' + value.slice(start)
-    onChange(newVal)
-    setTimeout(() => {
-      ta.focus()
-      const pos = start + needsNewline.length + block.length + 1
-      ta.setSelectionRange(pos, pos)
-    }, 0)
+    const view = viewRef.current
+    if (!view) return
+    const { from } = view.state.selection.main
+    const doc = view.state.doc.toString()
+    const needsNewline = from > 0 && doc[from - 1] !== '\n' ? '\n' : ''
+    const insertText = needsNewline + block + '\n'
+    const pos = from + insertText.length
+    view.dispatch({
+      changes: { from, insert: insertText },
+      selection: { anchor: pos },
+    })
+    view.focus()
+    selectionRef.current = { from: pos, to: pos }
   }
 
   const insertTextAtCursor = (text) => {
-    const ta = ref.current
-    if (!ta) return
-    const { start, end } = selectionRef.current
-    const newVal = value.slice(0, start) + text + value.slice(end)
-    onChange(newVal)
-    setTimeout(() => {
-      ta.focus()
-      const pos = start + text.length
-      ta.setSelectionRange(pos, pos)
-      selectionRef.current = { start: pos, end: pos }
-    }, 0)
-  }
-
-  const handleTab = (e) => {
-    if (e.key === 'Tab') {
-      e.preventDefault()
-      const ta = ref.current
-      const start = ta.selectionStart
-      const end = ta.selectionEnd
-      const newVal = value.slice(0, start) + '  ' + value.slice(end)
-      onChange(newVal)
-      setTimeout(() => {
-        ta.setSelectionRange(start + 2, start + 2)
-      }, 0)
-    }
+    const view = viewRef.current
+    if (!view) return
+    const { from, to } = selectionRef.current
+    const safeFrom = Math.min(from, view.state.doc.length)
+    const safeTo = Math.min(to, view.state.doc.length)
+    const pos = safeFrom + text.length
+    view.dispatch({
+      changes: { from: safeFrom, to: safeTo, insert: text },
+      selection: { anchor: pos },
+    })
+    view.focus()
+    selectionRef.current = { from: pos, to: pos }
   }
 
   return (
@@ -317,18 +315,32 @@ function MarkdownEditor({ value, onChange, placeholder }) {
           )}
         </div>
       </div>
-      <textarea
-        ref={ref}
-        className="md-textarea"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        onKeyDown={handleTab}
-        onSelect={rememberSelection}
-        onClick={rememberSelection}
-        onKeyUp={rememberSelection}
-        placeholder={placeholder}
-        spellCheck
-      />
+      <div className="md-codemirror-wrap">
+        <CodeMirror
+          value={value}
+          height="100%"
+          theme={vscodeDark}
+          extensions={extensions}
+          placeholder={placeholder}
+          onChange={onChange}
+          onCreateEditor={(view) => { viewRef.current = view }}
+          onUpdate={(vu) => {
+            if (vu.selectionSet) {
+              const { from, to } = vu.state.selection.main
+              selectionRef.current = { from, to }
+            }
+          }}
+          basicSetup={{
+            lineNumbers: false,
+            foldGutter: false,
+            highlightActiveLine: true,
+            highlightActiveLineGutter: false,
+            indentOnInput: true,
+            tabSize: 2,
+          }}
+          className="md-codemirror"
+        />
+      </div>
       {mcpLookup && <MdMcpLookup tool={mcpLookup} onInsert={(text) => { insertBlock(text); setMcpLookup(null) }} onClose={() => setMcpLookup(null)} />}
       {universePicker && <MdUniversePicker tool={universePicker} onConfirm={(uid) => insertBlock(MD_MCP_DIRECT[universePicker](uid))} onClose={() => setUniversePicker(null)} />}
     </div>
